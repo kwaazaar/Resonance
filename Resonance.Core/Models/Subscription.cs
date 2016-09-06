@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EventingLib.Models
+namespace Resonance.Models
 {
     public class Subscription
     {

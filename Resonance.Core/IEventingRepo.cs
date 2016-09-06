@@ -1,13 +1,13 @@
-﻿using EventingLib.Models;
+﻿using Resonance.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EventingLib.EventingRepo
+namespace Resonance
 {
-    interface IEventingRepo
+    public interface IEventingRepo
     {
         // Topic management
         IEnumerable<Topic> GetTopics(string partOfName);
