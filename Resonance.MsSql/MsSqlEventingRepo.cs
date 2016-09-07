@@ -15,9 +15,15 @@ namespace Resonance.Repo
     {
         protected readonly IDbConnection _conn;
 
+        /// <summary>
+        /// Creates a new MsSqlEventingRepo.
+        /// </summary>
+        /// <param name="conn">IDbConnection to use. If not yet opened, it will be opened here.</param>
         public MsSqlEventingRepo(IDbConnection conn)
         {
             _conn = conn;
+            if (_conn.State == ConnectionState.Closed)
+                _conn.Open();
         }
 
         public Subscription AddOrUpdateSubscription(Subscription subscription)
