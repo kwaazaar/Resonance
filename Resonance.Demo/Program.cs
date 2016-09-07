@@ -8,11 +8,14 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using System.IO;
 using Resonance.Repo;
+using Microsoft.Extensions.PlatformAbstractions;
 
 namespace Resonance.Demo
 {
     public class Program
     {
+        
+
         private static IServiceProvider serviceProvider;
 
         public static void Main(string[] args)
@@ -30,6 +33,7 @@ namespace Resonance.Demo
         {
             var builder = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
+                //.SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
             //builder.AddEnvironmentVariables();
             var config = builder.Build();
