@@ -28,12 +28,74 @@ namespace Resonance.Repo
 
         public Subscription AddOrUpdateSubscription(Subscription subscription)
         {
-            throw new NotImplementedException();
+            Subscription existingSubscription = (subscription.Id != null)
+                            ? existingSubscription = GetSubscription(subscription.Id)
+                            : null;
+
+            if (existingSubscription != null) // update
+            {
+                if (!existingSubscription.TopicId.Equals(subscription.TopicId, StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException("TopicId cannot be updated on a subscription", "subscription");
+
+                var parameters = new Dictionary<string, object>
+                {
+                    { "@id", subscription.Id },
+                    { "@name", subscription.Name },
+                    { "@deliveryDelay", subscription.DeliveryDelay },
+                    { "@maxDeliveries", subscription.MaxDeliveries },
+                    { "@ordered", subscription.Ordered },
+                    { "@timeToLive", subscription.TimeToLive },
+                };
+                _conn.Execute("update Subscription set Name = @name, DeliveryDelay = @deliveryDelay, MaxDeliveries = @maxDeliveries, Ordered = @ordered, TimeToLive = @timeToLive where Id = @id", parameters);
+                return GetSubscription(subscription.Id);
+            }
+            else
+            {
+                var subscriptionId = subscription.Id != null ? subscription.Id : Guid.NewGuid().ToString();
+                var parameters = new Dictionary<string, object>
+                {
+                    { "@id", subscriptionId },
+                    { "@name", subscription.Name },
+                    { "@topicId", subscription.TopicId },
+                    { "@deliveryDelay", subscription.DeliveryDelay },
+                    { "@maxDeliveries", subscription.MaxDeliveries },
+                    { "@ordered", subscription.Ordered },
+                    { "@timeToLive", subscription.TimeToLive },
+                };
+                _conn.Execute("insert into Subscription (Id, Name, TopicId, DeliveryDelay, MaxDeliveries, Ordered, TimeToLive) values (@id, @name, @topicId, @deliveryDelay, @maxDeliveries, @ordered, @timeToLive)", parameters);
+                return GetSubscription(subscriptionId);
+            }
         }
 
         public Topic AddOrUpdateTopic(Topic topic)
         {
-            throw new NotImplementedException();
+            Topic existingTopic = (topic.Id != null)
+                ? existingTopic = GetTopic(topic.Id)
+                : null;
+
+            if (existingTopic != null) // update
+            {
+                var parameters = new Dictionary<string, object>
+                {
+                    { "@id", topic.Id },
+                    { "@name", topic.Name },
+                    { "@notes", topic.Notes },
+                };
+                _conn.Execute("update Topic set Name = @name, Notes = @notes where Id = @id", parameters);
+                return GetTopic(topic.Id);
+            }
+            else
+            {
+                var topicId = topic.Id != null ? topic.Id : Guid.NewGuid().ToString();
+                var parameters = new Dictionary<string, object>
+                {
+                    { "@id", topicId },
+                    { "@name", topic.Name },
+                    { "@notes", topic.Notes },
+                };
+                _conn.Execute("insert into Topic (Id, Name, Notes) values (@id, @name, @notes)", parameters);
+                return GetTopic(topicId);
+            }
         }
 
         public void DeleteSubscription(string id)
@@ -46,35 +108,65 @@ namespace Resonance.Repo
             throw new NotImplementedException();
         }
 
-        public IEnumerable<Subscription> GetSubcriptions(string partOfName, string topicId)
+        public IEnumerable<Subscription> GetSubscriptions(string partOfName = null, string topicId = null)
         {
-            return null;
+            var parameters = new Dictionary<string, object>
+                {
+                    { "@topicId", topicId },
+                    { "@partOfName", $"%{partOfName}%"},
+                };
+            var query = "select * from Subscription";
+
+            var conditions = new List<string>();
+            if (partOfName != null)
+                conditions.Add("Name like @partOfName");
+            if (topicId != null)
+                conditions.Add("TopicId = @topicId");
+            if (conditions.Count > 0)
+                query += (" where " + String.Join(" and ", conditions));
+
+            return _conn
+                .Query<Subscription>(query, parameters);
         }
 
         public Subscription GetSubscription(string id)
         {
-            throw new NotImplementedException();
+            var parameters = new Dictionary<string, object>
+                {
+                    { "@id", id },
+                };
+
+            return _conn
+                .Query<Subscription>("select * from Subscription where id = @id", parameters)
+                .SingleOrDefault();
         }
 
         public Topic GetTopic(string id)
         {
-            
-            throw new NotImplementedException();
+            var parameters = new Dictionary<string, object>
+                {
+                    { "@id", id },
+                };
+
+            return _conn
+                .Query<Topic>("select * from Topic where id = @id", parameters)
+                .SingleOrDefault();
         }
 
-        public IEnumerable<Topic> GetTopics(string partOfName)
+        public IEnumerable<Topic> GetTopics(string partOfName = null)
         {
             if (partOfName != null)
             {
                 var parameters = new Dictionary<string, object>
                 {
-                    { "@partOfName", $"%{partOfName}%"}
+                    { "@partOfName", $"%{partOfName}%"},
                 };
-                return _conn.Query<Topic>("select * from Topic" +
-                    " where Name like @partOfName", parameters);
+                return _conn
+                    .Query<Topic>("select * from Topic where Name like @partOfName", parameters);
             }
             else
-                return _conn.Query<Topic>("select * from Topic");
+                return _conn
+                    .Query<Topic>("select * from Topic");
         }
 
         public IEnumerable<TopicStats> GetTopicStatistics(string id)

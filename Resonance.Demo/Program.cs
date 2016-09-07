@@ -8,15 +8,15 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using System.IO;
 using Resonance.Repo;
-using Microsoft.Extensions.PlatformAbstractions;
+using Resonance.Models;
 
 namespace Resonance.Demo
 {
     public class Program
     {
-        
-
         private static IServiceProvider serviceProvider;
+        private static string topicId = "c2581735-00d2-421c-9e65-34195a134d37";
+        private static string subscriptionId = "e1379e77-4c5c-4326-bedd-09250271d545";
 
         public static void Main(string[] args)
         {
@@ -24,16 +24,14 @@ namespace Resonance.Demo
             ConfigureServices(serviceCollection);
             serviceProvider = serviceCollection.BuildServiceProvider();
 
-            //Application application = new Application(serviceCollection);
-            var eventingRepo = serviceProvider.GetRequiredService<IEventingRepo>();
-            var topics = eventingRepo.GetTopics(null);
+            InitRepo();
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)
         {
             var builder = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                //.SetBasePath(AppContext.BaseDirectory)
+                //.SetBasePath(PlatformServices.Default.Application.ApplicationBasePath)
+                .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
             //builder.AddEnvironmentVariables();
             var config = builder.Build();
@@ -52,5 +50,31 @@ namespace Resonance.Demo
             serviceCollection.AddTransient<IEventingRepo, MsSqlEventingRepo>();
         }
 
+        private static void InitRepo()
+        {
+            var eventingRepo = serviceProvider.GetRequiredService<IEventingRepo>();
+
+            var topic = eventingRepo.GetTopic(topicId);
+            if (topic == null)
+                eventingRepo.AddOrUpdateTopic(new Topic
+                {
+                    Id = topicId,
+                    Name = "Demo Topic",
+                    Notes = "This topic is for demo purposes. Nothing to see here, move along!",
+                });
+
+            var subscription = eventingRepo.GetSubscription(subscriptionId);
+            if (subscription == null)
+                eventingRepo.AddOrUpdateSubscription(new Subscription
+                {
+                    Id = subscriptionId,
+                    Name = "Demo Subscription",
+                    TopicId = topicId,
+                    DeliveryDelay = 3,
+                    MaxDeliveries = 2,
+                    Ordered = true,
+                    TimeToLive = 60,
+                });
+        }
     }
 }

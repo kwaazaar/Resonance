@@ -10,13 +10,13 @@ namespace Resonance
     public interface IEventingRepo
     {
         // Topic management
-        IEnumerable<Topic> GetTopics(string partOfName);
+        IEnumerable<Topic> GetTopics(string partOfName = null);
         Topic GetTopic(string id);
         Topic AddOrUpdateTopic(Topic topic);
         void DeleteTopic(string id, bool inclSubscriptions);
 
         // Subscription management
-        IEnumerable<Subscription> GetSubcriptions(string partOfName, string topicId);
+        IEnumerable<Subscription> GetSubscriptions(string partOfName =  null, string topicId = null);
         Subscription GetSubscription(string id);
         Subscription AddOrUpdateSubscription(Subscription subscription);
         void DeleteSubscription(string id);

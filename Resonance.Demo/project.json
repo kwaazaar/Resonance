@@ -1,7 +1,8 @@
 {
   "version": "1.0.0-*",
   "buildOptions": {
-    "emitEntryPoint": true
+    "emitEntryPoint": true,
+    "copyToOutput": { "includeFiles": [ "appsettings.json" ] }
   },
 
   "dependencies": {
@@ -14,8 +15,7 @@
     "Microsoft.Extensions.DependencyInjection": "1.0.0",
     "Microsoft.Extensions.Configuration": "1.0.0",
     "Microsoft.Extensions.Configuration.FileExtensions": "1.0.0",
-    "Microsoft.Extensions.Configuration.Json": "1.0.0",
-    "Microsoft.Extensions.PlatformAbstractions": "1.0.0"
+    "Microsoft.Extensions.Configuration.Json": "1.0.0"
   },
 
   "frameworks": {
