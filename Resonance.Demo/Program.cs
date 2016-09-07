@@ -5,6 +5,8 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using System.IO;
 
 namespace Resonance.Demo
 {
@@ -14,13 +16,23 @@ namespace Resonance.Demo
         {
             IServiceCollection serviceCollection = new ServiceCollection();
             ConfigureServices(serviceCollection);
-            Application application = new Application(serviceCollection);
+            //Application application = new Application(serviceCollection);
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)
         {
-            IDbConnection conn = new SqlConnection();
-            serviceCollection.AddInstance<IDbConnection>(conn);
+            var builder = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+            //builder.AddEnvironmentVariables();
+
+            var config = builder.Build();
+            serviceCollection.AddSingleton<IConfiguration>(config);
+
+            var connectionString = config.GetConnectionString("Resonance");
+            serviceCollection.AddTransient<IDbConnection>((p) => {
+                return new SqlConnection(connectionString);
+            });
         }
 
     }
