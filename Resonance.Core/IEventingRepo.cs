@@ -12,6 +12,7 @@ namespace Resonance
         // Topic management
         IEnumerable<Topic> GetTopics(string partOfName = null);
         Topic GetTopic(string id);
+        Topic GetTopicByName(string name);
         Topic AddOrUpdateTopic(Topic topic);
         void DeleteTopic(string id, bool inclSubscriptions);
 
@@ -23,5 +24,9 @@ namespace Resonance
 
         // Stats
         IEnumerable<TopicStats> GetTopicStatistics(string id);
+
+        // TopicEvent/payload
+        string StorePayload(string payload);
+        string AddTopicEvent(TopicEvent topicEvent);
     }
 }

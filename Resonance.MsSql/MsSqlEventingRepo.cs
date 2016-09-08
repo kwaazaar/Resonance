@@ -155,6 +155,18 @@ namespace Resonance.Repo
                 .SingleOrDefault();
         }
 
+        public Topic GetTopicByName(string name)
+        {
+            var parameters = new Dictionary<string, object>
+                {
+                    { "@name", name },
+                };
+
+            return _conn
+                .Query<Topic>("select * from Topic where name = @name", parameters)
+                .SingleOrDefault();
+        }
+
         public IEnumerable<Topic> GetTopics(string partOfName = null)
         {
             if (partOfName != null)
@@ -174,6 +186,35 @@ namespace Resonance.Repo
         public IEnumerable<TopicStats> GetTopicStatistics(string id)
         {
             throw new NotImplementedException();
+        }
+
+        public string StorePayload(string payload)
+        {
+            var id = Guid.NewGuid().ToString();
+            var parameters = new Dictionary<string, object>
+                {
+                    { "@id", id },
+                    { "@payload", payload },
+                };
+            _conn.Execute("insert into EventPayload (Id, Payload) values (@id, @payload)", parameters);
+            return id;
+        }
+
+        public string AddTopicEvent(TopicEvent topicEvent)
+        {
+            var id = topicEvent.Id != null ? topicEvent.Id : Guid.NewGuid().ToString();
+
+            var parameters = new Dictionary<string, object>
+                {
+                    { "@id", id },
+                    { "@topicId", topicEvent.TopicId },
+                    { "@functionalKey", topicEvent.FunctionalKey },
+                    { "@publicationDateUtc", topicEvent.PublicationDateUtc },
+                    { "@expirationDateUtc", topicEvent.ExpirationDateUtc },
+                    { "@payloadId", topicEvent.PayloadId },
+                };
+            _conn.Execute("insert into TopicEvent (Id, TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, PayloadId) values (@id, @topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @payloadId)", parameters);
+            return id;
         }
     }
 }

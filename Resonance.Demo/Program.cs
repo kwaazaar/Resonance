@@ -48,6 +48,9 @@ namespace Resonance.Demo
 
             // Configure IEventingRepo dependency (reason: the repo that must be used in this app)
             serviceCollection.AddTransient<IEventingRepo, MsSqlEventingRepo>();
+
+            // Configure EventPublisher
+            serviceCollection.AddTransient<IEventPublisher, EventPublisher>();
         }
 
         private static void InitRepo()
@@ -76,6 +79,14 @@ namespace Resonance.Demo
                     Ordered = true,
                     TimeToLive = 60,
                 });
+
+            var publisher = serviceProvider.GetRequiredService<IEventPublisher>();
+            var x = new
+            {
+                Name = "Robert",
+                Age = 40,
+            };
+            publisher.Publish(topicName: "Demo Topic", payload: x);
         }
     }
 }
