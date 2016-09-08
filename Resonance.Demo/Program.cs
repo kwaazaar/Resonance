@@ -70,6 +70,7 @@ namespace Resonance.Demo
                     Id = subscriptionId,
                     Name = "Demo Subscription",
                     TopicId = topicId,
+                    Enabled = true,
                     DeliveryDelay = 3,
                     MaxDeliveries = 2,
                     Ordered = true,

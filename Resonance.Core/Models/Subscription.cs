@@ -11,6 +11,7 @@ namespace Resonance.Models
         public string Id { get; set; }
         public string Name { get; set; }
         public string TopicId { get; set; }
+        public bool Enabled { get; set; }
         public bool Ordered { get; set; }
         public int? TimeToLive { get; set; }
         public int MaxDeliveries { get; set; }

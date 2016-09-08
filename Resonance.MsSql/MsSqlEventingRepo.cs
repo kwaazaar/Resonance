@@ -41,12 +41,13 @@ namespace Resonance.Repo
                 {
                     { "@id", subscription.Id },
                     { "@name", subscription.Name },
+                    { "@enabled", subscription.Enabled },
                     { "@deliveryDelay", subscription.DeliveryDelay },
                     { "@maxDeliveries", subscription.MaxDeliveries },
                     { "@ordered", subscription.Ordered },
                     { "@timeToLive", subscription.TimeToLive },
                 };
-                _conn.Execute("update Subscription set Name = @name, DeliveryDelay = @deliveryDelay, MaxDeliveries = @maxDeliveries, Ordered = @ordered, TimeToLive = @timeToLive where Id = @id", parameters);
+                _conn.Execute("update Subscription set Name = @name, Enabled = @enabled, DeliveryDelay = @deliveryDelay, MaxDeliveries = @maxDeliveries, Ordered = @ordered, TimeToLive = @timeToLive where Id = @id", parameters);
                 return GetSubscription(subscription.Id);
             }
             else
@@ -56,13 +57,14 @@ namespace Resonance.Repo
                 {
                     { "@id", subscriptionId },
                     { "@name", subscription.Name },
+                    { "@enabled", subscription.Enabled },
                     { "@topicId", subscription.TopicId },
                     { "@deliveryDelay", subscription.DeliveryDelay },
                     { "@maxDeliveries", subscription.MaxDeliveries },
                     { "@ordered", subscription.Ordered },
                     { "@timeToLive", subscription.TimeToLive },
                 };
-                _conn.Execute("insert into Subscription (Id, Name, TopicId, DeliveryDelay, MaxDeliveries, Ordered, TimeToLive) values (@id, @name, @topicId, @deliveryDelay, @maxDeliveries, @ordered, @timeToLive)", parameters);
+                _conn.Execute("insert into Subscription (Id, Name, TopicId, Enabled, DeliveryDelay, MaxDeliveries, Ordered, TimeToLive) values (@id, @name, @topicId, @enabled, @deliveryDelay, @maxDeliveries, @ordered, @timeToLive)", parameters);
                 return GetSubscription(subscriptionId);
             }
         }
