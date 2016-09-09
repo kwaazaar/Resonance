@@ -9,5 +9,7 @@ namespace Resonance.Repo.InternalModels
     {
         public string Id { get; set; }
         public string DeliveryKey { get; set; }
+        public string FunctionalKey { get; set; }
+        public string PayloadId { get; set; }
     }
 }

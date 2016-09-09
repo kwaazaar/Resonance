@@ -91,7 +91,7 @@ namespace Resonance.Repo
 
                 var parameters = new Dictionary<string, object>
                 {
-                    { "@id", subscription.Id },
+                    { "@id", subscription.Id.ToDbKey() },
                     { "@name", subscription.Name },
                     { "@enabled", subscription.Enabled },
                     { "@deliveryDelay", subscription.DeliveryDelay },
@@ -107,10 +107,10 @@ namespace Resonance.Repo
                 var subscriptionId = subscription.Id != null ? subscription.Id : Guid.NewGuid().ToString();
                 var parameters = new Dictionary<string, object>
                 {
-                    { "@id", subscriptionId },
+                    { "@id", subscriptionId.ToDbKey() },
                     { "@name", subscription.Name },
                     { "@enabled", subscription.Enabled },
-                    { "@topicId", subscription.TopicId },
+                    { "@topicId", subscription.TopicId.ToDbKey() },
                     { "@deliveryDelay", subscription.DeliveryDelay },
                     { "@maxDeliveries", subscription.MaxDeliveries },
                     { "@ordered", subscription.Ordered },
@@ -131,7 +131,7 @@ namespace Resonance.Repo
             {
                 var parameters = new Dictionary<string, object>
                 {
-                    { "@id", topic.Id },
+                    { "@id", topic.Id.ToDbKey() },
                     { "@name", topic.Name },
                     { "@notes", topic.Notes },
                 };
@@ -143,7 +143,7 @@ namespace Resonance.Repo
                 var topicId = topic.Id != null ? topic.Id : Guid.NewGuid().ToString();
                 var parameters = new Dictionary<string, object>
                 {
-                    { "@id", topicId },
+                    { "@id", topicId.ToDbKey() },
                     { "@name", topic.Name },
                     { "@notes", topic.Notes },
                 };
@@ -166,7 +166,7 @@ namespace Resonance.Repo
         {
             var parameters = new Dictionary<string, object>
                 {
-                    { "@topicId", topicId },
+                    { "@topicId", topicId.ToDbKey() },
                     { "@partOfName", $"%{partOfName}%"},
                 };
             var query = "select * from Subscription";
@@ -187,7 +187,7 @@ namespace Resonance.Repo
         {
             var parameters = new Dictionary<string, object>
                 {
-                    { "@id", id },
+                    { "@id", id.ToDbKey() },
                 };
 
             return _conn
@@ -211,7 +211,7 @@ namespace Resonance.Repo
         {
             var parameters = new Dictionary<string, object>
                 {
-                    { "@id", id },
+                    { "@id", id.ToDbKey() },
                 };
 
             return _conn
@@ -261,11 +261,21 @@ namespace Resonance.Repo
             var id = Guid.NewGuid().ToString();
             var parameters = new Dictionary<string, object>
                 {
-                    { "@id", id },
+                    { "@id", id.ToDbKey() },
                     { "@payload", payload },
                 };
             TranExecute("insert into EventPayload (Id, Payload) values (@id, @payload)", parameters);
             return id;
+        }
+
+        public string GetPayload(string id)
+        {
+            return _conn.Query<string>("select Payload from EventPayload where Id = @id",
+                new Dictionary<string, object>
+                {
+                    { "@id", id.ToDbKey() },
+                })
+                .SingleOrDefault();
         }
 
         public string AddTopicEvent(TopicEvent topicEvent)
@@ -274,12 +284,12 @@ namespace Resonance.Repo
 
             var parameters = new Dictionary<string, object>
                 {
-                    { "@id", id },
-                    { "@topicId", topicEvent.TopicId },
+                    { "@id", id.ToDbKey() },
+                    { "@topicId", topicEvent.TopicId.ToDbKey() },
                     { "@functionalKey", topicEvent.FunctionalKey },
                     { "@publicationDateUtc", topicEvent.PublicationDateUtc },
                     { "@expirationDateUtc", topicEvent.ExpirationDateUtc },
-                    { "@payloadId", topicEvent.PayloadId },
+                    { "@payloadId", topicEvent.PayloadId.ToDbKey() },
                 };
             TranExecute("insert into TopicEvent (Id, TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, PayloadId) values (@id, @topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @payloadId)", parameters);
             return id;
@@ -291,12 +301,12 @@ namespace Resonance.Repo
 
             var parameters = new Dictionary<string, object>
                 {
-                    { "@id", id },
-                    { "@subscriptionId", subscriptionEvent.SubscriptionId },
-                    { "@topicEventId", subscriptionEvent.TopicEventId },
+                    { "@id", id.ToDbKey() },
+                    { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
+                    { "@topicEventId", subscriptionEvent.TopicEventId.ToDbKey() },
                     { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
-                    { "@payloadId", subscriptionEvent.PayloadId },
+                    { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
                     { "@expirationDateUtc", subscriptionEvent.ExpirationDateUtc },
                     { "@deliveryDelayedUntilUtc", subscriptionEvent.DeliveryDelayedUntilUtc },
                     { "@deliveryCount", default(int) },
@@ -311,13 +321,13 @@ namespace Resonance.Repo
 
         #region Event consumption
 
-        public SubscriptionEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = default(int?))
+        public ConsumableEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = default(int?))
         {
             var subscription = GetSubscriptionByName(subscriptionName);
             if (subscription == null) throw new ArgumentException($"No subscription with this name exists: {subscriptionName}");
 
             byte bufferSize = 10;
-            string query = $"select TOP {bufferSize} se.Id, se.DeliveryKey"
+            string query = $"select TOP {bufferSize} se.Id, se.DeliveryKey, se.FunctionalKey, se.PayloadId" // Get the minimal amount of data
                 + " from SubscriptionEvent se"
                 + " join Subscription s on s.Id = se.SubscriptionId" // Needed for MaxRetries
                 + " where se.SubscriptionId = @subscriptionId"
@@ -329,12 +339,46 @@ namespace Resonance.Repo
 
             var sIds = _conn.Query<SubscriptionEventIdentifier>(query, new Dictionary<string, object>
                 {
-                    { "@subscriptionId", subscription.Id },
+                    { "@subscriptionId", subscription.Id.ToDbKey() },
                     { "@utcNow", DateTime.UtcNow },
                 }).ToList();
 
             if (sIds.Count == 0)
                 return null; // Nothing found
+
+            string deliveryKey = Guid.NewGuid().ToString();
+
+            // Loop through all found subscriptionevents until one of them could be 'locked'
+            foreach (var sId in sIds)
+            {
+                var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout.GetValueOrDefault(60)); // Recalc on every attempt in this loop, since every attempt make take considerable time
+
+                // Attempt to lock it now
+                int rowsUpdated = TranExecute("update SubscriptionEvent" +
+                    " set DeliveryKey = @deliveryKey, InvisibleUntilUtc = @invisibleUntilUtc" +
+                    " where Id = @id" +
+                    " and ( (DeliveryKey is NULL and @deliveryKey is null)" + // We use DeliveryKey for OCC, since it changes on every update anyway
+                    "     or DeliveryKey = @deliveryKey)",
+                    new Dictionary<string,object>
+                    {
+                        { "@id", sId.Id.ToDbKey() },
+                        { "@deliveryKey", sId.DeliveryKey },
+                        { "@invisibleUntilUtc", invisibleUntilUtc },
+                    });
+
+                if (rowsUpdated > 0) // We got it! Now get the rest of the details
+                {
+                    var @event = new ConsumableEvent
+                    {
+                        Id = sId.Id,
+                        DeliveryKey = deliveryKey, // Updated above
+                        FunctionalKey = sId.FunctionalKey,
+                        InvisibleUntilUtc = invisibleUntilUtc,
+                    };
+                    @event.Payload = GetPayload(sId.PayloadId);
+                    return @event;
+                }
+            }
 
             return null;
         }

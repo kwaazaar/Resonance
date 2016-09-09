@@ -25,6 +25,16 @@ namespace Resonance.Demo
             serviceProvider = serviceCollection.BuildServiceProvider();
 
             InitRepo();
+
+            var publisher = serviceProvider.GetRequiredService<IEventPublisher>();
+            publisher.Publish(topicName: "Demo Topic", payload: new
+            {
+                Name = "Robert",
+                Age = 40,
+            });
+
+            var consumer = serviceProvider.GetRequiredService<IEventConsumer>();
+            var next = consumer.ConsumeNext("Demo Subscription");
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)
@@ -82,17 +92,6 @@ namespace Resonance.Demo
                     Ordered = true,
                     TimeToLive = 60,
                 });
-
-            var publisher = serviceProvider.GetRequiredService<IEventPublisher>();
-
-            publisher.Publish(topicName: "Demo Topic", payload: new
-                {
-                    Name = "Robert",
-                    Age = 40,
-                });
-
-            var consumer = serviceProvider.GetRequiredService<IEventConsumer>();
-            var next = consumer.ConsumeNext("Demo Subscription");
         }
     }
 }

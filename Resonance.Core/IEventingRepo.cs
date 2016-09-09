@@ -34,11 +34,12 @@ namespace Resonance
 
         // Publication
         string StorePayload(string payload);
+        string GetPayload(string id);
         string AddTopicEvent(TopicEvent topicEvent);
         string AddSubscriptionEvent(SubscriptionEvent subscriptionEvent);
 
         // Consumption
-        SubscriptionEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = null);
+        ConsumableEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = null);
         void MarkConsumed(string subscriptionEventId, string deliveryKey);
         void MarkFailed(string subscriptionEventId, string deliveryKey, string reason);
     }

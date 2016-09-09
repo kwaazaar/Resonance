@@ -15,7 +15,7 @@ namespace Resonance
             _repo = repo;
         }
 
-        public SubscriptionEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = default(int?))
+        public ConsumableEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = default(int?))
         {
             return _repo.ConsumeNext(subscriptionName, visibilityTimeout);
         }
