@@ -14,6 +14,8 @@ namespace Resonance.Repo
     public class MsSqlEventingRepo : IEventingRepo
     {
         protected readonly IDbConnection _conn;
+        protected readonly Stack<IDbTransaction> _runningTransactionsStack = new Stack<IDbTransaction>();
+        protected readonly Dictionary<string, IDbTransaction> _runningTransactions = new Dictionary<string, IDbTransaction>();
 
         /// <summary>
         /// Creates a new MsSqlEventingRepo.
@@ -24,6 +26,32 @@ namespace Resonance.Repo
             _conn = conn;
             if (_conn.State == ConnectionState.Closed)
                 _conn.Open();
+        }
+
+        public void BeginTransaction()
+        {
+            var transaction = _conn.BeginTransaction(IsolationLevel.ReadCommitted);
+            _runningTransactionsStack.Push(transaction);
+        }
+
+        public void RollbackTransaction()
+        {
+            IDbTransaction transaction = _runningTransactionsStack.Pop();
+            if (transaction == null)
+                throw new ArgumentException($"No running transaction found");
+
+            transaction.Rollback();
+            transaction.Dispose();
+        }
+
+        public void CommitTransaction()
+        {
+            IDbTransaction transaction = _runningTransactionsStack.Pop();
+            if (transaction == null)
+                throw new ArgumentException($"No running transaction found");
+
+            transaction.Commit();
+            transaction.Dispose();
         }
 
         public Subscription AddOrUpdateSubscription(Subscription subscription)
@@ -47,7 +75,7 @@ namespace Resonance.Repo
                     { "@ordered", subscription.Ordered },
                     { "@timeToLive", subscription.TimeToLive },
                 };
-                _conn.Execute("update Subscription set Name = @name, Enabled = @enabled, DeliveryDelay = @deliveryDelay, MaxDeliveries = @maxDeliveries, Ordered = @ordered, TimeToLive = @timeToLive where Id = @id", parameters);
+                TranExecute("update Subscription set Name = @name, Enabled = @enabled, DeliveryDelay = @deliveryDelay, MaxDeliveries = @maxDeliveries, Ordered = @ordered, TimeToLive = @timeToLive where Id = @id", parameters);
                 return GetSubscription(subscription.Id);
             }
             else
@@ -64,7 +92,7 @@ namespace Resonance.Repo
                     { "@ordered", subscription.Ordered },
                     { "@timeToLive", subscription.TimeToLive },
                 };
-                _conn.Execute("insert into Subscription (Id, Name, TopicId, Enabled, DeliveryDelay, MaxDeliveries, Ordered, TimeToLive) values (@id, @name, @topicId, @enabled, @deliveryDelay, @maxDeliveries, @ordered, @timeToLive)", parameters);
+                TranExecute("insert into Subscription (Id, Name, TopicId, Enabled, DeliveryDelay, MaxDeliveries, Ordered, TimeToLive) values (@id, @name, @topicId, @enabled, @deliveryDelay, @maxDeliveries, @ordered, @timeToLive)", parameters);
                 return GetSubscription(subscriptionId);
             }
         }
@@ -83,7 +111,7 @@ namespace Resonance.Repo
                     { "@name", topic.Name },
                     { "@notes", topic.Notes },
                 };
-                _conn.Execute("update Topic set Name = @name, Notes = @notes where Id = @id", parameters);
+                TranExecute("update Topic set Name = @name, Notes = @notes where Id = @id", parameters);
                 return GetTopic(topic.Id);
             }
             else
@@ -95,7 +123,7 @@ namespace Resonance.Repo
                     { "@name", topic.Name },
                     { "@notes", topic.Notes },
                 };
-                _conn.Execute("insert into Topic (Id, Name, Notes) values (@id, @name, @notes)", parameters);
+                TranExecute("insert into Topic (Id, Name, Notes) values (@id, @name, @notes)", parameters);
                 return GetTopic(topicId);
             }
         }
@@ -196,7 +224,7 @@ namespace Resonance.Repo
                     { "@id", id },
                     { "@payload", payload },
                 };
-            _conn.Execute("insert into EventPayload (Id, Payload) values (@id, @payload)", parameters);
+            TranExecute("insert into EventPayload (Id, Payload) values (@id, @payload)", parameters);
             return id;
         }
 
@@ -213,8 +241,51 @@ namespace Resonance.Repo
                     { "@expirationDateUtc", topicEvent.ExpirationDateUtc },
                     { "@payloadId", topicEvent.PayloadId },
                 };
-            _conn.Execute("insert into TopicEvent (Id, TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, PayloadId) values (@id, @topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @payloadId)", parameters);
+            TranExecute("insert into TopicEvent (Id, TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, PayloadId) values (@id, @topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @payloadId)", parameters);
             return id;
+        }
+
+        public string AddSubscriptionEvent(SubscriptionEvent subscriptionEvent)
+        {
+            var id = subscriptionEvent.Id != null ? subscriptionEvent.Id : Guid.NewGuid().ToString();
+
+            var parameters = new Dictionary<string, object>
+                {
+                    { "@id", id },
+                    { "@topicEventId", subscriptionEvent.TopicEventId },
+                    { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
+                    { "@functionalKey", subscriptionEvent.FunctionalKey },
+                    { "@payloadId", subscriptionEvent.PayloadId },
+                    { "@expirationDateUtc", subscriptionEvent.ExpirationDateUtc },
+                    { "@deliveryDelayedUntilUtc", subscriptionEvent.DeliveryDelayedUntilUtc },
+                    { "@deliveryCount", default(int) },
+                    { "@deliveryKey", default(string) },
+                    { "@invisibleUntilUtc", default(DateTime?) },
+                };
+            TranExecute("insert into SubscriptionEvent (Id, TopicEventId, PublicationDateUtc, FunctionalKey, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryKey, InvisibleUntilUtc)"
+                + " values (@id, @topicEventId, @publicationDateUtc, @functionalKey, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryKey, @invisibleUntilUtc)", parameters);
+            return id;
+        }
+
+        /// <summary>
+        /// Transacted execution; if a transaction was started, the execute will take place inside it
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="param"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        protected int TranExecute(string sql, object param = null, int? commandTimeout = null)
+        {
+            IDbTransaction tran = null;
+            if (_runningTransactionsStack.Count > 0)
+            {
+                try
+                {
+                    tran = _runningTransactionsStack.Peek();
+                }
+                catch (InvalidOperationException) { } // Don't care, probably empty
+            }
+            return _conn.Execute(sql, param: param, transaction: tran, commandTimeout: commandTimeout);
         }
     }
 }

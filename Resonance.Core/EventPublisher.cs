@@ -16,29 +16,71 @@ namespace Resonance
             _repo = repo;
         }
 
-        public TopicEvent Publish(string topicName, DateTime? PublicationDateUtc = default(DateTime?), DateTime? ExpirationDateUtc = default(DateTime?), string FunctionalKey = null, string payload = null)
+        public TopicEvent Publish(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, string payload = null)
         {
             var topic = _repo.GetTopicByName(topicName);
             if (topic == null)
                 throw new ArgumentException($"Topic with name {topicName} not found", "topicName");
 
-            // Store payload
+            // Store payload (outside transaction, no need to lock right now already)
             string payloadId = (payload != null) ? _repo.StorePayload(payload) : null;
 
-            // Store topic event
-            var newTopicEvent = new TopicEvent
-            {
-                TopicId = topic.Id,
-                PublicationDateUtc = PublicationDateUtc.GetValueOrDefault(DateTime.UtcNow),
-                FunctionalKey = FunctionalKey,
-                ExpirationDateUtc = ExpirationDateUtc,
-                PayloadId = payloadId,
-            };
-            string id = _repo.AddTopicEvent(newTopicEvent);
+            var subscriptions = _repo.GetSubscriptions(topicId: topic.Id);
 
-            // Return the topic event
-            newTopicEvent.Id = id;
-            return newTopicEvent;
+            _repo.BeginTransaction();
+            try
+            {
+                // Store topic event
+                var newTopicEvent = new TopicEvent
+                {
+                    TopicId = topic.Id,
+                    PublicationDateUtc = publicationDateUtc.GetValueOrDefault(DateTime.UtcNow),
+                    FunctionalKey = functionalKey,
+                    ExpirationDateUtc = expirationDateUtc,
+                    PayloadId = payloadId,
+                };
+                string topicEventId = _repo.AddTopicEvent(newTopicEvent);
+                newTopicEvent.Id = topicEventId;
+
+                // Create SubscriptionEvents
+                foreach (var subscription in subscriptions.Where((s) => s.Enabled))
+                {
+                    // By default a SubscriptionEvent takes expirationdate of TopicEvent
+                    DateTime? subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
+
+                    // If subscription has its own TTL, it will be applied, but may never exceed the TopicEvent expiration
+                    if (subscription.TimeToLive.HasValue)
+                    {
+                        subExpirationDateUtc = newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.TimeToLive.Value);
+                        if (newTopicEvent.ExpirationDateUtc.HasValue && (newTopicEvent.ExpirationDateUtc.Value < subExpirationDateUtc))
+                            subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
+                    }
+
+                    var newSubscriptionEvent = new SubscriptionEvent
+                    {
+                        TopicEventId = newTopicEvent.Id,
+                        PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
+                        FunctionalKey = newTopicEvent.FunctionalKey,
+                        PayloadId = newTopicEvent.PayloadId,
+                        ExpirationDateUtc = subExpirationDateUtc,
+                        DeliveryDelayedUntilUtc = subscription.DeliveryDelay.HasValue ? newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value) : default(DateTime?),
+                        DeliveryCount = 0,
+                        DeliveryKey = null,
+                        InvisibleUntilUtc = null,
+                    };
+                    _repo.AddSubscriptionEvent(newSubscriptionEvent);
+                }
+
+                _repo.CommitTransaction();
+
+                // Return the topic event
+                return newTopicEvent;
+            }
+            catch (Exception)
+            {
+                _repo.RollbackTransaction();
+                throw;
+            }
         }
 
         public TopicEvent Publish<T>(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, T payload = null) where T:class

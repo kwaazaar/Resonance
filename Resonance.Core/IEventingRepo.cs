@@ -9,6 +9,14 @@ namespace Resonance
 {
     public interface IEventingRepo
     {
+        // Transaction Management
+        /// <summary>
+        /// Starts a new transaction
+        /// </summary>
+        void BeginTransaction();
+        void RollbackTransaction();
+        void CommitTransaction();
+
         // Topic management
         IEnumerable<Topic> GetTopics(string partOfName = null);
         Topic GetTopic(string id);
@@ -25,8 +33,10 @@ namespace Resonance
         // Stats
         IEnumerable<TopicStats> GetTopicStatistics(string id);
 
-        // TopicEvent/payload
+        // Publication
         string StorePayload(string payload);
         string AddTopicEvent(TopicEvent topicEvent);
+        string AddSubscriptionEvent(SubscriptionEvent subscriptionEvent);
+
     }
 }
