@@ -10,6 +10,6 @@ namespace Resonance
     {
         ConsumableEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = null);
         void MarkConsumed(string id, string deliveryKey);
-        void MarkFailed(string id, string deliveryKey, string reason);
+        void MarkFailed(string id, string deliveryKey, Reason reason);
     }
 }

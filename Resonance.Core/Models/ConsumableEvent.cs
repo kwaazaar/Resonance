@@ -13,4 +13,9 @@ namespace Resonance.Models
         public DateTime InvisibleUntilUtc { get; set; }
         public string Payload { get; set; }
     }
+
+    public class ConsumableEvent<T> : ConsumableEvent
+    {
+        new public T Payload { get; set; }
+    }
 }

@@ -317,6 +317,48 @@ namespace Resonance.Repo
                 + " values (@id, @subscriptionId, @topicEventId, @publicationDateUtc, @functionalKey, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryKey, @invisibleUntilUtc)", parameters);
             return id;
         }
+
+        private SubscriptionEvent GetSubscriptionEvent(string id)
+        {
+            return _conn.Query<SubscriptionEvent>("select * from SubscriptionEvent where Id = @id",
+                new Dictionary<string, object>
+                {
+                    { "@id", id.ToDbKey() },
+                })
+                .SingleOrDefault();
+        }
+
+        private int AddConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
+        {
+            return TranExecute("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, PublishedDateUtc, FunctionalKey, PayloadId, ConsumedDateUtc)" +
+                " values (@id, @subscriptionId, @publishedDateUtc, @functionalKey, @payloadId, @consumedDateUtc)",
+                new Dictionary<string, object>
+                {
+                    { "@id", subscriptionEvent.Id.ToDbKey() },
+                    { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
+                    { "@publishedDateUtc", subscriptionEvent.PublicationDateUtc },
+                    { "@functionalKey", subscriptionEvent.FunctionalKey },
+                    { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
+                    { "@consumedDateUtc", DateTime.UtcNow },
+                });
+        }
+
+        private int AddFailedSubscriptionEvent(SubscriptionEvent subscriptionEvent, Reason reason)
+        {
+            return TranExecute("insert into FailedSubscriptionEvent (Id, SubscriptionId, PublishedDateUtc, FunctionalKey, PayloadId, FailedDateUtc, Reason, ReasonOther)" +
+                " values (@id, @subscriptionId, @publishedDateUtc, @functionalKey, @payloadId, @failedDateUtc, @reason, @reasonOther)",
+                new Dictionary<string, object>
+                {
+                    { "@id", subscriptionEvent.Id.ToDbKey() },
+                    { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
+                    { "@publishedDateUtc", subscriptionEvent.PublicationDateUtc },
+                    { "@functionalKey", subscriptionEvent.FunctionalKey },
+                    { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
+                    { "@failedDateUtc", DateTime.UtcNow },
+                    { "@reason", (int)reason.Type },
+                    { "@reasonOther", reason.ReasonText },
+                });
+        }
         #endregion
 
         #region Event consumption
@@ -326,7 +368,9 @@ namespace Resonance.Repo
             var subscription = GetSubscriptionByName(subscriptionName);
             if (subscription == null) throw new ArgumentException($"No subscription with this name exists: {subscriptionName}");
 
-            byte bufferSize = 10;
+            // Larger buffer failes for ordered delivery subscriptions (it will return more than one event per functional key and a second cannot yet be consumed while we're not sure about the first
+            int bufferSize = subscription.Ordered ? 1 : 10;
+
             string query = $"select TOP {bufferSize} se.Id, se.DeliveryKey, se.FunctionalKey, se.PayloadId" // Get the minimal amount of data
                 + " from SubscriptionEvent se"
                 + " join Subscription s on s.Id = se.SubscriptionId" // Needed for MaxRetries
@@ -355,7 +399,7 @@ namespace Resonance.Repo
 
                 // Attempt to lock it now
                 int rowsUpdated = TranExecute("update SubscriptionEvent" +
-                    " set DeliveryKey = @deliveryKey, InvisibleUntilUtc = @invisibleUntilUtc" +
+                    " set DeliveryKey = @newDeliveryKey, InvisibleUntilUtc = @invisibleUntilUtc" +
                     " where Id = @id" +
                     " and ( (DeliveryKey is NULL and @deliveryKey is null)" + // We use DeliveryKey for OCC, since it changes on every update anyway
                     "     or DeliveryKey = @deliveryKey)",
@@ -363,6 +407,7 @@ namespace Resonance.Repo
                     {
                         { "@id", sId.Id.ToDbKey() },
                         { "@deliveryKey", sId.DeliveryKey },
+                        { "@newDeliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },
                     });
 
@@ -383,14 +428,78 @@ namespace Resonance.Repo
             return null;
         }
 
-        public void MarkConsumed(string subscriptionEventId, string deliveryKey)
+        public void MarkConsumed(string id, string deliveryKey)
         {
-            throw new NotImplementedException();
+            var se = GetSubscriptionEvent(id);
+            if (se == null) throw new ArgumentException($"No subscription-event found with id {id}. Maybe it has already been consumed (by another). Using a higher visibility timeout may help.");
+
+            if (!se.DeliveryKey.Equals(deliveryKey, StringComparison.OrdinalIgnoreCase) // Mismatch is only ok... (we DID consume it)
+               && se.InvisibleUntilUtc > DateTime.UtcNow) // ... If not currently locked
+                throw new ArgumentException($"Subscription-event with id {id} had expired and it has already been locked again.");
+
+            BeginTransaction();
+            try
+            {
+                // 1. Remove from SubscriptionEvent
+                int rowsUpdated = TranExecute("delete from SubscriptionEvent where Id = @id and DeliveryKey = @deliveryKey",
+                    new Dictionary<string, object>
+                    {
+                        { "@id", se.Id.ToDbKey() },
+                        { "@deliveryKey", se.DeliveryKey }, // Make sure we delete the one we just inspected (in race conditions it may have been locked again)
+                    });
+
+                if (rowsUpdated == 0)
+                    throw new ArgumentException($"Subscription-event with id {id} has expired while attempting to mark it complete. Maybe use higher a visibility timeout?");
+
+                // 2. Insert into ConsumedEvent
+                rowsUpdated = AddConsumedSubscriptionEvent(se);
+                if (rowsUpdated == 0)
+                    throw new InvalidOperationException($"Failed to add ConsumedSubscriptionEvent for SubscriptionEvent with id {id}.");
+
+                CommitTransaction();
+            }
+            catch (Exception)
+            {
+                RollbackTransaction();
+                throw;
+            }
         }
 
-        public void MarkFailed(string subscriptionEventId, string deliveryKey, string reason)
+        public void MarkFailed(string id, string deliveryKey, Reason reason)
         {
-            throw new NotImplementedException();
+            var se = GetSubscriptionEvent(id);
+            if (se == null) throw new ArgumentException($"No subscription-event found with id {id}.");
+
+            if (!se.DeliveryKey.Equals(deliveryKey, StringComparison.OrdinalIgnoreCase) // Mismatch is only ok... (we DID consume it)
+               && se.InvisibleUntilUtc > DateTime.UtcNow) // ... If not currently locked
+                throw new ArgumentException($"Subscription-event with id {id} had expired and it has already been locked again.");
+
+            BeginTransaction();
+            try
+            {
+                // 1. Remove from SubscriptionEvent
+                int rowsUpdated = TranExecute("delete from SubscriptionEvent where Id = @id and DeliveryKey = @deliveryKey",
+                    new Dictionary<string, object>
+                    {
+                        { "@id", se.Id.ToDbKey() },
+                        { "@deliveryKey", se.DeliveryKey }, // Make sure we delete the one we just inspected (in race conditions it may have been locked again)
+                    });
+
+                if (rowsUpdated == 0)
+                    throw new ArgumentException($"Subscription-event with id {id} has expired while attempting to mark it complete. Maybe use higher a visibility timeout?");
+
+                // 2. Insert into ConsumedEvent
+                rowsUpdated = AddFailedSubscriptionEvent(se, reason);
+                if (rowsUpdated == 0)
+                    throw new InvalidOperationException($"Failed to add FailedSubscriptionEvent for SubscriptionEvent with id {id} and reason {reason}.");
+
+                CommitTransaction();
+            }
+            catch (Exception)
+            {
+                RollbackTransaction();
+                throw;
+            }
         }
         #endregion
     }

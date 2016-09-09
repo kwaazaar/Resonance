@@ -35,6 +35,11 @@ namespace Resonance.Demo
 
             var consumer = serviceProvider.GetRequiredService<IEventConsumer>();
             var next = consumer.ConsumeNext("Demo Subscription");
+            if (next != null)
+            {
+                consumer.MarkFailed(next.Id, next.DeliveryKey, Reason.Other("Kaput"));
+                consumer.MarkConsumed(next.Id, next.DeliveryKey);
+            }
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)
