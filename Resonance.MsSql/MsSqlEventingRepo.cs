@@ -15,7 +15,9 @@ namespace Resonance.Repo
     public class MsSqlEventingRepo : IEventingRepo
     {
         protected readonly IDbConnection _conn;
-        protected readonly Stack<IDbTransaction> _runningTransactions = new Stack<IDbTransaction>();
+        protected IDbTransaction _runningTransaction;
+        protected int _tranCount = 0;
+        protected object _tranLock = new object();
 
         /// <summary>
         /// Creates a new MsSqlEventingRepo.
@@ -29,30 +31,72 @@ namespace Resonance.Repo
         }
 
         #region Transactions
+        /// <summary>
+        /// Starts a new transaction.
+        /// NB: Transactions can be nested.
+        /// </summary>
         public void BeginTransaction()
         {
-            var transaction = _conn.BeginTransaction(IsolationLevel.ReadCommitted);
-            _runningTransactions.Push(transaction);
+            lock (_tranLock)
+            {
+                if (_runningTransaction == null)
+                {
+                    _runningTransaction = _conn.BeginTransaction(IsolationLevel.ReadCommitted);
+                }
+                _tranCount++;
+            }
         }
 
+        /// <summary>
+        /// Rolls back the the transaction and disposes it.
+        /// Make sure there are no parallel threads/tasks still using the transaction!
+        /// </summary>
         public void RollbackTransaction()
         {
-            IDbTransaction transaction = _runningTransactions.Pop();
-            if (transaction == null)
+            if (_runningTransaction == null) // Check before waiting for lock to prevent unnessecary locks
                 throw new ArgumentException($"No running transaction found");
 
-            transaction.Rollback();
-            transaction.Dispose();
+            lock (_tranLock)
+            {
+                if (_runningTransaction == null)
+                    throw new ArgumentException($"No running transaction found");
+
+                if (_runningTransaction.Connection != null) // Has not yet been committed/rollbacked
+                    _runningTransaction.Rollback();
+
+                _tranCount--;
+                if (_tranCount == 0)
+                {
+                    _runningTransaction.Dispose();
+                    _runningTransaction = null;
+                }
+            }
         }
 
+        /// <summary>
+        /// Commits the transaction and disposes it.
+        /// Make sure there are no parallel threads/tasks still using the transaction!
+        /// </summary>
         public void CommitTransaction()
         {
-            IDbTransaction transaction = _runningTransactions.Pop();
-            if (transaction == null)
+            if (_runningTransaction == null) // Check before waiting for lock to prevent unnessecary locks
                 throw new ArgumentException($"No running transaction found");
 
-            transaction.Commit();
-            transaction.Dispose();
+            lock (_tranLock)
+            {
+                if (_runningTransaction == null)
+                    throw new ArgumentException($"No running transaction found");
+
+                if (_runningTransaction.Connection != null) // Has not yet been committed/rollbacked
+                    _runningTransaction.Commit();
+
+                _tranCount--;
+                if (_tranCount == 0)
+                {
+                    _runningTransaction.Dispose();
+                    _runningTransaction = null;
+                }
+            }
         }
 
         /// <summary>
@@ -64,16 +108,20 @@ namespace Resonance.Repo
         /// <returns></returns>
         protected int TranExecute(string sql, object param = null, int? commandTimeout = null)
         {
-            IDbTransaction tran = null;
-            if (_runningTransactions.Count > 0)
-            {
-                try
-                {
-                    tran = _runningTransactions.Peek();
-                }
-                catch (InvalidOperationException) { } // Don't care, probably empty
-            }
-            return _conn.Execute(sql, param: param, transaction: tran, commandTimeout: commandTimeout);
+            return _conn.Execute(sql, param: param, transaction: _runningTransaction, commandTimeout: commandTimeout);
+        }
+
+        /// <summary>
+        /// Transacted query; if a transaction was started, the query will take place on/in it
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="sql"></param>
+        /// <param name="param"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        protected IEnumerable<T> TranQuery<T>(string sql, object param = null, int? commandTimeout = null)
+        {
+            return _conn.Query<T>(sql, param: param, transaction: _runningTransaction, commandTimeout: commandTimeout);
         }
         #endregion
 
@@ -179,8 +227,7 @@ namespace Resonance.Repo
             if (conditions.Count > 0)
                 query += (" where " + String.Join(" and ", conditions));
 
-            return _conn
-                .Query<Subscription>(query, parameters);
+            return TranQuery<Subscription>(query, parameters);
         }
 
         public Subscription GetSubscription(string id)
@@ -190,8 +237,7 @@ namespace Resonance.Repo
                     { "@id", id.ToDbKey() },
                 };
 
-            return _conn
-                .Query<Subscription>("select * from Subscription where id = @id", parameters)
+            return TranQuery<Subscription>("select * from Subscription where id = @id", parameters)
                 .SingleOrDefault();
         }
 
@@ -202,8 +248,7 @@ namespace Resonance.Repo
                     { "@name", name },
                 };
 
-            return _conn
-                .Query<Subscription>("select * from Subscription where name = @name", parameters)
+            return TranQuery<Subscription>("select * from Subscription where name = @name", parameters)
                 .SingleOrDefault();
         }
 
@@ -214,8 +259,7 @@ namespace Resonance.Repo
                     { "@id", id.ToDbKey() },
                 };
 
-            return _conn
-                .Query<Topic>("select * from Topic where id = @id", parameters)
+            return TranQuery<Topic>("select * from Topic where id = @id", parameters)
                 .SingleOrDefault();
         }
 
@@ -226,8 +270,7 @@ namespace Resonance.Repo
                     { "@name", name },
                 };
 
-            return _conn
-                .Query<Topic>("select * from Topic where name = @name", parameters)
+            return TranQuery<Topic>("select * from Topic where name = @name", parameters)
                 .SingleOrDefault();
         }
 
@@ -239,12 +282,10 @@ namespace Resonance.Repo
                 {
                     { "@partOfName", $"%{partOfName}%"},
                 };
-                return _conn
-                    .Query<Topic>("select * from Topic where Name like @partOfName", parameters);
+                return TranQuery<Topic>("select * from Topic where Name like @partOfName", parameters);
             }
             else
-                return _conn
-                    .Query<Topic>("select * from Topic");
+                return TranQuery<Topic>("select * from Topic");
         }
         #endregion
 
@@ -270,7 +311,7 @@ namespace Resonance.Repo
 
         public string GetPayload(string id)
         {
-            return _conn.Query<string>("select Payload from EventPayload where Id = @id",
+            return TranQuery<string>("select Payload from EventPayload where Id = @id",
                 new Dictionary<string, object>
                 {
                     { "@id", id.ToDbKey() },
@@ -320,7 +361,7 @@ namespace Resonance.Repo
 
         private SubscriptionEvent GetSubscriptionEvent(string id)
         {
-            return _conn.Query<SubscriptionEvent>("select * from SubscriptionEvent where Id = @id",
+            return TranQuery<SubscriptionEvent>("select * from SubscriptionEvent where Id = @id",
                 new Dictionary<string, object>
                 {
                     { "@id", id.ToDbKey() },
@@ -381,7 +422,7 @@ namespace Resonance.Repo
                 + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
                 + " order by se.PublicationDateUtc DESC"; // Oldest first (fifo)
 
-            var sIds = _conn.Query<SubscriptionEventIdentifier>(query, new Dictionary<string, object>
+            var sIds = TranQuery<SubscriptionEventIdentifier>(query, new Dictionary<string, object>
                 {
                     { "@subscriptionId", subscription.Id.ToDbKey() },
                     { "@utcNow", DateTime.UtcNow },

@@ -32,13 +32,14 @@ namespace Resonance.Demo
                 Name = "Robert",
                 Age = 40,
             });
+            System.Threading.Thread.Sleep(300);//For SQL datetime precision not to get it the way
 
             var consumer = serviceProvider.GetRequiredService<IEventConsumer>();
             var next = consumer.ConsumeNext("Demo Subscription");
             if (next != null)
             {
                 consumer.MarkFailed(next.Id, next.DeliveryKey, Reason.Other("Kaput"));
-                consumer.MarkConsumed(next.Id, next.DeliveryKey);
+                //consumer.MarkConsumed(next.Id, next.DeliveryKey);
             }
         }
 
