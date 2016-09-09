@@ -46,7 +46,7 @@ namespace Resonance
                 foreach (var subscription in subscriptions.Where((s) => s.Enabled))
                 {
                     // By default a SubscriptionEvent takes expirationdate of TopicEvent
-                    DateTime? subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
+                    var subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
 
                     // If subscription has its own TTL, it will be applied, but may never exceed the TopicEvent expiration
                     if (subscription.TimeToLive.HasValue)
@@ -56,14 +56,22 @@ namespace Resonance
                             subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
                     }
 
+                    // Delivery can be initially delayed, but it cannot exceed the expirationdate (would be useless)
+                    var deliveryDelayedUntilUtc = subscription.DeliveryDelay.HasValue ? newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value) : default(DateTime?);
+                    //if (deliveryDelayedUntilUtc.HasValue && subExpirationDateUtc.HasValue
+                    //    && deliveryDelayedUntilUtc.Value > subExpirationDateUtc.Value)
+                    //    break; // Skip this one, it would have been expired immedi
+
                     var newSubscriptionEvent = new SubscriptionEvent
                     {
+                        SubscriptionId = subscription.Id,
                         TopicEventId = newTopicEvent.Id,
                         PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
                         FunctionalKey = newTopicEvent.FunctionalKey,
                         PayloadId = newTopicEvent.PayloadId,
+                        Payload = null, // Only used when consuming
                         ExpirationDateUtc = subExpirationDateUtc,
-                        DeliveryDelayedUntilUtc = subscription.DeliveryDelay.HasValue ? newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value) : default(DateTime?),
+                        DeliveryDelayedUntilUtc = deliveryDelayedUntilUtc,
                         DeliveryCount = 0,
                         DeliveryKey = null,
                         InvisibleUntilUtc = null,

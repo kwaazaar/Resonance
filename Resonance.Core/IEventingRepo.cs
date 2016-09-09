@@ -17,16 +17,15 @@ namespace Resonance
         void RollbackTransaction();
         void CommitTransaction();
 
-        // Topic management
+        // Topic & subscription management
         IEnumerable<Topic> GetTopics(string partOfName = null);
         Topic GetTopic(string id);
         Topic GetTopicByName(string name);
         Topic AddOrUpdateTopic(Topic topic);
         void DeleteTopic(string id, bool inclSubscriptions);
-
-        // Subscription management
         IEnumerable<Subscription> GetSubscriptions(string partOfName =  null, string topicId = null);
         Subscription GetSubscription(string id);
+        Subscription GetSubscriptionByName(string name);
         Subscription AddOrUpdateSubscription(Subscription subscription);
         void DeleteSubscription(string id);
 
@@ -38,5 +37,9 @@ namespace Resonance
         string AddTopicEvent(TopicEvent topicEvent);
         string AddSubscriptionEvent(SubscriptionEvent subscriptionEvent);
 
+        // Consumption
+        SubscriptionEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = null);
+        void MarkConsumed(string subscriptionEventId, string deliveryKey);
+        void MarkFailed(string subscriptionEventId, string deliveryKey, string reason);
     }
 }

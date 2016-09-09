@@ -51,6 +51,9 @@ namespace Resonance.Demo
 
             // Configure EventPublisher
             serviceCollection.AddTransient<IEventPublisher, EventPublisher>();
+
+            // Configure EventConsumer
+            serviceCollection.AddTransient<IEventConsumer, EventConsumer>();
         }
 
         private static void InitRepo()
@@ -81,12 +84,15 @@ namespace Resonance.Demo
                 });
 
             var publisher = serviceProvider.GetRequiredService<IEventPublisher>();
-            var x = new
-            {
-                Name = "Robert",
-                Age = 40,
-            };
-            publisher.Publish(topicName: "Demo Topic", payload: x);
+
+            publisher.Publish(topicName: "Demo Topic", payload: new
+                {
+                    Name = "Robert",
+                    Age = 40,
+                });
+
+            var consumer = serviceProvider.GetRequiredService<IEventConsumer>();
+            var next = consumer.ConsumeNext("Demo Subscription");
         }
     }
 }

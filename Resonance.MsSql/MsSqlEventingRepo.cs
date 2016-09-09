@@ -8,14 +8,14 @@ using System.Data.SqlClient;
 using Dapper;
 using Resonance;
 using Resonance.Models;
+using Resonance.Repo.InternalModels;
 
 namespace Resonance.Repo
 {
     public class MsSqlEventingRepo : IEventingRepo
     {
         protected readonly IDbConnection _conn;
-        protected readonly Stack<IDbTransaction> _runningTransactionsStack = new Stack<IDbTransaction>();
-        protected readonly Dictionary<string, IDbTransaction> _runningTransactions = new Dictionary<string, IDbTransaction>();
+        protected readonly Stack<IDbTransaction> _runningTransactions = new Stack<IDbTransaction>();
 
         /// <summary>
         /// Creates a new MsSqlEventingRepo.
@@ -28,15 +28,16 @@ namespace Resonance.Repo
                 _conn.Open();
         }
 
+        #region Transactions
         public void BeginTransaction()
         {
             var transaction = _conn.BeginTransaction(IsolationLevel.ReadCommitted);
-            _runningTransactionsStack.Push(transaction);
+            _runningTransactions.Push(transaction);
         }
 
         public void RollbackTransaction()
         {
-            IDbTransaction transaction = _runningTransactionsStack.Pop();
+            IDbTransaction transaction = _runningTransactions.Pop();
             if (transaction == null)
                 throw new ArgumentException($"No running transaction found");
 
@@ -46,7 +47,7 @@ namespace Resonance.Repo
 
         public void CommitTransaction()
         {
-            IDbTransaction transaction = _runningTransactionsStack.Pop();
+            IDbTransaction transaction = _runningTransactions.Pop();
             if (transaction == null)
                 throw new ArgumentException($"No running transaction found");
 
@@ -54,6 +55,29 @@ namespace Resonance.Repo
             transaction.Dispose();
         }
 
+        /// <summary>
+        /// Transacted execution; if a transaction was started, the execute will take place on/in it
+        /// </summary>
+        /// <param name="sql"></param>
+        /// <param name="param"></param>
+        /// <param name="commandTimeout"></param>
+        /// <returns></returns>
+        protected int TranExecute(string sql, object param = null, int? commandTimeout = null)
+        {
+            IDbTransaction tran = null;
+            if (_runningTransactions.Count > 0)
+            {
+                try
+                {
+                    tran = _runningTransactions.Peek();
+                }
+                catch (InvalidOperationException) { } // Don't care, probably empty
+            }
+            return _conn.Execute(sql, param: param, transaction: tran, commandTimeout: commandTimeout);
+        }
+        #endregion
+
+        #region Topic and Subscription Management
         public Subscription AddOrUpdateSubscription(Subscription subscription)
         {
             Subscription existingSubscription = (subscription.Id != null)
@@ -171,6 +195,18 @@ namespace Resonance.Repo
                 .SingleOrDefault();
         }
 
+        public Subscription GetSubscriptionByName(string name)
+        {
+            var parameters = new Dictionary<string, object>
+                {
+                    { "@name", name },
+                };
+
+            return _conn
+                .Query<Subscription>("select * from Subscription where name = @name", parameters)
+                .SingleOrDefault();
+        }
+
         public Topic GetTopic(string id)
         {
             var parameters = new Dictionary<string, object>
@@ -210,12 +246,16 @@ namespace Resonance.Repo
                 return _conn
                     .Query<Topic>("select * from Topic");
         }
+        #endregion
 
+        #region Statistics
         public IEnumerable<TopicStats> GetTopicStatistics(string id)
         {
             throw new NotImplementedException();
         }
+        #endregion
 
+        #region Event publication
         public string StorePayload(string payload)
         {
             var id = Guid.NewGuid().ToString();
@@ -252,6 +292,7 @@ namespace Resonance.Repo
             var parameters = new Dictionary<string, object>
                 {
                     { "@id", id },
+                    { "@subscriptionId", subscriptionEvent.SubscriptionId },
                     { "@topicEventId", subscriptionEvent.TopicEventId },
                     { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
@@ -262,30 +303,51 @@ namespace Resonance.Repo
                     { "@deliveryKey", default(string) },
                     { "@invisibleUntilUtc", default(DateTime?) },
                 };
-            TranExecute("insert into SubscriptionEvent (Id, TopicEventId, PublicationDateUtc, FunctionalKey, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryKey, InvisibleUntilUtc)"
-                + " values (@id, @topicEventId, @publicationDateUtc, @functionalKey, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryKey, @invisibleUntilUtc)", parameters);
+            TranExecute("insert into SubscriptionEvent (Id, SubscriptionId, TopicEventId, PublicationDateUtc, FunctionalKey, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryKey, InvisibleUntilUtc)"
+                + " values (@id, @subscriptionId, @topicEventId, @publicationDateUtc, @functionalKey, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryKey, @invisibleUntilUtc)", parameters);
             return id;
         }
+        #endregion
 
-        /// <summary>
-        /// Transacted execution; if a transaction was started, the execute will take place inside it
-        /// </summary>
-        /// <param name="sql"></param>
-        /// <param name="param"></param>
-        /// <param name="commandTimeout"></param>
-        /// <returns></returns>
-        protected int TranExecute(string sql, object param = null, int? commandTimeout = null)
+        #region Event consumption
+
+        public SubscriptionEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = default(int?))
         {
-            IDbTransaction tran = null;
-            if (_runningTransactionsStack.Count > 0)
-            {
-                try
+            var subscription = GetSubscriptionByName(subscriptionName);
+            if (subscription == null) throw new ArgumentException($"No subscription with this name exists: {subscriptionName}");
+
+            byte bufferSize = 10;
+            string query = $"select TOP {bufferSize} se.Id, se.DeliveryKey"
+                + " from SubscriptionEvent se"
+                + " join Subscription s on s.Id = se.SubscriptionId" // Needed for MaxRetries
+                + " where se.SubscriptionId = @subscriptionId"
+                + " and (se.DeliveryDelayedUntilUtc IS NULL OR se.DeliveryDelayedUntilUtc < @utcNow)" // Must be allowed to be delivered
+                + " and (se.ExpirationDateUtc IS NULL OR se.ExpirationDateUtc > @utcNow)" // Must not yet have expired
+                + " and (se.InvisibleUntilUtc IS NULL OR se.InvisibleUntilUtc < @utcNow)" // Must not be 'locked'/made invisible by other consumer
+                + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
+                + " order by se.PublicationDateUtc DESC"; // Oldest first (fifo)
+
+            var sIds = _conn.Query<SubscriptionEventIdentifier>(query, new Dictionary<string, object>
                 {
-                    tran = _runningTransactionsStack.Peek();
-                }
-                catch (InvalidOperationException) { } // Don't care, probably empty
-            }
-            return _conn.Execute(sql, param: param, transaction: tran, commandTimeout: commandTimeout);
+                    { "@subscriptionId", subscription.Id },
+                    { "@utcNow", DateTime.UtcNow },
+                }).ToList();
+
+            if (sIds.Count == 0)
+                return null; // Nothing found
+
+            return null;
         }
+
+        public void MarkConsumed(string subscriptionEventId, string deliveryKey)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void MarkFailed(string subscriptionEventId, string deliveryKey, string reason)
+        {
+            throw new NotImplementedException();
+        }
+        #endregion
     }
 }
