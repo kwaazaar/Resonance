@@ -16,12 +16,38 @@ namespace Resonance
             _repo = repo;
         }
 
+        public Subscription AddOrUpdateSubscription(Subscription subscription)
+        {
+            return _repo.AddOrUpdateSubscription(subscription);
+        }
+
+        public void DeleteSubscription(string id)
+        {
+            _repo.DeleteSubscription(id);
+        }
+
+        public Subscription GetSubscription(string id)
+        {
+            return _repo.GetSubscription(id);
+        }
+
+        public Subscription GetSubscriptionByName(string name)
+        {
+            return _repo.GetSubscriptionByName(name);
+        }
+
+        public IEnumerable<Subscription> GetSubscriptions(string topicId = null)
+        {
+            return _repo.GetSubscriptions(topicId)
+                .ToList();
+        }
+
         public ConsumableEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = default(int?))
         {
             return _repo.ConsumeNext(subscriptionName, visibilityTimeout);
         }
 
-        public ConsumableEvent<T> ConsumeNext<T>(string subscriptionName, int? visibilityTimeout = default(int?)) where T : class
+        public ConsumableEvent<T> ConsumeNext<T>(string subscriptionName, int? visibilityTimeout = default(int?))
         {
             var ce = _repo.ConsumeNext(subscriptionName, visibilityTimeout);
             if (ce == null)

@@ -23,18 +23,16 @@ namespace Resonance
         Topic GetTopicByName(string name);
         Topic AddOrUpdateTopic(Topic topic);
         void DeleteTopic(string id, bool inclSubscriptions);
-        IEnumerable<Subscription> GetSubscriptions(string partOfName =  null, string topicId = null);
+        IEnumerable<Subscription> GetSubscriptions(string topicId = null);
         Subscription GetSubscription(string id);
         Subscription GetSubscriptionByName(string name);
         Subscription AddOrUpdateSubscription(Subscription subscription);
         void DeleteSubscription(string id);
 
-        // Stats
-        IEnumerable<TopicStats> GetTopicStatistics(string id);
-
         // Publication
         string StorePayload(string payload);
         string GetPayload(string id);
+        int DeletePayload(string id);
         string AddTopicEvent(TopicEvent topicEvent);
         string AddSubscriptionEvent(SubscriptionEvent subscriptionEvent);
 

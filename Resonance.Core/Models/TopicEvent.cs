@@ -13,5 +13,6 @@ namespace Resonance.Models
         public DateTime? ExpirationDateUtc { get; set; }
         public string FunctionalKey { get; set; }
         public string PayloadId { get; set; }
+        public Dictionary<string,string> Headers { get; set; }
     }
 }

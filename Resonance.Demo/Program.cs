@@ -15,8 +15,6 @@ namespace Resonance.Demo
     public class Program
     {
         private static IServiceProvider serviceProvider;
-        private static string topicId = "c2581735-00d2-421c-9e65-34195a134d37";
-        private static string subscriptionId = "e1379e77-4c5c-4326-bedd-09250271d545";
 
         public static void Main(string[] args)
         {
@@ -24,23 +22,51 @@ namespace Resonance.Demo
             ConfigureServices(serviceCollection);
             serviceProvider = serviceCollection.BuildServiceProvider();
 
-            InitRepo();
-
             var publisher = serviceProvider.GetRequiredService<IEventPublisher>();
-            publisher.Publish(topicName: "Demo Topic", payload: new
-            {
-                Name = "Robert",
-                Age = 40,
-            });
-            System.Threading.Thread.Sleep(300);//For SQL datetime precision not to get it the way
-
             var consumer = serviceProvider.GetRequiredService<IEventConsumer>();
-            var next = consumer.ConsumeNext("Demo Subscription");
-            if (next != null)
-            {
-                consumer.MarkFailed(next.Id, next.DeliveryKey, Reason.Other("Kaput"));
-                //consumer.MarkConsumed(next.Id, next.DeliveryKey);
-            }
+
+            // Make sure the topic exists
+            var topic = publisher.GetTopicByName("Demo Topic");
+            if (topic == null)
+                topic = publisher.AddOrUpdateTopic(new Topic
+                {
+                    Name = "Demo Topic",
+                    Notes = "This topic is for demo purposes. Nothing to see here, move along!",
+                });
+            var subscription = consumer.GetSubscriptionByName("Demo Subscription");
+            if (subscription == null)
+                subscription = consumer.AddOrUpdateSubscription(new Subscription
+                {
+                    Name = "Demo Subscription",
+                    DeliveryDelay = 3,
+                    MaxDeliveries = 2,
+                    Ordered = true,
+                    TimeToLive = 60,
+                    TopicSubscriptions = new List<TopicSubscription>
+                    {
+                        new TopicSubscription
+                        {
+                            TopicId = topic.Id,
+                            Enabled = true,
+                        },
+                    },
+                });
+
+            // Now publish an event
+            publisher.Publish(
+                topicName: "Demo Topic",
+                headers: new Dictionary<string, string> { { "EventName", "PaymentReceived" }, { "MessageId", "12345" } },
+                payload: new Tuple<string, int, string>("Robert", 40, "Holland")); // Publish typed
+
+            System.Threading.Thread.Sleep(3000); // The subscription has a delivery delay configured
+
+            var consEvent = consumer.ConsumeNext<Tuple<string, int, string>>("Demo Subscription"); // Consume typed
+            //consumer.MarkFailed(next.Id, next.DeliveryKey, Reason.Other("Kaput"));
+            if (consEvent != null)
+                consumer.MarkConsumed(consEvent.Id, consEvent.DeliveryKey);
+
+            consumer.DeleteSubscription(subscription.Id);
+            publisher.DeleteTopic(topic.Id, true);
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)
@@ -70,34 +96,6 @@ namespace Resonance.Demo
 
             // Configure EventConsumer
             serviceCollection.AddTransient<IEventConsumer, EventConsumer>();
-        }
-
-        private static void InitRepo()
-        {
-            var eventingRepo = serviceProvider.GetRequiredService<IEventingRepo>();
-
-            var topic = eventingRepo.GetTopic(topicId);
-            if (topic == null)
-                eventingRepo.AddOrUpdateTopic(new Topic
-                {
-                    Id = topicId,
-                    Name = "Demo Topic",
-                    Notes = "This topic is for demo purposes. Nothing to see here, move along!",
-                });
-
-            var subscription = eventingRepo.GetSubscription(subscriptionId);
-            if (subscription == null)
-                eventingRepo.AddOrUpdateSubscription(new Subscription
-                {
-                    Id = subscriptionId,
-                    Name = "Demo Subscription",
-                    TopicId = topicId,
-                    Enabled = true,
-                    DeliveryDelay = 3,
-                    MaxDeliveries = 2,
-                    Ordered = true,
-                    TimeToLive = 60,
-                });
         }
     }
 }

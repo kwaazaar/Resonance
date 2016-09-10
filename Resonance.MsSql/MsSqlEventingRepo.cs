@@ -9,6 +9,7 @@ using Dapper;
 using Resonance;
 using Resonance.Models;
 using Resonance.Repo.InternalModels;
+using Newtonsoft.Json;
 
 namespace Resonance.Repo
 {
@@ -134,38 +135,130 @@ namespace Resonance.Repo
 
             if (existingSubscription != null) // update
             {
-                if (!existingSubscription.TopicId.Equals(subscription.TopicId, StringComparison.OrdinalIgnoreCase))
-                    throw new ArgumentException("TopicId cannot be updated on a subscription", "subscription");
-
-                var parameters = new Dictionary<string, object>
+                BeginTransaction();
+                try
                 {
-                    { "@id", subscription.Id.ToDbKey() },
-                    { "@name", subscription.Name },
-                    { "@enabled", subscription.Enabled },
-                    { "@deliveryDelay", subscription.DeliveryDelay },
-                    { "@maxDeliveries", subscription.MaxDeliveries },
-                    { "@ordered", subscription.Ordered },
-                    { "@timeToLive", subscription.TimeToLive },
-                };
-                TranExecute("update Subscription set Name = @name, Enabled = @enabled, DeliveryDelay = @deliveryDelay, MaxDeliveries = @maxDeliveries, Ordered = @ordered, TimeToLive = @timeToLive where Id = @id", parameters);
+                    var parameters = new Dictionary<string, object>
+                    {
+                        { "@id", subscription.Id.ToDbKey() },
+                        { "@name", subscription.Name },
+                        { "@deliveryDelay", subscription.DeliveryDelay },
+                        { "@maxDeliveries", subscription.MaxDeliveries },
+                        { "@ordered", subscription.Ordered },
+                        { "@timeToLive", subscription.TimeToLive },
+                    };
+                    TranExecute("update Subscription set Name = @name, DeliveryDelay = @deliveryDelay, MaxDeliveries = @maxDeliveries, Ordered = @ordered, TimeToLive = @timeToLive where Id = @id", parameters);
+
+                    // Update TopicSubscriptions (by removing them and rebuilding them again)
+                    RemoveTopicSubscriptions(subscription.Id);
+                    AddTopicSubscriptions(subscription.Id, subscription.TopicSubscriptions);
+
+                    CommitTransaction();
+                }
+                catch (Exception)
+                {
+                    RollbackTransaction();
+                    throw;
+                }
+
                 return GetSubscription(subscription.Id);
             }
             else
             {
                 var subscriptionId = subscription.Id != null ? subscription.Id : Guid.NewGuid().ToString();
-                var parameters = new Dictionary<string, object>
+
+                BeginTransaction();
+                try
                 {
-                    { "@id", subscriptionId.ToDbKey() },
-                    { "@name", subscription.Name },
-                    { "@enabled", subscription.Enabled },
-                    { "@topicId", subscription.TopicId.ToDbKey() },
-                    { "@deliveryDelay", subscription.DeliveryDelay },
-                    { "@maxDeliveries", subscription.MaxDeliveries },
-                    { "@ordered", subscription.Ordered },
-                    { "@timeToLive", subscription.TimeToLive },
-                };
-                TranExecute("insert into Subscription (Id, Name, TopicId, Enabled, DeliveryDelay, MaxDeliveries, Ordered, TimeToLive) values (@id, @name, @topicId, @enabled, @deliveryDelay, @maxDeliveries, @ordered, @timeToLive)", parameters);
+                    var parameters = new Dictionary<string, object>
+                        {
+                            { "@id", subscriptionId.ToDbKey() },
+                            { "@name", subscription.Name },
+                            { "@deliveryDelay", subscription.DeliveryDelay },
+                            { "@maxDeliveries", subscription.MaxDeliveries },
+                            { "@ordered", subscription.Ordered },
+                            { "@timeToLive", subscription.TimeToLive },
+                        };
+                    TranExecute("insert into Subscription (Id, Name, DeliveryDelay, MaxDeliveries, Ordered, TimeToLive) values (@id, @name, @deliveryDelay, @maxDeliveries, @ordered, @timeToLive)", parameters);
+                    AddTopicSubscriptions(subscriptionId, subscription.TopicSubscriptions);
+                    CommitTransaction();
+                }
+                catch (Exception)
+                {
+                    RollbackTransaction();
+                    throw;
+                }
+
                 return GetSubscription(subscriptionId);
+            }
+        }
+
+        private void AddTopicSubscriptions(string subscriptionId, List<TopicSubscription> topicSubscriptions)
+        {
+            BeginTransaction();
+            try
+            {
+                foreach (var topicSubscription in topicSubscriptions)
+                {
+                    var topicSubscriptionId = topicSubscription.Id != null ? topicSubscription.Id : Guid.NewGuid().ToString();
+                    var parameters = new Dictionary<string, object>
+                        {
+                            { "@id", topicSubscriptionId.ToDbKey() },
+                            { "@topicId", topicSubscription.TopicId.ToDbKey() },
+                            { "@subscriptionId", subscriptionId.ToDbKey() },
+                            { "@enabled", topicSubscription.Enabled },
+                            { "@filtered", topicSubscription.Filtered },
+                        };
+                    TranExecute("insert into TopicSubscription (Id, TopicId, SubscriptionId, Enabled, Filtered) values (@id, @topicId, @subscriptionId, @enabled, @filtered)", parameters);
+
+                    if (topicSubscription.Filters != null)
+                    {
+                        foreach (var filter in topicSubscription.Filters)
+                        {
+                            var topicSubscriptionFilterId = filter.Id != null ? filter.Id : Guid.NewGuid().ToString();
+                            parameters = new Dictionary<string, object>
+                        {
+                            { "@id", topicSubscriptionFilterId.ToDbKey() },
+                            { "@topicSubscriptionId", topicSubscriptionId.ToDbKey() },
+                            { "@header", filter.Header },
+                            { "@matchExpression", filter.MatchExpression },
+                        };
+                            TranExecute("insert into TopicSubscriptionFilter (Id, TopicSubscriptionId, Header, MatchExpression) values (@id, @topicSubscriptionId, @header, @matchExpression)", parameters);
+                        }
+                    }
+                }
+                CommitTransaction();
+            }
+            catch (Exception)
+            {
+                RollbackTransaction();
+                throw;
+            }
+        }
+
+        private void RemoveTopicSubscriptions(string subscriptionId)
+        {
+            BeginTransaction();
+            try
+            {
+                var parameters = new Dictionary<string, object> { { "@subscriptionId", subscriptionId.ToDbKey() } };
+
+                // Delete topicsubscriptionfilters
+                var query = "delete tsf from TopicSubscriptionFilter tsf" +
+                    " join TopicSubscription ts on ts.Id = tsf.TopicSubscriptionId" +
+                    " where ts.SubscriptionId = @subscriptionId";
+                TranExecute(query, parameters);
+
+                // Delete topicsubscriptions
+                query = "delete ts from TopicSubscription ts" +
+                    " where ts.SubscriptionId = @subscriptionId";
+                TranExecute(query, parameters);
+
+                CommitTransaction();
+            }
+            catch (Exception)
+            {
+                RollbackTransaction();
             }
         }
 
@@ -202,54 +295,142 @@ namespace Resonance.Repo
 
         public void DeleteSubscription(string id)
         {
-            throw new NotImplementedException();
+            BeginTransaction();
+            try
+            {
+                //TranExecute("delete from SubscriptionEvent where SubscriptionId = @subscriptionId",
+                //    new Dictionary<string, object>
+                //    {
+                //        { "@subscriptionId", id.ToDbKey() },
+                //    });
+                RemoveTopicSubscriptions(id);
+                TranExecute("delete from Subscription where Id = @id",
+                    new Dictionary<string, object>
+                    {
+                        { "@id", id.ToDbKey() },
+                    });
+                CommitTransaction();
+            }
+            catch (Exception)
+            {
+                RollbackTransaction();
+                throw;
+            }
         }
 
         public void DeleteTopic(string id, bool inclSubscriptions)
         {
-            throw new NotImplementedException();
+            BeginTransaction();
+            try
+            {
+                if (inclSubscriptions)
+                {
+                    // Delete all topicsubscriptions in subscriptions for the specified topic
+                    var subscriptions = GetSubscriptions(topicId: id);
+                    foreach (var subscription in subscriptions)
+                    {
+                        var parameters = new Dictionary<string, object>
+                    {
+                        { "@subscriptionId", subscription.Id.ToDbKey() },
+                        { "@topicId", id.ToDbKey() },
+                    };
+
+                        // Delete topicsubscriptionfilters
+                        var query = "delete tsf from TopicSubscriptionFilter tsf" +
+                            " join TopicSubscription ts on ts.Id = tsf.TopicSubscriptionId" +
+                            " where ts.SubscriptionId = @subscriptionId and ts.TopicId = @topicId";
+                        TranExecute(query, parameters);
+
+                        // Delete topicsubscriptions
+                        query = "delete ts from TopicSubscription ts" +
+                            " where ts.SubscriptionId = @subscriptionId and ts.TopicId = @topicId";
+                        TranExecute(query, parameters);
+                    }
+                }
+
+                TranExecute("delete from Topic where Id = @id", // No check on rowcount, if it aint there, it's fine
+                    new Dictionary<string, object>
+                    {
+                        { "@id", id.ToDbKey() },
+                    });
+
+                CommitTransaction();
+            }
+            catch (Exception)
+            {
+                RollbackTransaction();
+                throw;
+            }
         }
 
-        public IEnumerable<Subscription> GetSubscriptions(string partOfName = null, string topicId = null)
+        /// <summary>
+        /// Returns all subscriptions, or optionally only the subscriptions that subscribe to (at least) the specified topic.
+        /// </summary>
+        /// <param name="topicId"></param>
+        /// <returns></returns>
+        public IEnumerable<Subscription> GetSubscriptions(string topicId = null)
         {
             var parameters = new Dictionary<string, object>
                 {
-                    { "@topicId", topicId.ToDbKey() },
-                    { "@partOfName", $"%{partOfName}%"},
+                    { "@topicId", topicId != null ? topicId.ToDbKey() : null },
                 };
-            var query = "select * from Subscription";
 
-            var conditions = new List<string>();
-            if (partOfName != null)
-                conditions.Add("Name like @partOfName");
+            var query = "select s.Id from Subscription s";
             if (topicId != null)
-                conditions.Add("TopicId = @topicId");
-            if (conditions.Count > 0)
-                query += (" where " + String.Join(" and ", conditions));
+            {
+                query = "select s.Id, ts.TopicId from Subscription s"
+                    + " join TopicSubscription ts on ts.SubscriptionId = s.Id and ts.TopicId = @topicId"
+                    + " group by s.Id, ts.TopicId having count(*) > 0"; // Matching at least once
+            }
 
-            return TranQuery<Subscription>(query, parameters);
+            var matchedSubscriptions = TranQuery<Identifier>(query, parameters);
+            foreach (var id in matchedSubscriptions.Select(ms => ms.Id))
+            {
+                yield return GetSubscription(id);
+            }
         }
 
         public Subscription GetSubscription(string id)
         {
-            var parameters = new Dictionary<string, object>
-                {
-                    { "@id", id.ToDbKey() },
-                };
-
-            return TranQuery<Subscription>("select * from Subscription where id = @id", parameters)
+            var subscription = TranQuery<Subscription>("select * from Subscription where id = @id",
+                new Dictionary<string, object> { { "@id", id.ToDbKey() } })
                 .SingleOrDefault();
+            if (subscription == null)
+                return null;
+
+            // Add topic-subscriptions
+            var topicSubscriptions = TranQuery<TopicSubscription>("select * from TopicSubscription where SubscriptionId = @id",
+                new Dictionary<string, object> { { "@id", id.ToDbKey() } }).ToList();
+            foreach (var topicSubscription in topicSubscriptions)
+            {
+                var topicSubscriptionFilters = TranQuery<TopicSubscriptionFilter>("select * from TopicSubscriptionFilter where TopicSubscriptionId = @topicSubscriptionId",
+                    new Dictionary<string, object> { { "@topicSubscriptionId", topicSubscription.Id.ToDbKey() } }).ToList();
+                topicSubscription.Filters = topicSubscriptionFilters;
+            }
+            subscription.TopicSubscriptions = topicSubscriptions;
+
+            return subscription;
         }
 
         public Subscription GetSubscriptionByName(string name)
         {
-            var parameters = new Dictionary<string, object>
-                {
-                    { "@name", name },
-                };
+            var subscription = TranQuery<Subscription>("select * from Subscription where name = @name",
+                new Dictionary<string, object> { { "@name", name } }).SingleOrDefault();
+            if (subscription == null)
+                return null;
 
-            return TranQuery<Subscription>("select * from Subscription where name = @name", parameters)
-                .SingleOrDefault();
+            // Add topic-subscriptions
+            var topicSubscriptions = TranQuery<TopicSubscription>("select * from TopicSubscription where SubscriptionId = @id",
+                new Dictionary<string, object> { { "@id", subscription.Id.ToDbKey() } }).ToList();
+            foreach (var topicSubscription in topicSubscriptions)
+            {
+                var topicSubscriptionFilters = TranQuery<TopicSubscriptionFilter>("select * from TopicSubscriptionFilter where TopicSubscriptionId = @topicSubscriptionId",
+                    new Dictionary<string, object> { { "@topicSubscriptionId", topicSubscription.Id.ToDbKey() } }).ToList();
+                topicSubscription.Filters = topicSubscriptionFilters;
+            }
+            subscription.TopicSubscriptions = topicSubscriptions;
+
+            return subscription;
         }
 
         public Topic GetTopic(string id)
@@ -289,13 +470,6 @@ namespace Resonance.Repo
         }
         #endregion
 
-        #region Statistics
-        public IEnumerable<TopicStats> GetTopicStatistics(string id)
-        {
-            throw new NotImplementedException();
-        }
-        #endregion
-
         #region Event publication
         public string StorePayload(string payload)
         {
@@ -319,10 +493,17 @@ namespace Resonance.Repo
                 .SingleOrDefault();
         }
 
+        public int DeletePayload(string id)
+        {
+            return TranExecute("delete EventPayload where Id = @id",
+                new Dictionary<string, object> { { "@id", id.ToDbKey() } });
+        }
+
         public string AddTopicEvent(TopicEvent topicEvent)
         {
             var id = topicEvent.Id != null ? topicEvent.Id : Guid.NewGuid().ToString();
 
+            var headers = topicEvent.Headers != null ? JsonConvert.SerializeObject(topicEvent.Headers) : null; // Just serialization. Not used anymore (filtering uses the original dictionary).
             var parameters = new Dictionary<string, object>
                 {
                     { "@id", id.ToDbKey() },
@@ -330,9 +511,10 @@ namespace Resonance.Repo
                     { "@functionalKey", topicEvent.FunctionalKey },
                     { "@publicationDateUtc", topicEvent.PublicationDateUtc },
                     { "@expirationDateUtc", topicEvent.ExpirationDateUtc },
+                    { "@headers", headers },
                     { "@payloadId", topicEvent.PayloadId.ToDbKey() },
                 };
-            TranExecute("insert into TopicEvent (Id, TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, PayloadId) values (@id, @topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @payloadId)", parameters);
+            TranExecute("insert into TopicEvent (Id, TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, Headers, PayloadId) values (@id, @topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @headers, @payloadId)", parameters);
             return id;
         }
 
