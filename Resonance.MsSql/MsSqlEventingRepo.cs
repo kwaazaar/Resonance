@@ -621,11 +621,12 @@ namespace Resonance.Repo
                 var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout.GetValueOrDefault(60)); // Recalc on every attempt in this loop, since every attempt make take considerable time
 
                 // Attempt to lock it now
-                int rowsUpdated = TranExecute("update SubscriptionEvent" +
-                    " set DeliveryKey = @newDeliveryKey, InvisibleUntilUtc = @invisibleUntilUtc" +
-                    " where Id = @id" +
-                    " and ( (DeliveryKey is NULL and @deliveryKey is null)" + // We use DeliveryKey for OCC, since it changes on every update anyway
-                    "     or DeliveryKey = @deliveryKey)",
+                int rowsUpdated = TranExecute("update s" +
+                    " set s.DeliveryKey = @newDeliveryKey, s.InvisibleUntilUtc = @invisibleUntilUtc, s.DeliveryCount = s.DeliveryCount + 1" +
+                    " from SubscriptionEvent s" +
+                    " where s.Id = @id" +
+                    " and ( (s.DeliveryKey is NULL and @deliveryKey is null)" + // We use DeliveryKey for OCC, since it changes on every update anyway
+                    "     or s.DeliveryKey = @deliveryKey)",
                     new Dictionary<string,object>
                     {
                         { "@id", sId.Id.ToDbKey() },
