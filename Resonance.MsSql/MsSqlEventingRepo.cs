@@ -8,6 +8,7 @@ using System.Data.SqlClient;
 using Dapper;
 using Resonance;
 using Resonance.Models;
+using Resonance.InternalModels;
 using Resonance.Repo.InternalModels;
 using Newtonsoft.Json;
 
@@ -586,11 +587,27 @@ namespace Resonance.Repo
 
         #region Event consumption
 
-        public ConsumableEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = default(int?))
+        public bool TryLockConsumableEvent(SubscriptionEventIdentifier sId, string deliveryKey, DateTime invisibleUntilUtc)
         {
-            var subscription = GetSubscriptionByName(subscriptionName);
-            if (subscription == null) throw new ArgumentException($"No subscription with this name exists: {subscriptionName}");
+            int rowsUpdated = TranExecute("update s" +
+                " set s.DeliveryKey = @newDeliveryKey, s.InvisibleUntilUtc = @invisibleUntilUtc, s.DeliveryCount = s.DeliveryCount + 1" +
+                " from SubscriptionEvent s" +
+                " where s.Id = @id" +
+                " and ( (s.DeliveryKey is NULL and @deliveryKey is null)" + // We use DeliveryKey for OCC, since it changes on every update anyway
+                "     or s.DeliveryKey = @deliveryKey)",
+                new Dictionary<string, object>
+                {
+                                    { "@id", sId.Id.ToDbKey() },
+                                    { "@deliveryKey", sId.DeliveryKey },
+                                    { "@newDeliveryKey", deliveryKey },
+                                    { "@invisibleUntilUtc", invisibleUntilUtc },
+                });
 
+            return (rowsUpdated > 0);
+        }
+
+        public IEnumerable<SubscriptionEventIdentifier> FindConsumableEventsForSubscription(Subscription subscription)
+        {
             // Larger buffer failes for ordered delivery subscriptions (it will return more than one event per functional key and a second cannot yet be consumed while we're not sure about the first
             int bufferSize = subscription.Ordered ? 1 : 10;
 
@@ -608,48 +625,8 @@ namespace Resonance.Repo
                 {
                     { "@subscriptionId", subscription.Id.ToDbKey() },
                     { "@utcNow", DateTime.UtcNow },
-                }).ToList();
-
-            if (sIds.Count == 0)
-                return null; // Nothing found
-
-            string deliveryKey = Guid.NewGuid().ToString();
-
-            // Loop through all found subscriptionevents until one of them could be 'locked'
-            foreach (var sId in sIds)
-            {
-                var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout.GetValueOrDefault(60)); // Recalc on every attempt in this loop, since every attempt make take considerable time
-
-                // Attempt to lock it now
-                int rowsUpdated = TranExecute("update s" +
-                    " set s.DeliveryKey = @newDeliveryKey, s.InvisibleUntilUtc = @invisibleUntilUtc, s.DeliveryCount = s.DeliveryCount + 1" +
-                    " from SubscriptionEvent s" +
-                    " where s.Id = @id" +
-                    " and ( (s.DeliveryKey is NULL and @deliveryKey is null)" + // We use DeliveryKey for OCC, since it changes on every update anyway
-                    "     or s.DeliveryKey = @deliveryKey)",
-                    new Dictionary<string,object>
-                    {
-                        { "@id", sId.Id.ToDbKey() },
-                        { "@deliveryKey", sId.DeliveryKey },
-                        { "@newDeliveryKey", deliveryKey },
-                        { "@invisibleUntilUtc", invisibleUntilUtc },
-                    });
-
-                if (rowsUpdated > 0) // We got it! Now get the rest of the details
-                {
-                    var @event = new ConsumableEvent
-                    {
-                        Id = sId.Id,
-                        DeliveryKey = deliveryKey, // Updated above
-                        FunctionalKey = sId.FunctionalKey,
-                        InvisibleUntilUtc = invisibleUntilUtc,
-                    };
-                    @event.Payload = GetPayload(sId.PayloadId);
-                    return @event;
-                }
-            }
-
-            return null;
+                });
+            return sIds;
         }
 
         public void MarkConsumed(string id, string deliveryKey)

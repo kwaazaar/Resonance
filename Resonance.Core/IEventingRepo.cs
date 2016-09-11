@@ -1,4 +1,5 @@
-﻿using Resonance.Models;
+﻿using Resonance.InternalModels;
+using Resonance.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,7 +38,8 @@ namespace Resonance
         string AddSubscriptionEvent(SubscriptionEvent subscriptionEvent);
 
         // Consumption
-        ConsumableEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = null);
+        IEnumerable<SubscriptionEventIdentifier> FindConsumableEventsForSubscription(Subscription subscription);
+        bool TryLockConsumableEvent(SubscriptionEventIdentifier sId, string deliveryKey, DateTime invisibleUntilUtc);
         void MarkConsumed(string id, string deliveryKey);
         void MarkFailed(string id, string deliveryKey, Reason reason);
     }
