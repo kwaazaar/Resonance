@@ -8,11 +8,10 @@ using System.Data.SqlClient;
 using Dapper;
 using Resonance;
 using Resonance.Models;
-using Resonance.InternalModels;
 using Resonance.Repo.InternalModels;
 using Newtonsoft.Json;
 
-namespace Resonance.Repo
+namespace Resonance.Repo.Database
 {
     public class MsSqlEventingRepo : IEventingRepo
     {
@@ -534,11 +533,12 @@ namespace Resonance.Repo
                     { "@expirationDateUtc", subscriptionEvent.ExpirationDateUtc },
                     { "@deliveryDelayedUntilUtc", subscriptionEvent.DeliveryDelayedUntilUtc },
                     { "@deliveryCount", default(int) },
+                    { "@deliveryDateUtc", default(DateTime?) },
                     { "@deliveryKey", default(string) },
                     { "@invisibleUntilUtc", default(DateTime?) },
                 };
-            TranExecute("insert into SubscriptionEvent (Id, SubscriptionId, TopicEventId, PublicationDateUtc, FunctionalKey, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryKey, InvisibleUntilUtc)"
-                + " values (@id, @subscriptionId, @topicEventId, @publicationDateUtc, @functionalKey, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryKey, @invisibleUntilUtc)", parameters);
+            TranExecute("insert into SubscriptionEvent (Id, SubscriptionId, TopicEventId, PublicationDateUtc, FunctionalKey, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryDateUtc, DeliveryKey, InvisibleUntilUtc)"
+                + " values (@id, @subscriptionId, @topicEventId, @publicationDateUtc, @functionalKey, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryDateUtc, @deliveryKey, @invisibleUntilUtc)", parameters);
             return id;
         }
 
@@ -554,8 +554,8 @@ namespace Resonance.Repo
 
         private int AddConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
-            return TranExecute("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, PublishedDateUtc, FunctionalKey, PayloadId, ConsumedDateUtc)" +
-                " values (@id, @subscriptionId, @publishedDateUtc, @functionalKey, @payloadId, @consumedDateUtc)",
+            return TranExecute("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, PublishedDateUtc, FunctionalKey, PayloadId, DeliveryDateUtc, ConsumedDateUtc)" +
+                " values (@id, @subscriptionId, @publishedDateUtc, @functionalKey, @payloadId, @deliveryDateUtc, @consumedDateUtc)",
                 new Dictionary<string, object>
                 {
                     { "@id", subscriptionEvent.Id.ToDbKey() },
@@ -563,14 +563,15 @@ namespace Resonance.Repo
                     { "@publishedDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
                     { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
+                    { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
                     { "@consumedDateUtc", DateTime.UtcNow },
                 });
         }
 
         private int AddFailedSubscriptionEvent(SubscriptionEvent subscriptionEvent, Reason reason)
         {
-            return TranExecute("insert into FailedSubscriptionEvent (Id, SubscriptionId, PublishedDateUtc, FunctionalKey, PayloadId, FailedDateUtc, Reason, ReasonOther)" +
-                " values (@id, @subscriptionId, @publishedDateUtc, @functionalKey, @payloadId, @failedDateUtc, @reason, @reasonOther)",
+            return TranExecute("insert into FailedSubscriptionEvent (Id, SubscriptionId, PublishedDateUtc, FunctionalKey, PayloadId, DeliveryDateUtc, FailedDateUtc, Reason, ReasonOther)" +
+                " values (@id, @subscriptionId, @publishedDateUtc, @functionalKey, @payloadId, @deliveryDateUtc, @failedDateUtc, @reason, @reasonOther)",
                 new Dictionary<string, object>
                 {
                     { "@id", subscriptionEvent.Id.ToDbKey() },
@@ -578,6 +579,7 @@ namespace Resonance.Repo
                     { "@publishedDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
                     { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
+                    { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
                     { "@failedDateUtc", DateTime.UtcNow },
                     { "@reason", (int)reason.Type },
                     { "@reasonOther", reason.ReasonText },
@@ -590,7 +592,7 @@ namespace Resonance.Repo
         public bool TryLockConsumableEvent(SubscriptionEventIdentifier sId, string deliveryKey, DateTime invisibleUntilUtc)
         {
             int rowsUpdated = TranExecute("update s" +
-                " set s.DeliveryKey = @newDeliveryKey, s.InvisibleUntilUtc = @invisibleUntilUtc, s.DeliveryCount = s.DeliveryCount + 1" +
+                " set s.DeliveryKey = @newDeliveryKey, s.DeliveryDateUtc = @deliveryDateUtc, s.InvisibleUntilUtc = @invisibleUntilUtc, s.DeliveryCount = s.DeliveryCount + 1" +
                 " from SubscriptionEvent s" +
                 " where s.Id = @id" +
                 " and ( (s.DeliveryKey is NULL and @deliveryKey is null)" + // We use DeliveryKey for OCC, since it changes on every update anyway
@@ -599,6 +601,7 @@ namespace Resonance.Repo
                 {
                                     { "@id", sId.Id.ToDbKey() },
                                     { "@deliveryKey", sId.DeliveryKey },
+                                    { "@deliveryDateUtc", DateTime.UtcNow },
                                     { "@newDeliveryKey", deliveryKey },
                                     { "@invisibleUntilUtc", invisibleUntilUtc },
                 });

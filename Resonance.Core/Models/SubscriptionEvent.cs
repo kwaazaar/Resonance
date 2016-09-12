@@ -17,6 +17,7 @@ namespace Resonance.Models
         public DateTime? ExpirationDateUtc { get; set; }
         public DateTime? DeliveryDelayedUntilUtc { get; set; }
         public int DeliveryCount { get; set; }
+        public DateTime? DeliveryDateUtc { get; set; }
         public string DeliveryKey { get; set; }
         public DateTime? InvisibleUntilUtc { get; set; }
     }

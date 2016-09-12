@@ -5,8 +5,6 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Resonance.Core", "Resonance.Core\Resonance.Core.xproj", "{F2D21CC3-1F85-44C9-8739-4D4CEAAF88D9}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Resonance.Repo.MsSql", "Resonance.MsSql\Resonance.Repo.MsSql.xproj", "{51B4B3CD-0CE1-442F-AF11-6A33FBF4D3E7}"
-EndProject
 Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Resonance.Demo", "Resonance.Demo\Resonance.Demo.xproj", "{435874BC-64B2-46CF-AA9C-B3467854B9C3}"
 EndProject
 Global
@@ -19,10 +17,6 @@ Global
 		{F2D21CC3-1F85-44C9-8739-4D4CEAAF88D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F2D21CC3-1F85-44C9-8739-4D4CEAAF88D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F2D21CC3-1F85-44C9-8739-4D4CEAAF88D9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{51B4B3CD-0CE1-442F-AF11-6A33FBF4D3E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{51B4B3CD-0CE1-442F-AF11-6A33FBF4D3E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{51B4B3CD-0CE1-442F-AF11-6A33FBF4D3E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{51B4B3CD-0CE1-442F-AF11-6A33FBF4D3E7}.Release|Any CPU.Build.0 = Release|Any CPU
 		{435874BC-64B2-46CF-AA9C-B3467854B9C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{435874BC-64B2-46CF-AA9C-B3467854B9C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{435874BC-64B2-46CF-AA9C-B3467854B9C3}.Release|Any CPU.ActiveCfg = Release|Any CPU

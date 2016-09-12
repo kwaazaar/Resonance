@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Resonance.InternalModels
+namespace Resonance.Repo.InternalModels
 {
     public class SubscriptionEventIdentifier
     {

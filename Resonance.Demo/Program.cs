@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using System.IO;
 using Resonance.Repo;
 using Resonance.Models;
+using Resonance.Repo.Database;
 
 namespace Resonance.Demo
 {
@@ -61,9 +62,9 @@ namespace Resonance.Demo
             System.Threading.Thread.Sleep(3000); // The subscription has a delivery delay configured
 
             var consEvent = consumer.ConsumeNext<Tuple<string, int, string>>("Demo Subscription"); // Consume typed
-            //consumer.MarkFailed(next.Id, next.DeliveryKey, Reason.Other("Kaput"));
             if (consEvent != null)
-                consumer.MarkConsumed(consEvent.Id, consEvent.DeliveryKey);
+                //consumer.MarkConsumed(consEvent.Id, consEvent.DeliveryKey);
+                consumer.MarkFailed(consEvent.Id, consEvent.DeliveryKey, Reason.Other("Kaput"));
 
             consumer.DeleteSubscription(subscription.Id);
             publisher.DeleteTopic(topic.Id, true);

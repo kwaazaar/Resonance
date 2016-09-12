@@ -1,4 +1,4 @@
-﻿using Resonance.InternalModels;
+﻿using Resonance.Repo.InternalModels;
 using Resonance.Models;
 using System;
 using System.Collections.Generic;
@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Resonance
+namespace Resonance.Repo
 {
     public interface IEventingRepo
     {

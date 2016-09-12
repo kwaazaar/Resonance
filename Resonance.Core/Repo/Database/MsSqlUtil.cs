@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Resonance.Repo
+namespace Resonance.Repo.Database
 {
     internal static class MsSqlUtil
     {
