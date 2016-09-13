@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>$id$</id>
+    <version>$version$</version>
+    <title>$title$</title>
+    <authors>$author$</authors>
+    <owners>$author$</owners>
+    <licenseUrl>https://opensource.org/licenses/MIT</licenseUrl>
+    <projectUrl>https://github.com/kwaazaar/Resonance</projectUrl>
+    <!--iconUrl>http://a.com/1.jpg</iconUrl-->
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <description>$description$</description>
+    <releaseNotes>Initial version. Please check the project site for more information.</releaseNotes>
+    <copyright>Copyright 2016 - Robert te Kaat</copyright>
+    <tags>pub sub esb queue topic subscription microservice messaging event publish subscribe</tags>
+  </metadata>
+  <files>
+    <!--file src="bin\Release\*.dll" target="lib" /-->
+    <!--ile src="tools\*.ps1" target="tools" /-->
+    <file src="content\*.*" target="content" />
+  </files>
+</package>

@@ -1,5 +1,8 @@
 {
-  "version": "1.0.0-*",
+  "title": "Resonance",
+  "copyright": "Copyright 2016 - Robert te Kaat",
+  "description": "Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc.",
+  "version": "0.1.0-*",
 
   "dependencies": {
     "Dapper": "1.50.2",
@@ -11,5 +14,10 @@
     "netstandard1.6": {
       "imports": "dnxcore50"
     }
+  },
+  "scripts": {
+    "postcompile": [
+      "dotnet pack --no-build --configuration %compile:Configuration%"
+    ]
   }
 }

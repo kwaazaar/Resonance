@@ -1,6 +1,6 @@
 # Resonance
-Eventing library, with support for MsSql (MySql coming soon).
-Ideal for implementing CQRS, business events, pub-sub, etc.
+Eventing library, with support for MsSql and MySql.
+Ideal for implementing CQRS, business events, pub-sub, microservices, etc.
 
 Supported features:
 * Pub-sub
