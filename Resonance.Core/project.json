@@ -2,25 +2,52 @@
   "title": "Resonance",
   "copyright": "Copyright 2016 - Robert te Kaat",
   "description": "Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc.",
-  "version": "0.1.1-*",
+  "version": "0.1.2-*",
+
   "buildOptions": {
     "copyToOutput": { "includeFiles": [ "Content\\ResonanceDB.sql" ] }
   },
 
   "dependencies": {
     "Dapper": "1.50.2",
-    "NETStandard.Library": "1.6.0",
     "Newtonsoft.Json": "9.0.1"
   },
 
   "frameworks": {
     "netstandard1.6": {
-      "imports": "dnxcore50"
+      "dependencies": {
+        "NETStandard.Library": "1.6.0"
+      }
+    },
+    "net452": {
     }
   },
-  "scripts": {
-    "postcompile": [
-      "dotnet pack --no-build --configuration %compile:Configuration%"
-    ]
+
+  "packOptions": {
+    "summary": "Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc.",
+    "tags": [ "pub", "sub", "esb", "queue", "topic", "subscription", "microservice", "messaging", "event", "publish", "subscribe" ],
+    "owners": [ "Robert te Kaat" ],
+    "releaseNotes": "Alpha version, expect many updates!",
+    "iconUrl": "",
+    "projectUrl": "https://github.com/kwaazaar/Resonance",
+    "licenseUrl": "https://opensource.org/licenses/MIT",
+    "requireLicenseAcceptance": true,
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/kwaazaar/Resonance"
+    },
+    "files": {
+      "include": "",
+      "exclude": "",
+      "includeFiles": [
+        "readme.txt",
+        "content/ResonanceDB.sql"
+      ],
+      "excludeFiles": [ "" ],
+      "builtIns": {},
+      "mappings": {
+     
+      }
+    }
   }
 }
