@@ -12,6 +12,7 @@ namespace Resonance.Models
         public string TopicEventId { get; set; }
         public DateTime PublicationDateUtc { get; set; }
         public string FunctionalKey { get; set; }
+        public int Priority { get; set; }
         public string PayloadId { get; set; }
         public string Payload { get; set; }
         public DateTime? ExpirationDateUtc { get; set; }

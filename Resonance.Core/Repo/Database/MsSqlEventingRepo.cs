@@ -512,9 +512,10 @@ namespace Resonance.Repo.Database
                     { "@publicationDateUtc", topicEvent.PublicationDateUtc },
                     { "@expirationDateUtc", topicEvent.ExpirationDateUtc },
                     { "@headers", headers },
+                    { "@priority", topicEvent.Priority },
                     { "@payloadId", topicEvent.PayloadId.ToDbKey() },
                 };
-            TranExecute("insert into TopicEvent (Id, TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, Headers, PayloadId) values (@id, @topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @headers, @payloadId)", parameters);
+            TranExecute("insert into TopicEvent (Id, TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, Headers, Priority, PayloadId) values (@id, @topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @headers, @priority, @payloadId)", parameters);
             return id;
         }
 
@@ -529,6 +530,7 @@ namespace Resonance.Repo.Database
                     { "@topicEventId", subscriptionEvent.TopicEventId.ToDbKey() },
                     { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
+                    { "@priority", subscriptionEvent.Priority },
                     { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
                     { "@expirationDateUtc", subscriptionEvent.ExpirationDateUtc },
                     { "@deliveryDelayedUntilUtc", subscriptionEvent.DeliveryDelayedUntilUtc },
@@ -537,8 +539,8 @@ namespace Resonance.Repo.Database
                     { "@deliveryKey", default(string) },
                     { "@invisibleUntilUtc", default(DateTime?) },
                 };
-            TranExecute("insert into SubscriptionEvent (Id, SubscriptionId, TopicEventId, PublicationDateUtc, FunctionalKey, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryDateUtc, DeliveryKey, InvisibleUntilUtc)"
-                + " values (@id, @subscriptionId, @topicEventId, @publicationDateUtc, @functionalKey, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryDateUtc, @deliveryKey, @invisibleUntilUtc)", parameters);
+            TranExecute("insert into SubscriptionEvent (Id, SubscriptionId, TopicEventId, PublicationDateUtc, FunctionalKey, Priority, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryDateUtc, DeliveryKey, InvisibleUntilUtc)"
+                + " values (@id, @subscriptionId, @topicEventId, @publicationDateUtc, @functionalKey, @priority, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryDateUtc, @deliveryKey, @invisibleUntilUtc)", parameters);
             return id;
         }
 
@@ -554,14 +556,15 @@ namespace Resonance.Repo.Database
 
         private int AddConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
-            return TranExecute("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, PublishedDateUtc, FunctionalKey, PayloadId, DeliveryDateUtc, ConsumedDateUtc)" +
-                " values (@id, @subscriptionId, @publishedDateUtc, @functionalKey, @payloadId, @deliveryDateUtc, @consumedDateUtc)",
+            return TranExecute("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, PublishedDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, ConsumedDateUtc)" +
+                " values (@id, @subscriptionId, @publishedDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @consumedDateUtc)",
                 new Dictionary<string, object>
                 {
                     { "@id", subscriptionEvent.Id.ToDbKey() },
                     { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
                     { "@publishedDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
+                    { "@priority", subscriptionEvent.Priority },
                     { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
                     { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
                     { "@consumedDateUtc", DateTime.UtcNow },
@@ -570,14 +573,15 @@ namespace Resonance.Repo.Database
 
         private int AddFailedSubscriptionEvent(SubscriptionEvent subscriptionEvent, Reason reason)
         {
-            return TranExecute("insert into FailedSubscriptionEvent (Id, SubscriptionId, PublishedDateUtc, FunctionalKey, PayloadId, DeliveryDateUtc, FailedDateUtc, Reason, ReasonOther)" +
-                " values (@id, @subscriptionId, @publishedDateUtc, @functionalKey, @payloadId, @deliveryDateUtc, @failedDateUtc, @reason, @reasonOther)",
+            return TranExecute("insert into FailedSubscriptionEvent (Id, SubscriptionId, PublishedDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, FailedDateUtc, Reason, ReasonOther)" +
+                " values (@id, @subscriptionId, @publishedDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @failedDateUtc, @reason, @reasonOther)",
                 new Dictionary<string, object>
                 {
                     { "@id", subscriptionEvent.Id.ToDbKey() },
                     { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
                     { "@publishedDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
+                    { "@priority", subscriptionEvent.Priority },
                     { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
                     { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
                     { "@failedDateUtc", DateTime.UtcNow },
@@ -622,7 +626,7 @@ namespace Resonance.Repo.Database
                 + " and (se.ExpirationDateUtc IS NULL OR se.ExpirationDateUtc > @utcNow)" // Must not yet have expired
                 + " and (se.InvisibleUntilUtc IS NULL OR se.InvisibleUntilUtc < @utcNow)" // Must not be 'locked'/made invisible by other consumer
                 + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
-                + " order by se.PublicationDateUtc DESC"; // Oldest first (fifo)
+                + " order by se.Priority DESC, se.PublicationDateUtc DESC"; // Highest prio first, oldest first
 
             var sIds = TranQuery<SubscriptionEventIdentifier>(query, new Dictionary<string, object>
                 {

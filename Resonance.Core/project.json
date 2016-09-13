@@ -2,7 +2,10 @@
   "title": "Resonance",
   "copyright": "Copyright 2016 - Robert te Kaat",
   "description": "Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc.",
-  "version": "0.1.0-*",
+  "version": "0.1.1-*",
+  "buildOptions": {
+    "copyToOutput": { "includeFiles": [ "Content\\ResonanceDB.sql" ] }
+  },
 
   "dependencies": {
     "Dapper": "1.50.2",
