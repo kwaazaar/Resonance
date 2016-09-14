@@ -39,10 +39,10 @@ namespace Resonance.Demo
                 subscription = consumer.AddOrUpdateSubscription(new Subscription
                 {
                     Name = "Demo Subscription",
-                    DeliveryDelay = 3,
+                    DeliveryDelay = 0,
                     MaxDeliveries = 2,
                     Ordered = true,
-                    TimeToLive = 60,
+                    TimeToLive = 600,
                     TopicSubscriptions = new List<TopicSubscription>
                     {
                         new TopicSubscription
@@ -57,14 +57,15 @@ namespace Resonance.Demo
             publisher.Publish(
                 topicName: "Demo Topic",
                 headers: new Dictionary<string, string> { { "EventName", "PaymentReceived" }, { "MessageId", "12345" } },
+                functionalKey: "1234",
                 payload: new Tuple<string, int, string>("Robert", 40, "Holland")); // Publish typed
 
             System.Threading.Thread.Sleep(3000); // The subscription has a delivery delay configured
 
             var consEvent = consumer.ConsumeNext<Tuple<string, int, string>>("Demo Subscription"); // Consume typed
             if (consEvent != null)
-                //consumer.MarkConsumed(consEvent.Id, consEvent.DeliveryKey);
-                consumer.MarkFailed(consEvent.Id, consEvent.DeliveryKey, Reason.Other("Kaput"));
+                consumer.MarkConsumed(consEvent.Id, consEvent.DeliveryKey);
+                //consumer.MarkFailed(consEvent.Id, consEvent.DeliveryKey, Reason.Other("Kaput"));
 
             consumer.DeleteSubscription(subscription.Id);
             publisher.DeleteTopic(topic.Id, true);

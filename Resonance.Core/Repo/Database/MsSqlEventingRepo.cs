@@ -556,30 +556,46 @@ namespace Resonance.Repo.Database
 
         private int AddConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
-            return TranExecute("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, PublishedDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, ConsumedDateUtc)" +
-                " values (@id, @subscriptionId, @publishedDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @consumedDateUtc)",
+            return TranExecute("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, ConsumedDateUtc)" +
+                " values (@id, @subscriptionId, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @consumedDateUtc)",
                 new Dictionary<string, object>
                 {
-                    { "@id", subscriptionEvent.Id.ToDbKey() },
-                    { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
-                    { "@publishedDateUtc", subscriptionEvent.PublicationDateUtc },
-                    { "@functionalKey", subscriptionEvent.FunctionalKey },
-                    { "@priority", subscriptionEvent.Priority },
-                    { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
-                    { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
-                    { "@consumedDateUtc", DateTime.UtcNow },
+                { "@id", subscriptionEvent.Id.ToDbKey() },
+                { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
+                { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
+                { "@functionalKey", subscriptionEvent.FunctionalKey },
+                { "@priority", subscriptionEvent.Priority },
+                { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
+                { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
+                { "@consumedDateUtc", DateTime.UtcNow },
                 });
+        }
+
+        private int UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
+        {
+            var query = "MERGE LastConsumedSubscriptionEvent AS target" +
+                " USING(SELECT @subscriptionId, @functionalKey) as source(SubscriptionId, FunctionalKey)" +
+                " ON(target.SubscriptionId = source.SubscriptionId AND target.FunctionalKey = source.FunctionalKey)" +
+                " WHEN MATCHED THEN UPDATE SET PublicationDateUtc = @publicationDateUtc" +
+                " WHEN NOT MATCHED THEN INSERT(SubscriptionId, FunctionalKey, PublicationDateUtc) VALUES(source.SubscriptionId, source.FunctionalKey, @publicationDateUtc);";
+
+            return TranExecute(query, new Dictionary<string, object>
+            {
+                { "@subscriptionId", subscriptionEvent.SubscriptionId },
+                { "@functionalKey", subscriptionEvent.FunctionalKey },
+                { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
+            });
         }
 
         private int AddFailedSubscriptionEvent(SubscriptionEvent subscriptionEvent, Reason reason)
         {
-            return TranExecute("insert into FailedSubscriptionEvent (Id, SubscriptionId, PublishedDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, FailedDateUtc, Reason, ReasonOther)" +
-                " values (@id, @subscriptionId, @publishedDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @failedDateUtc, @reason, @reasonOther)",
+            return TranExecute("insert into FailedSubscriptionEvent (Id, SubscriptionId, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, FailedDateUtc, Reason, ReasonOther)" +
+                " values (@id, @subscriptionId, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @failedDateUtc, @reason, @reasonOther)",
                 new Dictionary<string, object>
                 {
                     { "@id", subscriptionEvent.Id.ToDbKey() },
                     { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
-                    { "@publishedDateUtc", subscriptionEvent.PublicationDateUtc },
+                    { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
                     { "@priority", subscriptionEvent.Priority },
                     { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
@@ -618,16 +634,34 @@ namespace Resonance.Repo.Database
             // Larger buffer failes for ordered delivery subscriptions (it will return more than one event per functional key and a second cannot yet be consumed while we're not sure about the first
             int bufferSize = subscription.Ordered ? 1 : 10;
 
-            string query = $"select TOP {bufferSize} se.Id, se.DeliveryKey, se.FunctionalKey, se.PayloadId" // Get the minimal amount of data
-                + " from SubscriptionEvent se"
-                + " join Subscription s on s.Id = se.SubscriptionId" // Needed for MaxRetries
-                + " where se.SubscriptionId = @subscriptionId"
-                + " and (se.DeliveryDelayedUntilUtc IS NULL OR se.DeliveryDelayedUntilUtc < @utcNow)" // Must be allowed to be delivered
-                + " and (se.ExpirationDateUtc IS NULL OR se.ExpirationDateUtc > @utcNow)" // Must not yet have expired
-                + " and (se.InvisibleUntilUtc IS NULL OR se.InvisibleUntilUtc < @utcNow)" // Must not be 'locked'/made invisible by other consumer
-                + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
-                + " order by se.Priority DESC, se.PublicationDateUtc DESC"; // Highest prio first, oldest first
-
+            string query = null;
+            if (!subscription.Ordered)
+            {
+                query = $"select TOP {bufferSize} se.Id, se.DeliveryKey, se.FunctionalKey, se.PayloadId" // Get the minimal amount of data
+                    + " from SubscriptionEvent se"
+                    + " join Subscription s on s.Id = se.SubscriptionId" // Needed for MaxRetries
+                    + " where se.SubscriptionId = @subscriptionId"
+                    + " and (se.DeliveryDelayedUntilUtc IS NULL OR se.DeliveryDelayedUntilUtc < @utcNow)" // Must be allowed to be delivered
+                    + " and (se.ExpirationDateUtc IS NULL OR se.ExpirationDateUtc > @utcNow)" // Must not yet have expired
+                    + " and (se.InvisibleUntilUtc IS NULL OR se.InvisibleUntilUtc < @utcNow)" // Must not be 'locked'/made invisible by other consumer
+                    + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
+                    + " order by se.Priority DESC, se.PublicationDateUtc ASC"; // Highest prio first, oldest first
+            }
+            else
+            {
+                query = $"select TOP {bufferSize} se.Id, se.DeliveryKey, se.FunctionalKey, se.PayloadId" // Get the minimal amount of data
+                    + " from SubscriptionEvent se"
+                    + " join Subscription s on s.Id = se.SubscriptionId" // Needed for MaxRetries
+                    + " left join LastConsumedSubscriptionEvent lc" // For functional ordering
+                    + "   on lc.SubscriptionId = se.SubscriptionId and lc.FunctionalKey = se.FunctionalKey"
+                    + " where se.SubscriptionId = @subscriptionId"
+                    + " and (se.DeliveryDelayedUntilUtc IS NULL OR se.DeliveryDelayedUntilUtc < @utcNow)" // Must be allowed to be delivered
+                    + " and (se.ExpirationDateUtc IS NULL OR se.ExpirationDateUtc > @utcNow)" // Must not yet have expired
+                    + " and (se.InvisibleUntilUtc IS NULL OR se.InvisibleUntilUtc < @utcNow)" // Must not be 'locked'/made invisible by other consumer
+                    + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
+                    + " and	(lc.SubscriptionId IS NULL OR (lc.PublicationDateUtc < se.PublicationDateUtc))" // Newer than last published (TODO: PRIORITY!!)
+                    + " order by se.Priority DESC, se.PublicationDateUtc ASC"; // Warning: prio can mess everything up!
+            }
             var sIds = TranQuery<SubscriptionEventIdentifier>(query, new Dictionary<string, object>
                 {
                     { "@subscriptionId", subscription.Id.ToDbKey() },
@@ -642,7 +676,7 @@ namespace Resonance.Repo.Database
             if (se == null) throw new ArgumentException($"No subscription-event found with id {id}. Maybe it has already been consumed (by another). Using a higher visibility timeout may help.");
 
             if (!se.DeliveryKey.Equals(deliveryKey, StringComparison.OrdinalIgnoreCase) // Mismatch is only ok... (we DID consume it)
-               && se.InvisibleUntilUtc > DateTime.UtcNow) // ... If not currently locked
+               && se.InvisibleUntilUtc > DateTime.UtcNow) // ... if not currently locked
                 throw new ArgumentException($"Subscription-event with id {id} had expired and it has already been locked again.");
 
             BeginTransaction();
@@ -663,6 +697,13 @@ namespace Resonance.Repo.Database
                 rowsUpdated = AddConsumedSubscriptionEvent(se);
                 if (rowsUpdated == 0)
                     throw new InvalidOperationException($"Failed to add ConsumedSubscriptionEvent for SubscriptionEvent with id {id}.");
+
+                // 3. Upsert LastConsumedSubscriptionEvent
+                if (se.FunctionalKey != null) // Only makes sense with a functional key
+                {
+                    if (UpdateLastConsumedSubscriptionEvent(se) != 1) // Must hit exactly 1 row
+                        throw new InvalidOperationException($"Failed to upsert LastConsumedSubscriptionEvent for SubscriptionEvent with id {id}.");
+                }
 
                 CommitTransaction();
             }

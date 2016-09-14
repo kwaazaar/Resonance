@@ -10,11 +10,11 @@
       "type": "platform",
       "version": "1.0.0"
     },
-    "Resonance.Core": "0.1.0-*",
     "Microsoft.Extensions.DependencyInjection": "1.0.0",
     "Microsoft.Extensions.Configuration": "1.0.0",
     "Microsoft.Extensions.Configuration.FileExtensions": "1.0.0",
-    "Microsoft.Extensions.Configuration.Json": "1.0.0"
+    "Microsoft.Extensions.Configuration.Json": "1.0.0",
+    "Resonance.Core": "0.1.3-alpha"
   },
 
   "frameworks": {
