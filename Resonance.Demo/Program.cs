@@ -10,6 +10,7 @@ using System.IO;
 using Resonance.Repo;
 using Resonance.Models;
 using Resonance.Repo.Database;
+using Microsoft.Extensions.Logging;
 
 namespace Resonance.Demo
 {
@@ -60,12 +61,23 @@ namespace Resonance.Demo
                 functionalKey: "1234",
                 payload: new Tuple<string, int, string>("Robert", 40, "Holland")); // Publish typed
 
-            System.Threading.Thread.Sleep(3000); // The subscription has a delivery delay configured
+            var worker = new EventConsumptionWorker(consumer,
+                serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>(),
+                "Demo Subscription",
+                100, 5000, 30,
+                (ce) =>
+                {
+                    return true;
+                });
+            worker.Start();
+            Console.WriteLine("Press a key to stop the worker...");
+            Console.ReadKey();
+            worker.Stop();
 
-            var consEvent = consumer.ConsumeNext<Tuple<string, int, string>>("Demo Subscription"); // Consume typed
-            if (consEvent != null)
-                consumer.MarkConsumed(consEvent.Id, consEvent.DeliveryKey);
-                //consumer.MarkFailed(consEvent.Id, consEvent.DeliveryKey, Reason.Other("Kaput"));
+            //var consEvent = consumer.ConsumeNext<Tuple<string, int, string>>("Demo Subscription"); // Consume typed
+            //if (consEvent != null)
+            //    consumer.MarkConsumed(consEvent.Id, consEvent.DeliveryKey);
+            //    //consumer.MarkFailed(consEvent.Id, consEvent.DeliveryKey, Reason.Other("Kaput"));
 
             consumer.DeleteSubscription(subscription.Id);
             publisher.DeleteTopic(topic.Id, true);
@@ -83,6 +95,11 @@ namespace Resonance.Demo
 
             // Add IConfiguration dependency (reason: allows access to config from any injected component)
             serviceCollection.AddSingleton<IConfiguration>(config);
+
+            ILoggerFactory loggerFactory = new LoggerFactory()
+                .AddConsole()
+                .AddDebug();
+            serviceCollection.AddSingleton<ILoggerFactory>(loggerFactory);
 
             // Configure IDbConnection dependency (reason: may be required by IEventingRepo dependencies)
             var connectionString = config.GetConnectionString("Resonance");
