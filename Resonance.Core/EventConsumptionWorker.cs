@@ -26,7 +26,7 @@ namespace Resonance
         private readonly IEventConsumer _eventConsumer;
         private readonly ILogger<EventConsumptionWorker> _logger;
         private readonly string _subscriptionName;
-        private readonly Func<ConsumableEvent, bool> _consumeAction;
+        private readonly Func<ConsumableEvent, ConsumeResult> _consumeAction;
         private readonly int _visibilityTimeout;
 
         /// <summary>
@@ -40,7 +40,7 @@ namespace Resonance
         /// <param name="consumeAction">Action that must be invoked for each event. Must be thread-safe when parallelExecution is enabled!</param>
         public EventConsumptionWorker(IEventConsumer eventConsumer, ILogger<EventConsumptionWorker> logger, string subscriptionName,
             int minBackOffDelayInMs, int maxBackOffDelayInMs,// int maxThreads,
-            int visibilityTimeout, Func<ConsumableEvent, bool> consumeAction)
+            int visibilityTimeout, Func<ConsumableEvent, ConsumeResult> consumeAction)
         {
             if (maxBackOffDelayInMs < minBackOffDelayInMs) throw new ArgumentOutOfRangeException("maxBackOffDelayInSeconds", "maxBackOffDelayInSeconds must be greater than minBackOffDelay");
 
@@ -86,7 +86,6 @@ namespace Resonance
         {
             var timeout = this.GetBackOffDelay(this._attempts, this._minDelayInMs, this._maxDelayInMs);
             _logger.LogInformation($"Backing off for {timeout}.");
-
            
             Task.WaitAll(new Task[] { Task.Delay(timeout) }, _cancellationToken.Token);
         }
@@ -155,7 +154,7 @@ namespace Resonance
                 throw new InvalidOperationException("Task is already running or has not yet finished stopping");
 
             this._cancellationToken = new CancellationTokenSource();
-            this._internalTask = Task.Factory.StartNew(async () =>
+            this._internalTask = Task.Factory.StartNew(() =>
             {
                 while (!this._cancellationToken.IsCancellationRequested)
                 {
@@ -165,13 +164,12 @@ namespace Resonance
                     else
                     {
                         // Suspend processing
-                        await Task.Delay(suspendedUntilUtc.Value - DateTime.UtcNow, _cancellationToken.Token);
+                        Task.WaitAll(new Task[] { Task.Delay(suspendedUntilUtc.Value - DateTime.UtcNow) }, _cancellationToken.Token);
                         lock (_suspendTimeoutLock)
                             _suspendedUntilUtc = null;
                     }
                 }
-            }, this._cancellationToken.Token);
-            // Lonmgrunning
+            }, TaskCreationOptions.LongRunning); // CancellationToken is not passed: it's checked internally (while-loop) for gracefull cancellation
         }
 
         /// <summary>
@@ -308,48 +306,21 @@ namespace Resonance
 
         private bool ExecuteConcrete(ConsumableEvent ce)
         {
-            bool completed = false;
+            ConsumeResult result = null;
             bool mustRollback = false;
 
             try
             {
                 _logger.LogInformation($"Processing event with id {ce.Id} and functional key {ce.FunctionalKey}.");
-                completed = _consumeAction(ce);
+                result = _consumeAction(ce);
             }
-            //catch (BusinessEventWorkerException workerEx)
-            //{
-            //    mustRollback = true;
-
-            //    if (workerEx.SuspendTimeout != TimeSpan.MinValue)
-            //    {
-            //        var suspendedUntilUtc = this.Suspend(workerEx.SuspendTimeout);
-            //        LoggingManager.LogError("BusinessEventWorkerException opgetreden voor businessevent {0} (sleutel: {1}), polling uitgesteld t/m {2} (UTC). Details: {3}",
-            //            ce.EventName,
-            //            ce.FunctionalKey,
-            //            suspendedUntilUtc,
-            //            workerEx.ToString());
-            //    }
-            //    else
-            //        LoggingManager.LogError("BusinessEventWorkerException opgetreden voor businessevent {0} (sleutel: {1}), polling wordt voortgezet. Details: {2}",
-            //            ce.EventName,
-            //            ce.FunctionalKey,
-            //            workerEx.ToString());
-            //}
             catch (Exception procEx)
             {
-                // Let op: een exception anders dan BusinessEventWorkerException, wordt als corrupt beschouwd!
-                _logger.LogError("Exception occurred while processing event with id {ce.Id} and functional key {ce.FunctionalKey}: {procEx}.");
-                mustRollback = true;
-
-                try
-                {
-                    _eventConsumer.MarkFailed(ce.Id, ce.DeliveryKey, Reason.Other(procEx.ToString()));
-                }
-                catch (Exception) { } // Swallow, want is geen ramp als deze toch opnieuw wordt aangeboden (dan wordt hij alsnog corrupt gemeld)
+                result = ConsumeResult.Failed(procEx.ToString());
             }
 
 
-            if (completed)
+            if (result.ResultType == ConsumeResultType.Succeeded)
             {
                 bool markedComplete = false;
 
@@ -357,6 +328,7 @@ namespace Resonance
                 {
                     _eventConsumer.MarkConsumed(ce.Id, ce.DeliveryKey);
                     markedComplete = true;
+                    _logger.LogInformation($"Event consumption succeeded for event with id {ce.Id} and functional key {ce.FunctionalKey}.");
                 }
                 catch (Exception ex)
                 {
@@ -368,17 +340,27 @@ namespace Resonance
                 if (!markedComplete)
                     mustRollback = true;
             }
+            else if (result.ResultType == ConsumeResultType.Failed)
+            {
+                mustRollback = true;
+                // Let op: een exception anders dan BusinessEventWorkerException, wordt als corrupt beschouwd!
+                _logger.LogError("Exception occurred while processing event with id {ce.Id} and functional key {ce.FunctionalKey}: {procEx}.");
 
-            if (completed && !mustRollback)
-            {
-                _logger.LogInformation($"Event consumption succeeded for event with id {ce.Id} and functional key {ce.FunctionalKey}.");
-                return true;
+                try
+                {
+                    _eventConsumer.MarkFailed(ce.Id, ce.DeliveryKey, Reason.Other(result.Reason));
+                }
+                catch (Exception) { } // Swallow, want is geen ramp als deze toch opnieuw wordt aangeboden (dan wordt hij alsnog corrupt gemeld)
             }
-            else
+            else if (result.ResultType == ConsumeResultType.MustSuspend)
             {
-                _logger.LogInformation($"Event consumption failed for event with id {ce.Id} and functional key {ce.FunctionalKey}.");
-                return false;
+                mustRollback = true;
+                var suspendedUntilUtc = this.Suspend(result.SuspendDuration.GetValueOrDefault(TimeSpan.FromSeconds(60)));
+                _logger.LogError($"Event consumption failed for event with id {ce.Id} and functional key {ce.FunctionalKey}. Processing suspended until {suspendedUntilUtc} (UTC). Reason: {result.Reason}.");
             }
+            // MustRetry does nothing: default behaviour when not marked consumed/failed
+
+            return (result.ResultType == ConsumeResultType.Succeeded && !mustRollback);
         }
 
         /// <summary>

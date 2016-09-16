@@ -67,7 +67,10 @@ namespace Resonance.Demo
                 100, 5000, 30,
                 (ce) =>
                 {
-                    return true;
+                    if (DateTime.UtcNow.Second % 2 == 0)
+                        return ConsumeResult.Succeeded;
+                    else
+                        return ConsumeResult.MustSuspend(TimeSpan.FromSeconds(10), "Zomaar :)");
                 });
             worker.Start();
             Console.WriteLine("Press a key to stop the worker...");
