@@ -11,12 +11,37 @@ using Resonance.Repo;
 using Resonance.Models;
 using Resonance.Repo.Database;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace Resonance.Demo
 {
     public class Program
     {
         private static IServiceProvider serviceProvider;
+
+        #region Payloads
+        private static string payload100 = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
+        private static string payload2000 = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
+            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
+        #endregion
 
         public static void Main(string[] args)
         {
@@ -28,50 +53,55 @@ namespace Resonance.Demo
             var consumer = serviceProvider.GetRequiredService<IEventConsumer>();
 
             // Make sure the topic exists
-            var topic = publisher.GetTopicByName("Demo Topic");
-            if (topic == null)
-                topic = publisher.AddOrUpdateTopic(new Topic
-                {
-                    Name = "Demo Topic",
-                    Notes = "This topic is for demo purposes. Nothing to see here, move along!",
-                });
-            var subscription = consumer.GetSubscriptionByName("Demo Subscription");
-            if (subscription == null)
-                subscription = consumer.AddOrUpdateSubscription(new Subscription
-                {
-                    Name = "Demo Subscription",
-                    DeliveryDelay = 0,
-                    MaxDeliveries = 2,
-                    Ordered = true,
-                    TimeToLive = 600,
-                    TopicSubscriptions = new List<TopicSubscription>
-                    {
-                        new TopicSubscription
-                        {
-                            TopicId = topic.Id,
-                            Enabled = true,
-                        },
-                    },
-                });
+            var topic1 = publisher.AddOrUpdateTopic(new Topic { Id = "c526527a-9d16-4fa5-8ed7-000000000001", Name = "Demo Topic 1" });
+            var topic2 = publisher.AddOrUpdateTopic(new Topic { Id = "c526527a-9d16-4fa5-8ed7-000000000002", Name = "Demo Topic 2" });
+            var topic3 = publisher.AddOrUpdateTopic(new Topic { Id = "c526527a-9d16-4fa5-8ed7-000000000003", Name = "Demo Topic 3" });
+            var topic4 = publisher.AddOrUpdateTopic(new Topic { Id = "c526527a-9d16-4fa5-8ed7-000000000004", Name = "Demo Topic 4" });
+            var topic5 = publisher.AddOrUpdateTopic(new Topic { Id = "c526527a-9d16-4fa5-8ed7-000000000005", Name = "Demo Topic 5" });
+            var subscription1 = consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Id = "a526527a-9d16-4fa5-8ed7-000000000001",
+                Name = "Demo Subscription 1",
+                Ordered = true,
+                TopicSubscriptions = new List<TopicSubscription>
+                { new TopicSubscription { TopicId = topic1.Id, Enabled = true }, new TopicSubscription { TopicId = topic3.Id, Enabled = true }, new TopicSubscription { TopicId = topic5.Id, Enabled = true } }
+            });
+            var subscription2 = consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Id = "a526527a-9d16-4fa5-8ed7-000000000002",
+                Name = "Demo Subscription 2",
+                Ordered = false,
+                TopicSubscriptions = new List<TopicSubscription>
+                { new TopicSubscription { TopicId = topic1.Id, Enabled = true }, new TopicSubscription { TopicId = topic2.Id, Enabled = true }, new TopicSubscription { TopicId = topic4.Id, Enabled = true } }
+            });
 
-            // Now publish an event
-            publisher.Publish(
-                topicName: "Demo Topic",
-                headers: new Dictionary<string, string> { { "EventName", "PaymentReceived" }, { "MessageId", "12345" } },
-                functionalKey: "1234",
-                payload: new Tuple<string, int, string>("Robert", 40, "Holland")); // Publish typed
+            var sw = new Stopwatch();
+            //sw.Start();
+            //for (int i = 0; i < 10000; i++)
+            //{
+            //    publisher.Publish(topic1.Name, functionalKey: "1", payload: payload100);
+            //    publisher.Publish(topic1.Name, functionalKey: "1", payload: payload2000);
+            //    publisher.Publish(topic1.Name, functionalKey: "2", payload: payload100);
+            //    publisher.Publish(topic1.Name, functionalKey: "2", payload: payload2000);
+            //    publisher.Publish(topic1.Name, functionalKey: "3", payload: payload100);
+            //    publisher.Publish(topic2.Name, functionalKey: "1", payload: payload100);
+            //    publisher.Publish(topic2.Name, functionalKey: "1", payload: payload2000);
+            //    publisher.Publish(topic2.Name, functionalKey: "2", payload: payload100);
+            //    publisher.Publish(topic3.Name, functionalKey: "2", payload: payload2000);
+            //    publisher.Publish(topic3.Name, functionalKey: "3", payload: payload100);
+            //    publisher.Publish(topic4.Name, functionalKey: "1", payload: payload100);
+            //    publisher.Publish(topic5.Name, functionalKey: "2", payload: payload100);
+            //}
+            //sw.Stop();
+            //Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
 
             var worker = new EventConsumptionWorker(consumer,
                 serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>(),
-                "Demo Subscription",
-                100, 5000, 30,
-                (ce) =>
+                "Demo Subscription 2", (ce) =>
                 {
-                    if (DateTime.UtcNow.Second % 2 == 0)
-                        return ConsumeResult.Succeeded;
-                    else
-                        return ConsumeResult.MustSuspend(TimeSpan.FromSeconds(10), "Zomaar :)");
-                });
+                    return ConsumeResult.Succeeded;
+                }, maxThreads: 10);
+            sw.Reset();
             worker.Start();
             Console.WriteLine("Press a key to stop the worker...");
             Console.ReadKey();
@@ -82,8 +112,8 @@ namespace Resonance.Demo
             //    consumer.MarkConsumed(consEvent.Id, consEvent.DeliveryKey);
             //    //consumer.MarkFailed(consEvent.Id, consEvent.DeliveryKey, Reason.Other("Kaput"));
 
-            consumer.DeleteSubscription(subscription.Id);
-            publisher.DeleteTopic(topic.Id, true);
+            //consumer.DeleteSubscription(subscription.Id);
+            //publisher.DeleteTopic(topic.Id, true);
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)

@@ -21,7 +21,7 @@ namespace Resonance
         private object _suspendTimeoutLock = new object();
         private readonly int _minDelayInMs;
         private readonly int _maxDelayInMs;
-        //private readonly int _maxThreads;
+        private readonly int _maxThreads;
 
         private readonly IEventConsumer _eventConsumer;
         private readonly ILogger<EventConsumptionWorker> _logger;
@@ -39,15 +39,15 @@ namespace Resonance
         /// <param name="visibilityTimeout">Number of seconds the business event must be locked</param>
         /// <param name="consumeAction">Action that must be invoked for each event. Must be thread-safe when parallelExecution is enabled!</param>
         public EventConsumptionWorker(IEventConsumer eventConsumer, ILogger<EventConsumptionWorker> logger, string subscriptionName,
-            int minBackOffDelayInMs, int maxBackOffDelayInMs,// int maxThreads,
-            int visibilityTimeout, Func<ConsumableEvent, ConsumeResult> consumeAction)
+            Func<ConsumableEvent, ConsumeResult> consumeAction, int visibilityTimeout = 60,
+            int minBackOffDelayInMs = 1, int maxBackOffDelayInMs = 60000, int maxThreads = 1)
         {
             if (maxBackOffDelayInMs < minBackOffDelayInMs) throw new ArgumentOutOfRangeException("maxBackOffDelayInSeconds", "maxBackOffDelayInSeconds must be greater than minBackOffDelay");
 
             this._minDelayInMs = minBackOffDelayInMs;
             this._maxDelayInMs = maxBackOffDelayInMs;
             this._cancellationToken = new CancellationTokenSource();
-            //this._maxThreads = maxThreads;
+            this._maxThreads = maxThreads;
 
             this._eventConsumer = eventConsumer;
             this._logger = logger;
@@ -86,8 +86,12 @@ namespace Resonance
         {
             var timeout = this.GetBackOffDelay(this._attempts, this._minDelayInMs, this._maxDelayInMs);
             _logger.LogInformation($"Backing off for {timeout}.");
-           
-            Task.WaitAll(new Task[] { Task.Delay(timeout) }, _cancellationToken.Token);
+
+            try
+            {
+                Task.WaitAll(new Task[] { Task.Delay(timeout) }, _cancellationToken.Token);
+            }
+            catch (OperationCanceledException) { }
         }
 
         /// <summary>
@@ -163,8 +167,12 @@ namespace Resonance
                         this.TryExecuteWorkItems();
                     else
                     {
-                        // Suspend processing
-                        Task.WaitAll(new Task[] { Task.Delay(suspendedUntilUtc.Value - DateTime.UtcNow) }, _cancellationToken.Token);
+                        try
+                        { 
+                            // Suspend processing
+                            Task.WaitAll(new Task[] { Task.Delay(suspendedUntilUtc.Value - DateTime.UtcNow) }, _cancellationToken.Token);
+                        }
+                        catch (OperationCanceledException) { }
                         lock (_suspendTimeoutLock)
                             _suspendedUntilUtc = null;
                     }
@@ -194,9 +202,9 @@ namespace Resonance
                 {
                     this._attempts = 0;
 
-                    //if (this._maxThreads > 1)
-                    //    workitems.AsParallel().ForAll(new Action<ConsumableEvent>(this.ExecuteWork));
-                    //else
+                    if (this._maxThreads > 1)
+                        workitems.AsParallel().ForAll(new Action<ConsumableEvent>(this.ExecuteWork));
+                    else
                         workitems.ToList().ForEach(new Action<ConsumableEvent>(this.ExecuteWork)); // Executed on single (current) thread, but theoretically the TryGetWork could have returned more than one workitem
 
                     this.BackOff(); // Ook hier backoff, zodat obv minBackOffDelayInMs vermeden wordt dat deze verwerking alle CPU opeist.

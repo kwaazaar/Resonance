@@ -12,7 +12,8 @@
   "dependencies": {
     "Dapper": "1.50.2",
     "Microsoft.Extensions.Logging.Abstractions": "1.0.0",
-    "Newtonsoft.Json": "9.0.1"
+    "Newtonsoft.Json": "9.0.1",
+    "System.Linq.Parallel": "4.0.1"
   },
 
   "frameworks": {
