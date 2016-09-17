@@ -61,7 +61,7 @@ namespace Resonance.Demo
             var subscription1 = consumer.AddOrUpdateSubscription(new Subscription
             {
                 Id = "a526527a-9d16-4fa5-8ed7-000000000001",
-                Name = "Demo Subscription 1",
+                Name = "Demo Subscription 1", MaxDeliveries = 2,
                 Ordered = true,
                 TopicSubscriptions = new List<TopicSubscription>
                 { new TopicSubscription { TopicId = topic1.Id, Enabled = true }, new TopicSubscription { TopicId = topic3.Id, Enabled = true }, new TopicSubscription { TopicId = topic5.Id, Enabled = true } }
@@ -69,7 +69,7 @@ namespace Resonance.Demo
             var subscription2 = consumer.AddOrUpdateSubscription(new Subscription
             {
                 Id = "a526527a-9d16-4fa5-8ed7-000000000002",
-                Name = "Demo Subscription 2",
+                Name = "Demo Subscription 2", MaxDeliveries = 2,
                 Ordered = false,
                 TopicSubscriptions = new List<TopicSubscription>
                 { new TopicSubscription { TopicId = topic1.Id, Enabled = true }, new TopicSubscription { TopicId = topic2.Id, Enabled = true }, new TopicSubscription { TopicId = topic4.Id, Enabled = true } }
@@ -98,21 +98,16 @@ namespace Resonance.Demo
 
             var worker = new EventConsumptionWorker(consumer,
                 serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>(),
-                "Demo Subscription 2", (ce) =>
+                "Demo Subscription 1", (ce) =>
                 {
                     //Console.WriteLine($"Consumed {ce.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
-                    return ConsumeResult.Succeeded;
-                }, maxThreads: 10, minBackOffDelayInMs: 0);
+                    return DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded;
+                }, maxThreads: 100, minBackOffDelayInMs: 0);
             sw.Reset();
             worker.Start();
             Console.WriteLine("Press a key to stop the worker...");
             Console.ReadKey();
             worker.Stop();
-
-            //var consEvent = consumer.ConsumeNext<Tuple<string, int, string>>("Demo Subscription"); // Consume typed
-            //if (consEvent != null)
-            //    consumer.MarkConsumed(consEvent.Id, consEvent.DeliveryKey);
-            //    //consumer.MarkFailed(consEvent.Id, consEvent.DeliveryKey, Reason.Other("Kaput"));
 
             //consumer.DeleteSubscription(subscription.Id);
             //publisher.DeleteTopic(topic.Id, true);
