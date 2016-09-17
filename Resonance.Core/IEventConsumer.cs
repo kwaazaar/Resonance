@@ -8,8 +8,8 @@ namespace Resonance
 {
     public interface IEventConsumer
     {
-        ConsumableEvent ConsumeNext(string subscriptionName, int? visibilityTimeout = null);
-        ConsumableEvent<T> ConsumeNext<T>(string subscriptionName, int? visibilityTimeout = default(int?));
+        IEnumerable<ConsumableEvent> ConsumeNext(string subscriptionName, int? visibilityTimeout = null, int maxCount = 1);
+        IEnumerable<ConsumableEvent<T>> ConsumeNext<T>(string subscriptionName, int? visibilityTimeout = default(int?), int maxCount = 1);
         void MarkConsumed(string id, string deliveryKey);
         void MarkFailed(string id, string deliveryKey, Reason reason);
 

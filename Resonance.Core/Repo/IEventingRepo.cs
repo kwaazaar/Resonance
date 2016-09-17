@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Resonance.Repo
 {
-    public interface IEventingRepo
+    public interface IEventingRepo : IDisposable
     {
         // Transaction Management
         /// <summary>
@@ -38,7 +38,7 @@ namespace Resonance.Repo
         string AddSubscriptionEvent(SubscriptionEvent subscriptionEvent);
 
         // Consumption
-        IEnumerable<SubscriptionEventIdentifier> FindConsumableEventsForSubscription(Subscription subscription);
+        IEnumerable<SubscriptionEventIdentifier> FindConsumableEventsForSubscription(Subscription subscription, int maxCount);
         bool TryLockConsumableEvent(SubscriptionEventIdentifier sId, string deliveryKey, DateTime invisibleUntilUtc);
         void MarkConsumed(string id, string deliveryKey);
         void MarkFailed(string id, string deliveryKey, Reason reason);

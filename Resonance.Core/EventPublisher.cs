@@ -10,127 +10,134 @@ namespace Resonance
 {
     public class EventPublisher : IEventPublisher
     {
-        private IEventingRepo _repo;
+        private IEventingRepoFactory _repoFactory;
 
-        public EventPublisher(IEventingRepo repo)
+        public EventPublisher(IEventingRepoFactory repoFactory)
         {
-            _repo = repo;
+            _repoFactory = repoFactory;
         }
 
         public Topic AddOrUpdateTopic(Topic topic)
         {
-            return _repo.AddOrUpdateTopic(topic);
+            using (var repo = _repoFactory.CreateRepo())
+                return repo.AddOrUpdateTopic(topic);
         }
 
         public void DeleteTopic(string id, bool inclSubscriptions)
         {
-            _repo.DeleteTopic(id, inclSubscriptions);
+            using (var repo = _repoFactory.CreateRepo())
+                repo.DeleteTopic(id, inclSubscriptions);
         }
 
         public Topic GetTopic(string id)
         {
-            return _repo.GetTopic(id);
+            using (var repo = _repoFactory.CreateRepo())
+                return repo.GetTopic(id);
         }
 
         public Topic GetTopicByName(string name)
         {
-            return _repo.GetTopicByName(name);
+            using (var repo = _repoFactory.CreateRepo())
+                return repo.GetTopicByName(name);
         }
 
         public IEnumerable<Topic> GetTopics(string partOfName = null)
         {
-            return _repo.GetTopics(partOfName)
-                .ToList();
+            using (var repo = _repoFactory.CreateRepo())
+                return repo.GetTopics(partOfName).ToList();
         }
 
         public TopicEvent Publish(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, string payload = null)
         {
-            var topic = _repo.GetTopicByName(topicName);
-            if (topic == null)
-                throw new ArgumentException($"Topic with name {topicName} not found", "topicName");
-
-            // Store payload (outside transaction, no need to lock right now already)
-            string payloadId = (payload != null) ? _repo.StorePayload(payload) : null;
-
-            var subscriptions = _repo.GetSubscriptions(topicId: topic.Id).ToList();
-
-            _repo.BeginTransaction();
-            try
+            using (var repo = _repoFactory.CreateRepo())
             {
-                // Store topic event
-                var newTopicEvent = new TopicEvent
-                {
-                    TopicId = topic.Id,
-                    PublicationDateUtc = publicationDateUtc.GetValueOrDefault(DateTime.UtcNow),
-                    FunctionalKey = functionalKey,
-                    ExpirationDateUtc = expirationDateUtc,
-                    Headers = headers,
-                    PayloadId = payloadId,
-                };
-                string topicEventId = _repo.AddTopicEvent(newTopicEvent);
-                newTopicEvent.Id = topicEventId;
+                var topic = repo.GetTopicByName(topicName);
+                if (topic == null)
+                    throw new ArgumentException($"Topic with name {topicName} not found", "topicName");
 
-                foreach (var subscription in subscriptions)
+                // Store payload (outside transaction, no need to lock right now already)
+                string payloadId = (payload != null) ? repo.StorePayload(payload) : null;
+
+                var subscriptions = repo.GetSubscriptions(topicId: topic.Id).ToList();
+
+                repo.BeginTransaction();
+                try
                 {
-                    // Create SubscriptionEvents for topicsubscriptions for the specified topic that are enabled
-                    foreach (var topicSubscription in subscription.TopicSubscriptions
-                        .Where((ts) => ts.TopicId.Equals(topic.Id, StringComparison.OrdinalIgnoreCase)) // Correct topic
-                        .Where((ts) => ts.Enabled) // Enabled
-                        .Where((ts) => !ts.Filtered || CheckFilters(ts.Filters, headers))) // Filters match
+                    // Store topic event
+                    var newTopicEvent = new TopicEvent
                     {
-                        // By default a SubscriptionEvent takes expirationdate of TopicEvent
-                        var subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
+                        TopicId = topic.Id,
+                        PublicationDateUtc = publicationDateUtc.GetValueOrDefault(DateTime.UtcNow),
+                        FunctionalKey = functionalKey,
+                        ExpirationDateUtc = expirationDateUtc,
+                        Headers = headers,
+                        PayloadId = payloadId,
+                    };
+                    string topicEventId = repo.AddTopicEvent(newTopicEvent);
+                    newTopicEvent.Id = topicEventId;
 
-                        // If subscription has its own TTL, it will be applied, but may never exceed the TopicEvent expiration
-                        if (subscription.TimeToLive.HasValue)
+                    foreach (var subscription in subscriptions)
+                    {
+                        // Create SubscriptionEvents for topicsubscriptions for the specified topic that are enabled
+                        foreach (var topicSubscription in subscription.TopicSubscriptions
+                            .Where((ts) => ts.TopicId.Equals(topic.Id, StringComparison.OrdinalIgnoreCase)) // Correct topic
+                            .Where((ts) => ts.Enabled) // Enabled
+                            .Where((ts) => !ts.Filtered || CheckFilters(ts.Filters, headers))) // Filters match
                         {
-                            subExpirationDateUtc = newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.TimeToLive.Value);
-                            if (newTopicEvent.ExpirationDateUtc.HasValue && (newTopicEvent.ExpirationDateUtc.Value < subExpirationDateUtc))
-                                subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
+                            // By default a SubscriptionEvent takes expirationdate of TopicEvent
+                            var subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
+
+                            // If subscription has its own TTL, it will be applied, but may never exceed the TopicEvent expiration
+                            if (subscription.TimeToLive.HasValue)
+                            {
+                                subExpirationDateUtc = newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.TimeToLive.Value);
+                                if (newTopicEvent.ExpirationDateUtc.HasValue && (newTopicEvent.ExpirationDateUtc.Value < subExpirationDateUtc))
+                                    subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
+                            }
+
+                            // Delivery can be initially delayed, but it cannot exceed the expirationdate (would be useless)
+                            var deliveryDelayedUntilUtc = subscription.DeliveryDelay.HasValue ? newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value) : default(DateTime?);
+                            //if (deliveryDelayedUntilUtc.HasValue && subExpirationDateUtc.HasValue
+                            //    && deliveryDelayedUntilUtc.Value > subExpirationDateUtc.Value)
+                            //    break; // Skip this one, it would have been expired immedi
+
+                            var newSubscriptionEvent = new SubscriptionEvent
+                            {
+                                SubscriptionId = subscription.Id,
+                                TopicEventId = newTopicEvent.Id,
+                                PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
+                                FunctionalKey = newTopicEvent.FunctionalKey,
+                                PayloadId = newTopicEvent.PayloadId,
+                                Payload = null, // Only used when consuming
+                                ExpirationDateUtc = subExpirationDateUtc,
+                                DeliveryDelayedUntilUtc = deliveryDelayedUntilUtc,
+                                DeliveryCount = 0,
+                                DeliveryKey = null,
+                                InvisibleUntilUtc = null,
+                            };
+                            repo.AddSubscriptionEvent(newSubscriptionEvent);
                         }
-
-                        // Delivery can be initially delayed, but it cannot exceed the expirationdate (would be useless)
-                        var deliveryDelayedUntilUtc = subscription.DeliveryDelay.HasValue ? newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value) : default(DateTime?);
-                        //if (deliveryDelayedUntilUtc.HasValue && subExpirationDateUtc.HasValue
-                        //    && deliveryDelayedUntilUtc.Value > subExpirationDateUtc.Value)
-                        //    break; // Skip this one, it would have been expired immedi
-
-                        var newSubscriptionEvent = new SubscriptionEvent
-                        {
-                            SubscriptionId = subscription.Id,
-                            TopicEventId = newTopicEvent.Id,
-                            PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
-                            FunctionalKey = newTopicEvent.FunctionalKey,
-                            PayloadId = newTopicEvent.PayloadId,
-                            Payload = null, // Only used when consuming
-                            ExpirationDateUtc = subExpirationDateUtc,
-                            DeliveryDelayedUntilUtc = deliveryDelayedUntilUtc,
-                            DeliveryCount = 0,
-                            DeliveryKey = null,
-                            InvisibleUntilUtc = null,
-                        };
-                        _repo.AddSubscriptionEvent(newSubscriptionEvent);
                     }
+
+                    repo.CommitTransaction();
+
+                    // Return the topic event
+                    return newTopicEvent;
                 }
-
-                _repo.CommitTransaction();
-
-                // Return the topic event
-                return newTopicEvent;
-            }
-            catch (Exception)
-            {
-                _repo.RollbackTransaction();
-
-                if (payloadId != null)
+                catch (Exception)
                 {
-                    try
+                    repo.RollbackTransaction();
+
+                    if (payloadId != null)
                     {
-                        _repo.DeletePayload(payloadId);
+                        try
+                        {
+                            repo.DeletePayload(payloadId);
+                        }
+                        catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
                     }
-                    catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
+                    throw;
                 }
-                throw;
             }
         }
 

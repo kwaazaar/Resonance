@@ -77,20 +77,21 @@ namespace Resonance.Demo
 
             var sw = new Stopwatch();
             //sw.Start();
-            //for (int i = 0; i < 10000; i++)
+            //for (int i = 0; i < 100; i++)
             //{
-            //    publisher.Publish(topic1.Name, functionalKey: "1", payload: payload100);
-            //    publisher.Publish(topic1.Name, functionalKey: "1", payload: payload2000);
-            //    publisher.Publish(topic1.Name, functionalKey: "2", payload: payload100);
-            //    publisher.Publish(topic1.Name, functionalKey: "2", payload: payload2000);
-            //    publisher.Publish(topic1.Name, functionalKey: "3", payload: payload100);
-            //    publisher.Publish(topic2.Name, functionalKey: "1", payload: payload100);
-            //    publisher.Publish(topic2.Name, functionalKey: "1", payload: payload2000);
-            //    publisher.Publish(topic2.Name, functionalKey: "2", payload: payload100);
-            //    publisher.Publish(topic3.Name, functionalKey: "2", payload: payload2000);
-            //    publisher.Publish(topic3.Name, functionalKey: "3", payload: payload100);
-            //    publisher.Publish(topic4.Name, functionalKey: "1", payload: payload100);
-            //    publisher.Publish(topic5.Name, functionalKey: "2", payload: payload100);
+            //    var iAsString = i.ToString();
+            //    for (int fk = 0; fk < 1000; fk++)
+            //    {
+            //        var fkAsString = fk.ToString();
+            //        publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload100);
+            //        publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload2000);
+            //        publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload100);
+            //        publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload2000);
+            //        publisher.Publish(topic3.Name, functionalKey: fkAsString, payload: payload100);
+            //        publisher.Publish(topic4.Name, functionalKey: fkAsString, payload: payload100);
+            //        publisher.Publish(topic5.Name, functionalKey: fkAsString, payload: payload100);
+            //    }
+            //    Console.WriteLine($"Run done: {i}");
             //}
             //sw.Stop();
             //Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
@@ -99,8 +100,9 @@ namespace Resonance.Demo
                 serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>(),
                 "Demo Subscription 2", (ce) =>
                 {
+                    //Console.WriteLine($"Consumed {ce.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     return ConsumeResult.Succeeded;
-                }, maxThreads: 10);
+                }, maxThreads: 10, minBackOffDelayInMs: 0);
             sw.Reset();
             worker.Start();
             Console.WriteLine("Press a key to stop the worker...");
@@ -130,18 +132,16 @@ namespace Resonance.Demo
             serviceCollection.AddSingleton<IConfiguration>(config);
 
             ILoggerFactory loggerFactory = new LoggerFactory()
-                .AddConsole()
-                .AddDebug();
+                .AddConsole(LogLevel.Warning);
+                //.AddDebug(LogLevel.Trace);
             serviceCollection.AddSingleton<ILoggerFactory>(loggerFactory);
 
-            // Configure IDbConnection dependency (reason: may be required by IEventingRepo dependencies)
+            // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
             var connectionString = config.GetConnectionString("Resonance");
-            serviceCollection.AddTransient<IDbConnection>((p) => {
-                return new SqlConnection(connectionString);
+            serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
+            {
+                return new MsSqlEventingRepoFactory(connectionString);
             });
-
-            // Configure IEventingRepo dependency (reason: the repo that must be used in this app)
-            serviceCollection.AddTransient<IEventingRepo, MsSqlEventingRepo>();
 
             // Configure EventPublisher
             serviceCollection.AddTransient<IEventPublisher, EventPublisher>();

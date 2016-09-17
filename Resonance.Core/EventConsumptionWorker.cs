@@ -188,7 +188,7 @@ namespace Resonance
         {
             try
             {
-                var workitems = this.TryGetWork(1);// this._maxThreads);
+                var workitems = this.TryGetWork(this._maxThreads);
                 if (workitems == null || (!workitems.Any<ConsumableEvent>())) // No result or empty list
                 {
                     this._attempts++;
@@ -222,7 +222,8 @@ namespace Resonance
         public void Stop()
         {
             this._cancellationToken.Cancel();
-            this._internalTask.Wait();
+            if (this._internalTask.Status == TaskStatus.Running)
+                this._internalTask.Wait();
 
             // We no longer need the task and cancellation token
 #if NET452
@@ -277,15 +278,8 @@ namespace Resonance
         {
             try
             {
-                var consEvent = _eventConsumer.ConsumeNext(_subscriptionName, _visibilityTimeout);
-
-                if (consEvent != null)
-                {
-                    // ignore maxWorkItems, we don't want/need parallel processing
-                    return new ConsumableEvent[] { consEvent };
-                }
-                else
-                    return new ConsumableEvent[] { };
+                var consEvent = _eventConsumer.ConsumeNext(_subscriptionName, _visibilityTimeout, maxWorkItems);
+                return consEvent;
             }
             catch (Exception ex)
             {

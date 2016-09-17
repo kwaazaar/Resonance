@@ -13,7 +13,10 @@ using Newtonsoft.Json;
 
 namespace Resonance.Repo.Database
 {
-    public class MsSqlEventingRepo : IEventingRepo
+    //2627: Duplicate key
+    //1205: Deadlock victim
+
+    public class MsSqlEventingRepo : IEventingRepo, IDisposable
     {
         protected readonly IDbConnection _conn;
         protected IDbTransaction _runningTransaction;
@@ -29,6 +32,29 @@ namespace Resonance.Repo.Database
             _conn = conn;
             if (_conn.State == ConnectionState.Closed)
                 _conn.Open();
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// IDispose implementation
+        /// </summary>
+        /// <param name="disposing"></param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (_conn != null)
+                {
+                    if (_conn.State == ConnectionState.Open)
+                        _conn.Close();
+                    _conn.Dispose();
+                }
+            }
         }
 
         #region Transactions
@@ -629,10 +655,9 @@ namespace Resonance.Repo.Database
             return (rowsUpdated > 0);
         }
 
-        public IEnumerable<SubscriptionEventIdentifier> FindConsumableEventsForSubscription(Subscription subscription)
+        public IEnumerable<SubscriptionEventIdentifier> FindConsumableEventsForSubscription(Subscription subscription, int maxCount)
         {
-            // Larger buffer failes for ordered delivery subscriptions (it will return more than one event per functional key and a second cannot yet be consumed while we're not sure about the first
-            int bufferSize = subscription.Ordered ? 1 : 10;
+            int bufferSize = subscription.Ordered ? maxCount * 5 : maxCount; // When ordered delivery, the resultset must be filtered to make sure every functional key is unique
 
             string query = null;
             if (!subscription.Ordered)
@@ -662,11 +687,33 @@ namespace Resonance.Repo.Database
                     + " and	(lc.SubscriptionId IS NULL OR (lc.PublicationDateUtc < se.PublicationDateUtc))" // Newer than last published (TODO: PRIORITY!!)
                     + " order by se.Priority DESC, se.PublicationDateUtc ASC"; // Warning: prio can mess everything up!
             }
+
+            // Get the list
             var sIds = TranQuery<SubscriptionEventIdentifier>(query, new Dictionary<string, object>
                 {
                     { "@subscriptionId", subscription.Id.ToDbKey() },
                     { "@utcNow", DateTime.UtcNow },
-                });
+                }).ToList();
+
+            if (subscription.Ordered)
+            {
+                var functionalKeyGroups = sIds
+                    .GroupBy(sId => sId.FunctionalKey.ToLowerInvariant())
+                    .ToList();
+
+                sIds = functionalKeyGroups.Select((g) =>
+                    {
+                        var first = g.First();
+                        return new SubscriptionEventIdentifier
+                        {
+                            Id = first.Id,
+                            DeliveryKey = first.DeliveryKey,
+                            PayloadId = first.PayloadId,
+                            FunctionalKey = first.FunctionalKey,
+                        };
+                    }).ToList();
+            }
+
             return sIds;
         }
 
@@ -679,39 +726,54 @@ namespace Resonance.Repo.Database
                && se.InvisibleUntilUtc > DateTime.UtcNow) // ... if not currently locked
                 throw new ArgumentException($"Subscription-event with id {id} had expired and it has already been locked again.");
 
-            BeginTransaction();
-            try
+            int attempts = 0;
+            bool success = false;
+            bool allowRetry = false;
+            do
             {
-                // 1. Remove from SubscriptionEvent
-                int rowsUpdated = TranExecute("delete from SubscriptionEvent where Id = @id and DeliveryKey = @deliveryKey",
-                    new Dictionary<string, object>
-                    {
+                attempts++;
+
+                BeginTransaction();
+                try
+                {
+                    // 1. Remove from SubscriptionEvent
+                    int rowsUpdated = TranExecute("delete from SubscriptionEvent where Id = @id and DeliveryKey = @deliveryKey",
+                        new Dictionary<string, object>
+                        {
                         { "@id", se.Id.ToDbKey() },
                         { "@deliveryKey", se.DeliveryKey }, // Make sure we delete the one we just inspected (in race conditions it may have been locked again)
-                    });
+                        });
 
-                if (rowsUpdated == 0)
-                    throw new ArgumentException($"Subscription-event with id {id} has expired while attempting to mark it complete. Maybe use higher a visibility timeout?");
+                    if (rowsUpdated == 0)
+                        throw new ArgumentException($"Subscription-event with id {id} has expired while attempting to mark it complete. Maybe use higher a visibility timeout?");
 
-                // 2. Insert into ConsumedEvent
-                rowsUpdated = AddConsumedSubscriptionEvent(se);
-                if (rowsUpdated == 0)
-                    throw new InvalidOperationException($"Failed to add ConsumedSubscriptionEvent for SubscriptionEvent with id {id}.");
+                    // 2. Insert into ConsumedEvent
+                    rowsUpdated = AddConsumedSubscriptionEvent(se);
+                    if (rowsUpdated == 0)
+                        throw new InvalidOperationException($"Failed to add ConsumedSubscriptionEvent for SubscriptionEvent with id {id}.");
 
-                // 3. Upsert LastConsumedSubscriptionEvent
-                if (se.FunctionalKey != null) // Only makes sense with a functional key
-                {
-                    if (UpdateLastConsumedSubscriptionEvent(se) != 1) // Must hit exactly 1 row
-                        throw new InvalidOperationException($"Failed to upsert LastConsumedSubscriptionEvent for SubscriptionEvent with id {id}.");
+                    // 3. Upsert LastConsumedSubscriptionEvent
+                    if (se.FunctionalKey != null) // Only makes sense with a functional key
+                    {
+                        if (UpdateLastConsumedSubscriptionEvent(se) != 1) // Must hit exactly 1 row
+                            throw new InvalidOperationException($"Failed to upsert LastConsumedSubscriptionEvent for SubscriptionEvent with id {id}.");
+                    }
+
+                    CommitTransaction();
+                    success = true;
                 }
-
-                CommitTransaction();
-            }
-            catch (Exception)
-            {
-                RollbackTransaction();
-                throw;
-            }
+                catch (SqlException sqlEx)
+                {
+                    RollbackTransaction();
+                    if (sqlEx.Number == 1205)
+                        allowRetry = true;
+                }
+                catch (Exception)
+                {
+                    RollbackTransaction();
+                    throw;
+                }
+            } while (!success && allowRetry && attempts < 3); // Allow 3 attempts to solve SQL-specific issues, like deadlocks
         }
 
         public void MarkFailed(string id, string deliveryKey, Reason reason)
