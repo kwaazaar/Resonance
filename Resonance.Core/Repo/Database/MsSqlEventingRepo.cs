@@ -698,7 +698,7 @@ namespace Resonance.Repo.Database
             if (subscription.Ordered)
             {
                 var functionalKeyGroups = sIds
-                    .GroupBy(sId => sId.FunctionalKey.ToLowerInvariant())
+                    .GroupBy(sId => sId.FunctionalKey != null ? sId.FunctionalKey.ToLowerInvariant() : null)
                     .ToList();
 
                 sIds = functionalKeyGroups.Select((g) =>
