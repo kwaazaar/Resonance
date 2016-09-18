@@ -14,4 +14,19 @@ Ideal for implementing a (business) event driven architecture, CQRS, pub-sub, mi
  
 ## Topics and subscriptions ##
 Messages are sent to *topics*. Whether each type of message gets its own topic or not is up to you. It may be usefull to group certain messages that are usually always processed by the same subscriber.
-For processing these messages, a *subscription* must be created. A subscription subscribes to one or more topics. When messages are published to a topic, each subscription will get its own copy. 
+For processing these messages, a *subscription* must be created. A subscription subscribes to one or more topics. When messages are published to a topic, each subscription will get its own copy.
+
+## Publishing a message ##
+First we need to set-up the *EventPublisher* class. It's constructor requires an *IEventingRepoFactory*. In this example MS SQL Server is used, so we create a *MsSqlEventingRepoFactory* and provide a connectionstring:
+
+    var connectionString = config.GetConnectionString("Resonance");
+    var repoFactory = new MsSqlEventingRepoFactory(connectionString);
+    var publisher = new EventPublisher(repoFactory);
+
+Now we need to make sure the topic exists:
+
+    var topic = publisher.GetTopicByName("Demo Topic");
+    if (topic == null)
+       topic = publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic" });
+
+(to be continued)
