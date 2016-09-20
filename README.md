@@ -47,7 +47,7 @@ The *EventConsumer* is used to consume messages and to manage subscriptions. Sim
 
     var consumer = new EventConsumer(repoFactory);
 
-The message published above currently cannot be consumed, since there are no subscriptions. Creating a subscription is pretty straight forward:
+The message published above currently cannot be consumed, since there were no subscriptions at the time of publishing (it is not lost: it is stored in the 'TopicEvent'-table in the repository). Creating a subscription is pretty straight forward:
 
     consumer.AddOrUpdateSubscription(new Subscription
     {
@@ -79,6 +79,8 @@ If for some reason the message is unprocessable, eg: the publisher passed an inc
 
     consumer.MarkFailed(orderEvent.Id, orderEvent.DeliveryKey, Reason.Other("Order data is missing!"));
 
+Messages marked *consumed* or *failed* are not gone: they are moved to different tables in the repository. This allows for performing health-checks on the system, reporting on processed messages, etc. It also allows messages to be reprocessed, eg: when a flaw in the processing logic was found and corrections need to be made. The data is easily accessible and can therefore be easily used to create new messages to support such scenarios. When used as a central 'business eventing' solution, it may also provide insight into what business-level events occur, where business processed take the most time, etc. 
+
 ## EventConsumptionWorker ##
 
 A more convenient way to consume messages is to use the *EventConsumptionWorker*. It handles polling the subscription (with an exponential back-off mechanism), marks messages complete when done processing and handles parallel processing to maximize throughput.
@@ -97,4 +99,36 @@ Using the EventConsumptionWorker is not much harder than using the EventConsumer
     Console.ReadKey();
     worker.Stop();
 
-*Coming soon: advanced scenario's*
+## Ordered Delivery ##
+
+Messages are always *delivered* in the order of publication: first in, first out (fifo).
+However, this is no guarantee that messages are also processed in the same order: when a subscription is consumed by multiple eventconsumers, perhaps each processing messages on multiple threads, it is very likely that the processing of a later message finishes sooner than earlier messages. It is a best practice to design a consuming system in such way that it handles these situations gracefully, eg. by dropping older messages.
+
+However, this is often not very trivial, especially when different parts of a business process are handled by different subsystems. These systems are normally not aware of eachother and have no clue what messages the others have or have not processed. In this case *functional ordering* can be used.
+
+Functional ordering means that messages are still delivered in the order of publication, but this is done *per functional key*. The functional key can be specified for a message, which allows all messages marked with the same functional key to be delivered in the correct order.
+
+**A message with a functional key will only be delivered if:**
+* It was published later than the last successfully consumed message for this functional key (if not, it will never be delivered)
+* It is the next in line for messages with the same functional key (for each functional key the publishingdate of the last consumed message is stored (per subscription))
+* There are currently no messages being locked (invisible) with the same functional key: the current processing of that message may time out, requiring it to be redelivered.
+
+In this way, Resonance relieves the event consumers of the complex task of handling incorrectly ordered messages themselves and is therefore a very powerfull feature.
+
+## Advanced features ##
+The examples above show basic usage of Resonance. There are however some more supported scenarios. These are briefly explained here.
+
+** Message expiration / Time to Live **
+Most messages become less relevant after some time and delivery may not be needed or even desired. It possible to specify an expiration timeout on messages. This can be done on both topics and subscriptions, but subscriptions can never make message expire later than the expiration specified when published.
+
+** Retries / redelivery **
+Messages that are not marked consumed or failed in time, become visible again. Every they are consumed, their *delivery count* is raised. A subscription can specify a *maximum delivery count*: once the message has been retried/delivery this many times and is still not marked consumed/failed, will not be delivered any more.
+
+** Filtered subscriptions **
+A subscription specifies which topics it subscribes to. For each topic a filter can be specified: only messages which match this filter will be delivered to the subscription. Currently filters only work on the headers-collection on the message.
+
+** Priority **
+As stated before, messages are delivered first-in first-out. However, if a message should not be put 'back in row', a priority can be specified. Messages with a higher priority are delivered first. By default messages are published with a priority of 0. A priority of 10 is considered a higher priority (warning: do not use in conjuction with functional ordering, unless you know exactly what you are doing).
+
+** Delivery delay **
+Published messages will normally be delivered immediatly, it the subscription queue was empty. If for some reason messages should not be processed immediately, eg: to allow other systems (having their own subscriptions) to process it first, a delivery delay can be specified on the subscription (warning: do not use in conjuction with functional ordering, unless you know exactly what you are doing).
