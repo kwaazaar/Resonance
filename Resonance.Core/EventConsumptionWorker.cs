@@ -38,8 +38,9 @@ namespace Resonance
         /// <param name="maxThreads"></param>
         /// <param name="visibilityTimeout">Number of seconds the business event must be locked</param>
         /// <param name="consumeAction">Action that must be invoked for each event. Must be thread-safe when parallelExecution is enabled!</param>
-        public EventConsumptionWorker(IEventConsumer eventConsumer, ILogger<EventConsumptionWorker> logger, string subscriptionName,
+        public EventConsumptionWorker(IEventConsumer eventConsumer, string subscriptionName,
             Func<ConsumableEvent, ConsumeResult> consumeAction, int visibilityTimeout = 60,
+            ILogger<EventConsumptionWorker> logger = null,
             int minBackOffDelayInMs = 1, int maxBackOffDelayInMs = 60000, int maxThreads = 1)
         {
             if (maxBackOffDelayInMs < minBackOffDelayInMs) throw new ArgumentOutOfRangeException("maxBackOffDelayInSeconds", "maxBackOffDelayInSeconds must be greater than minBackOffDelay");
@@ -85,7 +86,7 @@ namespace Resonance
         protected void BackOff()
         {
             var timeout = this.GetBackOffDelay(this._attempts, this._minDelayInMs, this._maxDelayInMs);
-            _logger.LogInformation($"Backing off for {timeout}.");
+            LogInformation($"Backing off for {timeout}.");
 
             try
             {
@@ -194,7 +195,7 @@ namespace Resonance
                     this._attempts++;
                     if (this._attempts == 1) // Eerste keer dat geen workitems gevonden
                     {
-                        _logger.LogInformation($"No consumable events found. Polling-timeout will increase from {_minDelayInMs} till {_maxDelayInMs} milliseconds.");
+                        LogTrace($"No consumable events found. Polling-timeout will increase from {_minDelayInMs} till {_maxDelayInMs} milliseconds.");
                     }
                     this.BackOff();
                 }
@@ -283,7 +284,7 @@ namespace Resonance
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to get consumable event: {ex}");
+                LogError($"Failed to get consumable event: {ex}");
                 return null;
             }
         }
@@ -301,7 +302,7 @@ namespace Resonance
             }
             else
             {
-                _logger.LogWarning($"ConsumableEvent with id {workItem.Id} has expired: InvisibleUntilUtc ({workItem.InvisibleUntilUtc}) < UtcNow ({DateTime.UtcNow}).");
+                LogWarning($"ConsumableEvent with id {workItem.Id} has expired: InvisibleUntilUtc ({workItem.InvisibleUntilUtc}) < UtcNow ({DateTime.UtcNow}).");
                 return false;
             }
         }
@@ -313,7 +314,7 @@ namespace Resonance
 
             try
             {
-                _logger.LogInformation($"Processing event with id {ce.Id} and functional key {ce.FunctionalKey}.");
+                LogTrace($"Processing event with id {ce.Id} and functional key {ce.FunctionalKey}.");
                 result = _consumeAction(ce);
             }
             catch (Exception procEx)
@@ -330,11 +331,11 @@ namespace Resonance
                 {
                     _eventConsumer.MarkConsumed(ce.Id, ce.DeliveryKey);
                     markedComplete = true;
-                    _logger.LogInformation($"Event consumption succeeded for event with id {ce.Id} and functional key {ce.FunctionalKey}.");
+                    LogTrace($"Event consumption succeeded for event with id {ce.Id} and functional key {ce.FunctionalKey}.");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Failed to mark event complete with id {ce.Id} and functional key {ce.FunctionalKey}, cause event to be processes again! Details: {ex}.");
+                    LogError($"Failed to mark event complete with id {ce.Id} and functional key {ce.FunctionalKey}, cause event to be processes again! Details: {ex}.");
                     // mustRollback hoeft eigenlijk niet geset te worden, want markedComplete zal niet meer true zijn
                     mustRollback = true;
                 }
@@ -346,7 +347,7 @@ namespace Resonance
             {
                 mustRollback = true;
                 // Let op: een exception anders dan BusinessEventWorkerException, wordt als corrupt beschouwd!
-                _logger.LogError("Exception occurred while processing event with id {ce.Id} and functional key {ce.FunctionalKey}: {procEx}.");
+                LogError($"Exception occurred while processing event with id {ce.Id} and functional key {ce.FunctionalKey}: {result.Reason}.");
 
                 try
                 {
@@ -358,7 +359,7 @@ namespace Resonance
             {
                 mustRollback = true;
                 var suspendedUntilUtc = this.Suspend(result.SuspendDuration.GetValueOrDefault(TimeSpan.FromSeconds(60)));
-                _logger.LogError($"Event consumption failed for event with id {ce.Id} and functional key {ce.FunctionalKey}. Processing suspended until {suspendedUntilUtc} (UTC). Reason: {result.Reason}.");
+                LogError($"Event consumption failed for event with id {ce.Id} and functional key {ce.FunctionalKey}. Processing suspended until {suspendedUntilUtc} (UTC). Reason: {result.Reason}.");
             }
             // MustRetry does nothing: default behaviour when not marked consumed/failed
 
@@ -386,8 +387,34 @@ namespace Resonance
         /// <param name="pollingEx"></param>
         protected virtual void PollingException(Exception pollingEx)
         {
-            _logger.LogError($"Polling exception occurred: {pollingEx}");
+            LogError($"Polling exception occurred: {pollingEx}");
         }
+
+        #region Logging helpers
+        private void LogTrace(string text)
+        {
+            if (_logger != null)
+                _logger.LogTrace(text);
+        }
+
+        private void LogInformation(string text)
+        {
+            if (_logger != null)
+                _logger.LogInformation(text);
+        }
+
+        private void LogError(string text)
+        {
+            if (_logger != null)
+                _logger.LogError(text);
+        }
+
+        private void LogWarning(string text)
+        {
+            if (_logger != null)
+                _logger.LogWarning(text);
+        }
+        #endregion
     }
 }
 

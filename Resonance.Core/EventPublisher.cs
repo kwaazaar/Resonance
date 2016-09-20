@@ -141,7 +141,7 @@ namespace Resonance
             }
         }
 
-        public TopicEvent Publish<T>(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, T payload = null) where T:class
+        public TopicEvent Publish<T>(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, T payload = null) where T : class
         {
             string payloadAsString = null;
             if (payload != null)
@@ -159,8 +159,46 @@ namespace Resonance
             if (filters.Count == 0)
                 return false;
 
-#warning TODO: Implement filter-logic
-            return false;
+            foreach (var filter in filters)
+            {
+                if (!CheckFilters(filter, headers))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private bool CheckFilters(TopicSubscriptionFilter filter, Dictionary<string, string> headers)
+        {
+            if (!headers.Any((h) => h.Key.Equals(filter.Header, StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            if (filter.MatchExpression == "*") return true;
+
+            var headerValue = headers.First((h) => h.Key.Equals(filter.Header, StringComparison.OrdinalIgnoreCase)).Value;
+            var endsWith = filter.MatchExpression.EndsWith("*");
+            var startsWith = filter.MatchExpression.EndsWith("*");
+
+            if (endsWith && startsWith)
+            {
+#warning TODO: fix endwith+startswith filter
+                return ((filter.MatchExpression.Length >= 3)
+                    && filter.MatchExpression.Substring(1).Substring(0, filter.MatchExpression.Length - 2).Equals(headerValue, StringComparison.OrdinalIgnoreCase));
+            }
+            else if (endsWith)
+            {
+                return ((filter.MatchExpression.Length >= 2)
+                    && headerValue.StartsWith(filter.MatchExpression.Substring(0, filter.MatchExpression.Length - 1), StringComparison.OrdinalIgnoreCase));
+            }
+            else if (startsWith)
+            {
+                return ((filter.MatchExpression.Length >= 2)
+                    && headerValue.EndsWith(filter.MatchExpression.Substring(1, filter.MatchExpression.Length - 1), StringComparison.OrdinalIgnoreCase));
+            }
+            else
+            {
+                return filter.MatchExpression.Equals(headerValue, StringComparison.OrdinalIgnoreCase);
+            }
         }
     }
 }

@@ -61,21 +61,28 @@ namespace Resonance.Demo
             var subscription1 = consumer.AddOrUpdateSubscription(new Subscription
             {
                 Id = "a526527a-9d16-4fa5-8ed7-000000000001",
-                Name = "Demo Subscription 1", MaxDeliveries = 2,
+                Name = "Demo Subscription 1",
+                MaxDeliveries = 2,
                 Ordered = true,
                 TopicSubscriptions = new List<TopicSubscription>
-                { new TopicSubscription { TopicId = topic1.Id, Enabled = true }, new TopicSubscription { TopicId = topic3.Id, Enabled = true }, new TopicSubscription { TopicId = topic5.Id, Enabled = true } }
+                { new TopicSubscription { TopicId = topic1.Id, Enabled = true,
+                Filters = new List<TopicSubscriptionFilter>
+                {
+                    new TopicSubscriptionFilter { Header = "EventName", MatchExpression = "*" },
+                }, Filtered = true
+                }, new TopicSubscription { TopicId = topic3.Id, Enabled = true }, new TopicSubscription { TopicId = topic5.Id, Enabled = true } }
             });
             var subscription2 = consumer.AddOrUpdateSubscription(new Subscription
             {
                 Id = "a526527a-9d16-4fa5-8ed7-000000000002",
-                Name = "Demo Subscription 2", MaxDeliveries = 2,
+                Name = "Demo Subscription 2",
+                MaxDeliveries = 2,
                 Ordered = false,
                 TopicSubscriptions = new List<TopicSubscription>
                 { new TopicSubscription { TopicId = topic1.Id, Enabled = true }, new TopicSubscription { TopicId = topic2.Id, Enabled = true }, new TopicSubscription { TopicId = topic4.Id, Enabled = true } }
             });
 
-            var sw = new Stopwatch();
+            //var sw = new Stopwatch();
             //sw.Start();
             //for (int i = 0; i < 100; i++)
             //{
@@ -83,7 +90,7 @@ namespace Resonance.Demo
             //    for (int fk = 0; fk < 1000; fk++)
             //    {
             //        var fkAsString = fk.ToString();
-            //        publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload100);
+            //        publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload100, headers: new Dictionary<string, string> { { "EventName", "Bla" } });
             //        publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload2000);
             //        publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload100);
             //        publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload2000);
@@ -97,13 +104,12 @@ namespace Resonance.Demo
             //Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
 
             var worker = new EventConsumptionWorker(consumer,
-                serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>(),
                 "Demo Subscription 1", (ce) =>
                 {
                     //Console.WriteLine($"Consumed {ce.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     return DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded;
-                }, maxThreads: 100, minBackOffDelayInMs: 0);
-            sw.Reset();
+                }, maxThreads: 100, minBackOffDelayInMs: 0,
+                logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>());
             worker.Start();
             Console.WriteLine("Press a key to stop the worker...");
             Console.ReadKey();
@@ -127,8 +133,8 @@ namespace Resonance.Demo
             serviceCollection.AddSingleton<IConfiguration>(config);
 
             ILoggerFactory loggerFactory = new LoggerFactory()
-                .AddConsole(LogLevel.Warning);
-                //.AddDebug(LogLevel.Trace);
+                .AddConsole(LogLevel.Information);
+            //.AddDebug(LogLevel.Trace);
             serviceCollection.AddSingleton<ILoggerFactory>(loggerFactory);
 
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
