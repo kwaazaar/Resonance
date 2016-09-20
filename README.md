@@ -17,16 +17,57 @@ Messages are sent to *topics*. Whether each type of message gets its own topic o
 For processing these messages, a *subscription* must be created. A subscription subscribes to one or more topics. When messages are published to a topic, each subscription will get its own copy.
 
 ## Publishing a message ##
-First we need to set-up the *EventPublisher* class. It's constructor requires an *IEventingRepoFactory*. In this example MS SQL Server is used, so we create a *MsSqlEventingRepoFactory* and provide a connectionstring:
+The *EventPublisher* is used to publish messages and to manage topics. It's constructor requires an *IEventingRepoFactory*. In this example MS SQL Server is used, so we create a *MsSqlEventingRepoFactory* and provide a connectionstring:
 
     var connectionString = config.GetConnectionString("Resonance");
     var repoFactory = new MsSqlEventingRepoFactory(connectionString);
     var publisher = new EventPublisher(repoFactory);
 
-Now we need to make sure the topic exists:
+Messages are published to topics, so before a message can be published, a topic must be created:
 
-    var topic = publisher.GetTopicByName("Demo Topic");
-    if (topic == null)
-       topic = publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic" });
+    var demoTopic = publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic" });
 
-(to be continued)
+Now that the topic exists, publishing a message/event it very easy:
+
+    publisher.Publish("Demo Topic", payload: "Hello there!");
+    
+Or to publish an object instead of a string:
+
+    var order = new Order
+    {
+        Product = "Car",
+        Price = 15000m,
+        ItemCount = 1,
+    };
+    publisher.Publish<Order>("Demo Topic", payload: order);
+    
+## Consuming a message ##
+
+The *EventConsumer* is used to consume messages and to manage subscriptions. Similar to the EventPublisher, it also takes a IEventingRepoFactory as an argument to its constructor:
+
+    var consumer = new EventConsumer(repoFactory);
+
+The message published above currently cannot be consumed, since there are no subscriptions. Creating a subscription is pretty straight forward:
+
+    consumer.AddOrUpdateSubscription(new Subscription
+    {
+        Name = "Demo Subscription",
+        TopicSubscriptions = new List<TopicSubscription>
+        {
+            new TopicSubscription { TopicId = demoTopic.Id, Enabled = true }
+        }
+    });
+
+The subscription can receive messages from multiple topics. In this case it only receives messages from the above created *demoTopic*. If we publish the order once more, it can then be consumed from the subscription:
+
+    publisher.Publish<Order>("Demo Topic", payload: order);
+    var orderEvent = consumer.ConsumeNext<Order>("Demo Subscription").SingleOrDefault();
+
+## Locking: the Visibility Timeout ##
+If no messages are available, ConsumeNext will return null. If it *does* return a message (order in this case), the order can be processed, eg: by sending an invoice. However, if multiple eventconsumers are consuming events from the same subscription (which is a very valid scenario when many using an event driven architecture), other consumers should not receive the same order, since it would be processed more than once. This is the reason the message must be locked, before it can be consumed.
+
+Locking is done by using a making the message invisible to other consumers, so that it will not be consumed once. The consumer get a specified time to perform the processing. Once the message is processed, the consumer must explicitly *mark it consumed*:
+
+    consumer.MarkConsumed(orderEvent.Id, orderEvent.DeliveryKey);
+    
+This will remove the event from the subscription-queue and it cannot be consumed anymore. It the consumer does not process the message before the visibility timeout expires, the message becomes visible again and can be consumed again.
