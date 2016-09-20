@@ -711,7 +711,9 @@ namespace Resonance.Repo.Database
                             PayloadId = first.PayloadId,
                             FunctionalKey = first.FunctionalKey,
                         };
-                    }).ToList();
+                    })
+                    .Take(maxCount)
+                    .ToList();
             }
 
             return sIds;
