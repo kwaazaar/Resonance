@@ -6,11 +6,13 @@ Ideal for implementing a (business) event driven architecture, CQRS, pub-sub, mi
 * Pub-sub (using topics and subscriptions)
 * Subscriptions on multiple topics
 * Fifo delivery (on publishing date), with priority-support to 'skip the line'
-* Ordered delivery on functional key: this you want!
+* Ordered delivery on functional key: niiice!!
 * Delayed delivery
 * Message expiration (time to live), on both topic and subscriptions
 * Max-deliveries (per subscription) to maximize the number of retries/redeliveries
 * Filtered subscriptions (only matched messages go through)
+* Targets both .NET Core and the regular .NET Framework (4.5.2)
+* Supports Microsoft SQL Server and MySql (coming soon)
  
 ## Topics and subscriptions ##
 Messages are sent to *topics*. Whether each type of message gets its own topic or not is up to you. It may be usefull to group certain messages that are usually always processed by the same subscriber.
