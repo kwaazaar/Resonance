@@ -118,17 +118,17 @@ In this way, Resonance relieves the event consumers of the complex task of handl
 ## Advanced features ##
 The examples above show basic usage of Resonance. There are however some more supported scenarios. These are briefly explained here.
 
-** Message expiration / Time to Live **
+### Message expiration / Time to Live
 Most messages become less relevant after some time and delivery may not be needed or even desired. It possible to specify an expiration timeout on messages. This can be done on both topics and subscriptions, but subscriptions can never make message expire later than the expiration specified when published.
 
-** Retries / redelivery **
+### Retries / redelivery
 Messages that are not marked consumed or failed in time, become visible again. Every they are consumed, their *delivery count* is raised. A subscription can specify a *maximum delivery count*: once the message has been retried/delivery this many times and is still not marked consumed/failed, will not be delivered any more.
 
-** Filtered subscriptions **
+### Filtered subscriptions
 A subscription specifies which topics it subscribes to. For each topic a filter can be specified: only messages which match this filter will be delivered to the subscription. Currently filters only work on the headers-collection on the message.
 
-** Priority **
+### Priority
 As stated before, messages are delivered first-in first-out. However, if a message should not be put 'back in row', a priority can be specified. Messages with a higher priority are delivered first. By default messages are published with a priority of 0. A priority of 10 is considered a higher priority (warning: do not use in conjuction with functional ordering, unless you know exactly what you are doing).
 
-** Delivery delay **
+### Delivery delay
 Published messages will normally be delivered immediatly, it the subscription queue was empty. If for some reason messages should not be processed immediately, eg: to allow other systems (having their own subscriptions) to process it first, a delivery delay can be specified on the subscription (warning: do not use in conjuction with functional ordering, unless you know exactly what you are doing).
