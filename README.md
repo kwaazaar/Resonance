@@ -14,6 +14,10 @@ Ideal for implementing a (business) event driven architecture, CQRS, pub-sub, mi
 * Targets both .NET Core and the regular .NET Framework (4.5.2)
 * Supports Microsoft SQL Server and MySql (coming soon)
  
+## How to get it ##
+Easiest way is to install the NuGet package [Resonance.Core](https://www.nuget.org/packages/Resonance.Core/).
+You may also deside to [fork this repo](https://github.com/kwaazaar/Resonance/fork).
+ 
 ## Topics and subscriptions ##
 Messages are sent to *topics*. Whether each type of message gets its own topic or not is up to you. It may be usefull to group certain messages that are usually always processed by the same subscriber.
 For processing these messages, a *subscription* must be created. A subscription subscribes to one or more topics. When messages are published to a topic, each subscription will get its own copy.
