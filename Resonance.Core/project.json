@@ -6,12 +6,18 @@
   
 
   "buildOptions": {
-    "copyToOutput": { "includeFiles": [ "Content\\ResonanceDB.sql" ] }
+    "copyToOutput": {
+      "includeFiles": [
+        "content\\ResonanceDB.MsSql.sql",
+        "content\\ResonanceDB.MySql.sql"
+      ]
+    }
   },
 
   "dependencies": {
     "Dapper": "1.50.2",
     "Microsoft.Extensions.Logging.Abstractions": "1.0.0",
+    "MySqlConnector": "0.1.0-alpha23",
     "Newtonsoft.Json": "9.0.1",
     "System.Linq.Parallel": "4.0.1"
   },
@@ -30,7 +36,7 @@
     "summary": "Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc.",
     "tags": [ "pub", "sub", "esb", "queue", "topic", "subscription", "microservice", "messaging", "event", "publish", "subscribe" ],
     "owners": [ "Robert te Kaat" ],
-    "releaseNotes": "Alpha version, expect many updates!",
+    "releaseNotes": "To get a quick idea, check the repo on GitHub for documentation and code samples: https://github.com/kwaazaar/Resonance",
     "iconUrl": "https://msg.blob.core.windows.net/resonance/Resonance-Icon-64x64.png",
     "projectUrl": "https://github.com/kwaazaar/Resonance",
     "licenseUrl": "https://opensource.org/licenses/MIT",
@@ -44,7 +50,8 @@
       "exclude": "",
       "includeFiles": [
         "readme.txt",
-        "content/ResonanceDB.sql"
+        "content/ResonanceDB.MsSql.sql",
+        "content/ResonanceDB.MySql.sql"
       ],
       "excludeFiles": [ "" ],
       "builtIns": {},

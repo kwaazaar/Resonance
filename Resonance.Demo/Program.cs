@@ -115,8 +115,8 @@ namespace Resonance.Demo
             Console.ReadKey();
             worker.Stop();
 
-            //consumer.DeleteSubscription(subscription.Id);
-            //publisher.DeleteTopic(topic.Id, true);
+            //consumer.DeleteSubscription(subscription1.Id);
+            //publisher.DeleteTopic(topic1.Id, true);
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)
@@ -138,11 +138,20 @@ namespace Resonance.Demo
             serviceCollection.AddSingleton<ILoggerFactory>(loggerFactory);
 
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
-            var connectionString = config.GetConnectionString("Resonance");
+
+            // To use MSSQLServer:
+            var connectionString = config.GetConnectionString("Resonance.MsSql");
             serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
             {
                 return new MsSqlEventingRepoFactory(connectionString);
             });
+
+            // To use MySQL:
+            //var connectionString = config.GetConnectionString("Resonance.MySql");
+            //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
+            //{
+            //    return new MySqlEventingRepoFactory(connectionString);
+            //});
 
             // Configure EventPublisher
             serviceCollection.AddTransient<IEventPublisher, EventPublisher>();
