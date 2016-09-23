@@ -9,6 +9,7 @@ namespace Resonance.Models
     {
         public string Id { get; set; }
         public string SubscriptionId { get; set; }
+        public bool Ordered { get; set; }
         public string TopicEventId { get; set; }
         public DateTime PublicationDateUtc { get; set; }
         public string FunctionalKey { get; set; }

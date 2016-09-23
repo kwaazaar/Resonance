@@ -47,46 +47,13 @@ namespace Resonance
                 return repo.GetSubscriptions(topicId).ToList();
         }
 
-        public IEnumerable<ConsumableEvent> ConsumeNext(string subscriptionName, int? visibilityTimeout = default(int?), int maxCount = 1)
+        public IEnumerable<ConsumableEvent> ConsumeNext(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
         {
-            var subscription = GetSubscriptionByName(subscriptionName);
-            if (subscription == null) throw new ArgumentException($"No subscription with this name exists: {subscriptionName}");
-
-            var ces = new List<ConsumableEvent>();
             using (var repo = _repoFactory.CreateRepo())
-            {
-                // Find possible subscriptionevents for consumption (repo decides how many it can buffer)
-                var sIds = repo.FindConsumableEventsForSubscription(subscription, maxCount).ToList();
-
-                // Loop through all found subscriptionevents until one of them could be 'locked'
-                foreach (var sId in sIds)
-                {
-                    string deliveryKey = Guid.NewGuid().ToString(); // Determine new deliverykey
-                    var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout.GetValueOrDefault(60)); // Recalc on every attempt in this loop, since every attempt make take considerable time
-
-                    // Attempt to lock it now
-                    if (repo.TryLockConsumableEvent(sId, deliveryKey, invisibleUntilUtc))
-                    {
-                        // We got it! Now get the rest of the details
-                        var @event = new ConsumableEvent
-                        {
-                            Id = sId.Id,
-                            DeliveryKey = deliveryKey, // Updated above
-                            FunctionalKey = sId.FunctionalKey,
-                            InvisibleUntilUtc = invisibleUntilUtc,
-                        };
-                        @event.Payload = repo.GetPayload(sId.PayloadId);
-                        ces.Add(@event);
-                    }
-                }
-
-                if (ces.Count < sIds.Count)
-                    System.Diagnostics.Debug.WriteLine($"Managed to lock only {ces.Count} events out of {sIds.Count} found.");
-            }
-            return ces;
+                return repo.ConsumeNext(subscriptionName, visibilityTimeout, maxCount);
         }
 
-        public IEnumerable<ConsumableEvent<T>> ConsumeNext<T>(string subscriptionName, int? visibilityTimeout = default(int?), int maxCount = 1)
+        public IEnumerable<ConsumableEvent<T>> ConsumeNext<T>(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
         {
             foreach (var ce in ConsumeNext(subscriptionName, visibilityTimeout, maxCount))
             {

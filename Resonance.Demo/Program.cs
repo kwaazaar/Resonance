@@ -55,9 +55,7 @@ namespace Resonance.Demo
             // Make sure the topic exists
             var topic1 = publisher.AddOrUpdateTopic(new Topic { Id = "c526527a-9d16-4fa5-8ed7-000000000001", Name = "Demo Topic 1" });
             var topic2 = publisher.AddOrUpdateTopic(new Topic { Id = "c526527a-9d16-4fa5-8ed7-000000000002", Name = "Demo Topic 2" });
-            var topic3 = publisher.AddOrUpdateTopic(new Topic { Id = "c526527a-9d16-4fa5-8ed7-000000000003", Name = "Demo Topic 3" });
-            var topic4 = publisher.AddOrUpdateTopic(new Topic { Id = "c526527a-9d16-4fa5-8ed7-000000000004", Name = "Demo Topic 4" });
-            var topic5 = publisher.AddOrUpdateTopic(new Topic { Id = "c526527a-9d16-4fa5-8ed7-000000000005", Name = "Demo Topic 5" });
+
             var subscription1 = consumer.AddOrUpdateSubscription(new Subscription
             {
                 Id = "a526527a-9d16-4fa5-8ed7-000000000001",
@@ -65,12 +63,18 @@ namespace Resonance.Demo
                 MaxDeliveries = 2,
                 Ordered = true,
                 TopicSubscriptions = new List<TopicSubscription>
-                { new TopicSubscription { TopicId = topic1.Id, Enabled = true,
-                Filters = new List<TopicSubscriptionFilter>
                 {
-                    new TopicSubscriptionFilter { Header = "EventName", MatchExpression = "*" },
-                }, Filtered = true
-                }, new TopicSubscription { TopicId = topic3.Id, Enabled = true }, new TopicSubscription { TopicId = topic5.Id, Enabled = true } }
+                    new TopicSubscription
+                    {
+                        TopicId = topic1.Id, Enabled = true,
+                        Filtered = true,
+                        Filters = new List<TopicSubscriptionFilter>
+                        {
+                            new TopicSubscriptionFilter { Header = "EventName", MatchExpression = "*" }, // Matches on every "EventName"-header, but header MUST exist!
+                        },
+                    },
+                    new TopicSubscription { TopicId = topic2.Id, Enabled = true },
+                }
             });
             var subscription2 = consumer.AddOrUpdateSubscription(new Subscription
             {
@@ -79,36 +83,41 @@ namespace Resonance.Demo
                 MaxDeliveries = 2,
                 Ordered = false,
                 TopicSubscriptions = new List<TopicSubscription>
-                { new TopicSubscription { TopicId = topic1.Id, Enabled = true }, new TopicSubscription { TopicId = topic2.Id, Enabled = true }, new TopicSubscription { TopicId = topic4.Id, Enabled = true } }
+                {
+                    new TopicSubscription { TopicId = topic1.Id, Enabled = true },
+                    new TopicSubscription { TopicId = topic2.Id, Enabled = false }, // Not enabled
+                }
             });
 
             //var sw = new Stopwatch();
             //sw.Start();
-            //for (int i = 0; i < 100; i++)
+            //int maxLoop = 10;
+            //for (int i = 1; i <= maxLoop; i++)
             //{
             //    var iAsString = i.ToString();
-            //    for (int fk = 0; fk < 1000; fk++)
+            //    for (int fk = 1; fk <= 1000; fk++) // 1000 different functional keys, 4 TopicEvents per fk
             //    {
             //        var fkAsString = fk.ToString();
             //        publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload100, headers: new Dictionary<string, string> { { "EventName", "Bla" } });
-            //        publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload2000);
-            //        publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload100);
-            //        publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload2000);
-            //        publisher.Publish(topic3.Name, functionalKey: fkAsString, payload: payload100);
-            //        publisher.Publish(topic4.Name, functionalKey: fkAsString, payload: payload100);
-            //        publisher.Publish(topic5.Name, functionalKey: fkAsString, payload: payload100);
+            //        publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload2000); // Not delivered to sub1: EventName-header is missing
+            //        publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload2000); // Not delivered to sub2: topic2-subscription is not enabled
+            //        publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload100); // Not delivered to sub2: topic2-subscription is not enabled
             //    }
-            //    Console.WriteLine($"Run done: {i}");
+            //    Console.WriteLine($"Runs done: {i} of {maxLoop}");
             //}
             //sw.Stop();
             //Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
 
+            //var ce = consumer.ConsumeNext(subscription1.Name).FirstOrDefault();
+            //if (ce != null)
+            //    consumer.MarkConsumed(ce.Id, ce.DeliveryKey);
+
             var worker = new EventConsumptionWorker(consumer,
                 "Demo Subscription 1", (ce) =>
                 {
-                    //Console.WriteLine($"Consumed {ce.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
+                    Console.WriteLine($"Consumed {ce.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     return DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded;
-                }, maxThreads: 100, minBackOffDelayInMs: 0,
+                }, maxThreads: 10, minBackOffDelayInMs: 0,
                 logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>());
             worker.Start();
             Console.WriteLine("Press a key to stop the worker...");

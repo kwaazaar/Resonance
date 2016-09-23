@@ -20,24 +20,7 @@ namespace Resonance.Repo.Database
             Committed = 1,
             Rollbacked = 2,
         }
-
-        public class ResultsetLimitQueryPart
-        {
-            /// <summary>
-            /// The query part
-            /// </summary>
-            public string QueryPart { get; private set; }
-            /// <summary>
-            /// When true, this means the query-part should be added right after the SELECT-statement, otherwise it will be added to the end of the query.
-            /// </summary>
-            public bool InSelector { get; private set; }
-
-            public ResultsetLimitQueryPart(string queryPart, bool inSelector)
-            {
-                QueryPart = queryPart;
-                InSelector = inSelector;
-            }
-        }
+        
         #endregion
 
         protected readonly IDbConnection _conn;
@@ -186,16 +169,6 @@ namespace Resonance.Repo.Database
         #endregion
 
         #region Repo-specific DB-implementation
-        /// <summary>
-        /// Genererates a resultset limiting query-part, eg: TOP 100 or LIMIT 5.
-        /// This default implementation returns "TOP {limit}" and sets InSelector to true.
-        /// </summary>
-        /// <param name="limit">Nr of items</param>
-        /// <returns></returns>
-        public virtual ResultsetLimitQueryPart GetQueryPart_ResultsetLimit(int limit)
-        {
-            return new ResultsetLimitQueryPart($"TOP {limit}", true);
-        }
 
         /// <summary>
         /// Depending on the type of DbException, the specific repo can determine if a retry of the DB-call is usefull.
@@ -629,7 +602,9 @@ namespace Resonance.Repo.Database
 
         private SubscriptionEvent GetSubscriptionEvent(string id)
         {
-            return TranQuery<SubscriptionEvent>("select * from SubscriptionEvent where Id = @id",
+            return TranQuery<SubscriptionEvent>("select se.*, s.Ordered from SubscriptionEvent se" + // Ordered flag included for efficiency
+                " join Subscription s on s.Id = se.SubscriptionId" +
+                " where se.Id = @id",
                 new Dictionary<string, object>
                 {
                     { "@id", id.ToDbKey() },
@@ -678,90 +653,14 @@ namespace Resonance.Repo.Database
 
         #region Event consumption
 
-        public virtual bool TryLockConsumableEvent(SubscriptionEventIdentifier sId, string deliveryKey, DateTime invisibleUntilUtc)
+        protected abstract IEnumerable<ConsumableEvent> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount);
+
+        public IEnumerable<ConsumableEvent> ConsumeNext(string subscriptionName, int visibilityTimeout, int maxCount)
         {
-            int rowsUpdated = TranExecute("update SubscriptionEvent" +
-                " set DeliveryKey = @newDeliveryKey, DeliveryDateUtc = @deliveryDateUtc, InvisibleUntilUtc = @invisibleUntilUtc, DeliveryCount = DeliveryCount + 1" +
-                " where Id = @id and ((DeliveryKey is NULL and @deliveryKey is null) or DeliveryKey = @deliveryKey)",
-                new Dictionary<string, object>
-                {
-                                    { "@id", sId.Id.ToDbKey() },
-                                    { "@deliveryKey", sId.DeliveryKey },
-                                    { "@deliveryDateUtc", DateTime.UtcNow },
-                                    { "@newDeliveryKey", deliveryKey },
-                                    { "@invisibleUntilUtc", invisibleUntilUtc },
-                });
+            var subscription = GetSubscriptionByName(subscriptionName);
+            if (subscription == null) throw new ArgumentException($"No subscription with this name exists: {subscriptionName}");
 
-            return (rowsUpdated > 0);
-        }
-
-        public virtual IEnumerable<SubscriptionEventIdentifier> FindConsumableEventsForSubscription(Subscription subscription, int maxCount)
-        {
-            int bufferSize = subscription.Ordered ? maxCount * 5 : maxCount; // When ordered delivery, the resultset must be filtered to make sure every functional key is unique
-
-            var limitQueryPart = this.GetQueryPart_ResultsetLimit(bufferSize);
-            string selectorLimitQuery = limitQueryPart.InSelector ? limitQueryPart.QueryPart : string.Empty;
-            string endLimitQuery = !limitQueryPart.InSelector ? limitQueryPart.QueryPart : string.Empty;
-            string query = null;
-            if (!subscription.Ordered)
-            {
-                query = $"select {selectorLimitQuery} se.Id, se.DeliveryKey, se.FunctionalKey, se.PayloadId" // Get the minimal amount of data
-                    + " from SubscriptionEvent se"
-                    + " join Subscription s on s.Id = se.SubscriptionId" // Needed for MaxRetries
-                    + " where se.SubscriptionId = @subscriptionId"
-                    + " and (se.DeliveryDelayedUntilUtc IS NULL OR se.DeliveryDelayedUntilUtc < @utcNow)" // Must be allowed to be delivered
-                    + " and (se.ExpirationDateUtc IS NULL OR se.ExpirationDateUtc > @utcNow)" // Must not yet have expired
-                    + " and (se.InvisibleUntilUtc IS NULL OR se.InvisibleUntilUtc < @utcNow)" // Must not be 'locked'/made invisible by other consumer
-                    + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
-                    + " order by se.Priority DESC, se.PublicationDateUtc ASC" // Highest prio first, oldest first
-                    + " " + endLimitQuery;
-            }
-            else
-            {
-                query = $"select {selectorLimitQuery} se.Id, se.DeliveryKey, se.FunctionalKey, se.PayloadId" // Get the minimal amount of data
-                    + " from SubscriptionEvent se"
-                    + " join Subscription s on s.Id = se.SubscriptionId" // Needed for MaxRetries
-                    + " left join LastConsumedSubscriptionEvent lc" // For functional ordering
-                    + "   on lc.SubscriptionId = se.SubscriptionId and lc.FunctionalKey = se.FunctionalKey"
-                    + " where se.SubscriptionId = @subscriptionId"
-                    + " and (se.DeliveryDelayedUntilUtc IS NULL OR se.DeliveryDelayedUntilUtc < @utcNow)" // Must be allowed to be delivered
-                    + " and (se.ExpirationDateUtc IS NULL OR se.ExpirationDateUtc > @utcNow)" // Must not yet have expired
-                    + " and (se.InvisibleUntilUtc IS NULL OR se.InvisibleUntilUtc < @utcNow)" // Must not be 'locked'/made invisible by other consumer
-                    + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
-                    + " and	(lc.SubscriptionId IS NULL OR (lc.PublicationDateUtc < se.PublicationDateUtc))" // Newer than last published (TODO: PRIORITY!!)
-                    + " order by se.Priority DESC, se.PublicationDateUtc ASC" // Warning: prio can mess everything up!
-                    + " " + endLimitQuery;
-            }
-
-            // Get the list
-            var sIds = TranQuery<SubscriptionEventIdentifier>(query, new Dictionary<string, object>
-                {
-                    { "@subscriptionId", subscription.Id.ToDbKey() },
-                    { "@utcNow", DateTime.UtcNow },
-                }).ToList();
-
-            if (subscription.Ordered)
-            {
-                var functionalKeyGroups = sIds
-                    .GroupBy(sId => sId.FunctionalKey != null ? sId.FunctionalKey.ToLowerInvariant() : null)
-                    .ToList();
-
-                sIds = functionalKeyGroups.Select((g) =>
-                {
-                    var first = g.First();
-                    return new SubscriptionEventIdentifier
-                    {
-                        Id = first.Id,
-                        DeliveryKey = first.DeliveryKey,
-                        PayloadId = first.PayloadId,
-                        FunctionalKey = first.FunctionalKey,
-                    };
-                })
-                    .Take(maxCount)
-                    .ToList();
-            }
-
-            return sIds;
+            return ConsumeNextForSubscription(subscription, visibilityTimeout, maxCount);
         }
 
         public virtual void MarkConsumed(string id, string deliveryKey)
@@ -799,8 +698,8 @@ namespace Resonance.Repo.Database
                     if (rowsUpdated == 0)
                         throw new InvalidOperationException($"Failed to add ConsumedSubscriptionEvent for SubscriptionEvent with id {id}.");
 
-                    // 3. Upsert LastConsumedSubscriptionEvent
-                    if (se.FunctionalKey != null) // Only makes sense with a functional key
+                    // 3. Upsert LastConsumedSubscriptionEvent (only for ordered subscription)
+                    if (se.Ordered && se.FunctionalKey != null) // Only makes sense with a functional key
                     {
                         rowsUpdated = UpdateLastConsumedSubscriptionEvent(se);
                         if (rowsUpdated == 0 || rowsUpdated > 2) // On MySql an upsert (on duplicate key...) will report 2 rows hit (by design)

@@ -38,8 +38,9 @@ namespace Resonance.Repo
         string AddSubscriptionEvent(SubscriptionEvent subscriptionEvent);
 
         // Consumption
-        IEnumerable<SubscriptionEventIdentifier> FindConsumableEventsForSubscription(Subscription subscription, int maxCount);
-        bool TryLockConsumableEvent(SubscriptionEventIdentifier sId, string deliveryKey, DateTime invisibleUntilUtc);
+        //IEnumerable<SubscriptionEventIdentifier> FindConsumableEventsForSubscription(Subscription subscription, int maxCount);
+        //bool TryLockConsumableEvent(SubscriptionEventIdentifier sId, string deliveryKey, DateTime invisibleUntilUtc);
+        IEnumerable<ConsumableEvent> ConsumeNext(string subscriptionName, int visibilityTimeout, int maxCount = 1);
         void MarkConsumed(string id, string deliveryKey);
         void MarkFailed(string id, string deliveryKey, Reason reason);
     }

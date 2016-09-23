@@ -133,9 +133,10 @@ CREATE TABLE `subscriptionevent` (
   `DeliveryKey` varchar(36) DEFAULT NULL,
   `InvisibleUntilUtc` datetime(6) DEFAULT NULL,
   PRIMARY KEY (`Id`),
-  KEY `IX_SubscriptionEvent_Find` (`Priority`,`PublicationDateUtc`,`DeliveryDelayedUntilUtc`,`InvisibleUntilUtc`,`SubscriptionId`,`ExpirationDateUtc`,`Id`,`FunctionalKey`,`PayloadId`,`DeliveryCount`,`DeliveryKey`),
   KEY `FK_SubscriptionEvent_EventPayload` (`PayloadId`),
   KEY `FK_SubscriptionEvent_TopicEvent` (`TopicEventId`),
+  KEY `IX_SubscriptionEvent_FindOrdered` (`Id`,`SubscriptionId`,`PublicationDateUtc`,`Priority`,`FunctionalKey`,`DeliveryDelayedUntilUtc`,`ExpirationDateUtc`,`DeliveryCount`,`DeliveryKey`,`PayloadId`) USING BTREE,
+  KEY `IX_SubscriptionEvent_Invisible` (`SubscriptionId`,`InvisibleUntilUtc`,`Id`,`FunctionalKey`) USING BTREE,
   CONSTRAINT `FK_SubscriptionEvent_EventPayload` FOREIGN KEY (`PayloadId`) REFERENCES `eventpayload` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `FK_SubscriptionEvent_TopicEvent` FOREIGN KEY (`TopicEventId`) REFERENCES `topicevent` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -227,4 +228,4 @@ CREATE TABLE `topicsubscriptionfilter` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-09-22 21:07:11
+-- Dump completed on 2016-09-23 16:51:24

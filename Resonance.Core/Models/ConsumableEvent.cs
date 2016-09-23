@@ -12,6 +12,7 @@ namespace Resonance.Models
         public string DeliveryKey { get; set; }
         public DateTime InvisibleUntilUtc { get; set; }
         public string Payload { get; set; }
+        internal string PayloadId { get; set; }
     }
 
     public class ConsumableEvent<T> : ConsumableEvent

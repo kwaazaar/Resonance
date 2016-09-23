@@ -86,13 +86,16 @@ namespace Resonance
         protected void BackOff()
         {
             var timeout = this.GetBackOffDelay(this._attempts, this._minDelayInMs, this._maxDelayInMs);
-            LogInformation($"Backing off for {timeout}.");
-
-            try
+            if (timeout.TotalMilliseconds > 0)
             {
-                Task.WaitAll(new Task[] { Task.Delay(timeout) }, _cancellationToken.Token);
+                LogTrace($"Backing off for {timeout}.");
+
+                try
+                {
+                    Task.WaitAll(new Task[] { Task.Delay(timeout) }, _cancellationToken.Token);
+                }
+                catch (OperationCanceledException) { }
             }
-            catch (OperationCanceledException) { }
         }
 
         /// <summary>
@@ -335,7 +338,7 @@ namespace Resonance
                 }
                 catch (Exception ex)
                 {
-                    LogError($"Failed to mark event complete with id {ce.Id} and functional key {ce.FunctionalKey}, cause event to be processes again! Details: {ex}.");
+                    LogError($"Failed to mark event consumed with id {ce.Id} and functional key {ce.FunctionalKey}, cause event to be processes again! Details: {ex}.");
                     // mustRollback hoeft eigenlijk niet geset te worden, want markedComplete zal niet meer true zijn
                     mustRollback = true;
                 }
