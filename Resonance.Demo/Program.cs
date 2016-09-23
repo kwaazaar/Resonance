@@ -113,9 +113,9 @@ namespace Resonance.Demo
             //    consumer.MarkConsumed(ce.Id, ce.DeliveryKey);
 
             var worker = new EventConsumptionWorker(consumer,
-                "Demo Subscription 1", (ce) =>
+                "Demo Subscription 2", (ce) =>
                 {
-                    Console.WriteLine($"Consumed {ce.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
+                    //Console.WriteLine($"Consumed {ce.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     return DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded;
                 }, maxThreads: 10, minBackOffDelayInMs: 0,
                 logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>());

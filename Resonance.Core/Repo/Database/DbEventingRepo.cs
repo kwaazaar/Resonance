@@ -315,6 +315,7 @@ namespace Resonance.Repo.Database
             catch (Exception)
             {
                 RollbackTransaction();
+                throw;
             }
         }
 
@@ -678,6 +679,9 @@ namespace Resonance.Repo.Database
             do
             {
                 attempts++;
+                // Reinit these on very loop:
+                success = false;
+                allowRetry = false;
 
                 BeginTransaction();
                 try
