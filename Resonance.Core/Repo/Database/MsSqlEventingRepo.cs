@@ -37,6 +37,11 @@ namespace Resonance.Repo.Database
                 return base.CanRetry(dbEx, attempts);
         }
 
+        public override string GetLastAutoIncrementValue
+        {
+            get { return "SCOPE_IDENTITY()"; }
+        }
+
         public override int UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
             var query = "MERGE LastConsumedSubscriptionEvent AS target" +

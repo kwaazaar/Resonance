@@ -25,12 +25,12 @@ DROP TABLE IF EXISTS `consumedsubscriptionevent`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `consumedsubscriptionevent` (
-  `Id` varchar(36) NOT NULL,
+  `Id` BIGINT(20) UNSIGNED NOT NULL,
   `SubscriptionId` varchar(36) NOT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `Priority` int(11) NOT NULL,
-  `PayloadId` varchar(36) DEFAULT NULL,
+  `PayloadId` BIGINT(20) UNSIGNED DEFAULT NULL,
   `DeliveryDateUtc` datetime(6) NOT NULL,
   `ConsumedDateUtc` datetime(6) NOT NULL,
   PRIMARY KEY (`Id`),
@@ -47,7 +47,7 @@ DROP TABLE IF EXISTS `eventpayload`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `eventpayload` (
-  `Id` varchar(36) NOT NULL,
+  `Id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
   `Payload` longtext NOT NULL,
   PRIMARY KEY (`Id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -61,12 +61,12 @@ DROP TABLE IF EXISTS `failedsubscriptionevent`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `failedsubscriptionevent` (
-  `Id` varchar(36) NOT NULL,
+  `Id` BIGINT(20) UNSIGNED NOT NULL,
   `SubscriptionId` varchar(36) NOT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `Priority` int(11) NOT NULL,
-  `PayloadId` varchar(36) DEFAULT NULL,
+  `PayloadId` BIGINT(20) UNSIGNED DEFAULT NULL,
   `DeliveryDateUtc` datetime(6) NOT NULL,
   `FailedDateUtc` datetime(6) NOT NULL,
   `Reason` int(11) NOT NULL COMMENT '0=Unknown, 1=Expired, 2=MaxRetriesReached, 3=Other',
@@ -119,13 +119,13 @@ DROP TABLE IF EXISTS `subscriptionevent`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `subscriptionevent` (
-  `Id` varchar(36) NOT NULL,
+  `Id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
   `SubscriptionId` varchar(36) NOT NULL,
-  `TopicEventId` varchar(36) NOT NULL,
+  `TopicEventId` BIGINT(20) UNSIGNED NOT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `Priority` int(11) NOT NULL,
-  `PayloadId` varchar(36) DEFAULT NULL COMMENT 'Custom payload for this subscriber, in case the payload was transformed/modified for this subscription.',
+  `PayloadId` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'Custom payload for this subscriber, in case the payload was transformed/modified for this subscription.',
   `ExpirationDateUtc` datetime(6) DEFAULT NULL,
   `DeliveryDelayedUntilUtc` datetime(6) DEFAULT NULL,
   `DeliveryCount` int(11) NOT NULL,
@@ -166,14 +166,14 @@ DROP TABLE IF EXISTS `topicevent`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `topicevent` (
-  `Id` varchar(36) NOT NULL,
+  `Id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
   `TopicId` varchar(36) NOT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `ExpirationDateUtc` datetime(6) DEFAULT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `Headers` varchar(1000) CHARACTER SET utf8mb4 DEFAULT NULL COMMENT 'Json-formatted key-value pair. Only used for topic-subscription filtering.',
   `Priority` int(11) NOT NULL,
-  `PayloadId` varchar(36) DEFAULT NULL,
+  `PayloadId` BIGINT(20) UNSIGNED DEFAULT NULL,
   PRIMARY KEY (`Id`),
   KEY `FK_TopicEvent_EventPayload` (`PayloadId`),
   CONSTRAINT `FK_TopicEvent_EventPayload` FOREIGN KEY (`PayloadId`) REFERENCES `eventpayload` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION

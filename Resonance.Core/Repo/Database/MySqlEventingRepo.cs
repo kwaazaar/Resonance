@@ -28,6 +28,11 @@ namespace Resonance.Repo.Database
         {
         }
 
+        public override string GetLastAutoIncrementValue
+        {
+            get { return "LAST_INSERT_ID()"; }
+        }
+
         public override int UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
             var query = "INSERT INTO LastConsumedSubscriptionEvent (SubscriptionId, FunctionalKey, PublicationDateUtc)" +

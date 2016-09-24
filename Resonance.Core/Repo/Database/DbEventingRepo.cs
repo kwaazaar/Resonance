@@ -180,6 +180,11 @@ namespace Resonance.Repo.Database
         {
             return false;
         }
+
+        /// <summary>
+        /// Function signature for getting the latest autoincrement value
+        /// </summary>
+        public abstract string GetLastAutoIncrementValue { get; }
         #endregion
 
         #region Topic and Subscription Management
@@ -535,7 +540,7 @@ namespace Resonance.Repo.Database
                     { "@payload", payload },
                 };
             var id = TranQuery<Int64>("insert into EventPayload (Payload) values (@payload)" +
-                ";select SCOPE_IDENTITY() as 'Id'",
+                $";select {GetLastAutoIncrementValue} as 'Id'",
                 parameters).SingleOrDefault();
             return id;
         }
@@ -573,7 +578,7 @@ namespace Resonance.Repo.Database
                     { "@payloadId", topicEvent.PayloadId },
                 };
             var id = TranQuery<Int64>("insert into TopicEvent (TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, Headers, Priority, PayloadId) values (@topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @headers, @priority, @payloadId)" +
-                ";select SCOPE_IDENTITY() as 'Id'",
+                $";select {GetLastAutoIncrementValue} as 'Id'",
                 parameters).SingleOrDefault();
 
             return id;
@@ -601,7 +606,7 @@ namespace Resonance.Repo.Database
                 };
             var id = TranQuery<Int64>("insert into SubscriptionEvent (SubscriptionId, TopicEventId, PublicationDateUtc, FunctionalKey, Priority, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryDateUtc, DeliveryKey, InvisibleUntilUtc)"
                 + " values (@subscriptionId, @topicEventId, @publicationDateUtc, @functionalKey, @priority, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryDateUtc, @deliveryKey, @invisibleUntilUtc)"
-                + ";select SCOPE_IDENTITY() as 'Id'",
+                + $";select {GetLastAutoIncrementValue} as 'Id'",
                 parameters).SingleOrDefault();
 
             return id;
