@@ -31,17 +31,17 @@ namespace Resonance.Repo
         void DeleteSubscription(string id);
 
         // Publication
-        string StorePayload(string payload);
-        string GetPayload(string id);
-        int DeletePayload(string id);
-        string AddTopicEvent(TopicEvent topicEvent);
-        string AddSubscriptionEvent(SubscriptionEvent subscriptionEvent);
+        Int64 StorePayload(string payload);
+        string GetPayload(Int64 id);
+        int DeletePayload(Int64 id);
+        Int64 AddTopicEvent(TopicEvent topicEvent);
+        Int64 AddSubscriptionEvent(SubscriptionEvent subscriptionEvent);
 
         // Consumption
         //IEnumerable<SubscriptionEventIdentifier> FindConsumableEventsForSubscription(Subscription subscription, int maxCount);
         //bool TryLockConsumableEvent(SubscriptionEventIdentifier sId, string deliveryKey, DateTime invisibleUntilUtc);
         IEnumerable<ConsumableEvent> ConsumeNext(string subscriptionName, int visibilityTimeout, int maxCount = 1);
-        void MarkConsumed(string id, string deliveryKey);
-        void MarkFailed(string id, string deliveryKey, Reason reason);
+        void MarkConsumed(Int64 id, string deliveryKey);
+        void MarkFailed(Int64 id, string deliveryKey, Reason reason);
     }
 }

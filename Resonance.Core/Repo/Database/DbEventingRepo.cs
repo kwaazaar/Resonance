@@ -528,67 +528,70 @@ namespace Resonance.Repo.Database
         #endregion
 
         #region Event publication
-        public string StorePayload(string payload)
+        public Int64 StorePayload(string payload)
         {
-            var id = Guid.NewGuid().ToString();
             var parameters = new Dictionary<string, object>
                 {
-                    { "@id", id.ToDbKey() },
                     { "@payload", payload },
                 };
-            TranExecute("insert into EventPayload (Id, Payload) values (@id, @payload)", parameters);
+            var id = TranQuery<Int64>("insert into EventPayload (Payload) values (@payload)" +
+                ";select SCOPE_IDENTITY() as 'Id'",
+                parameters).SingleOrDefault();
             return id;
         }
 
-        public string GetPayload(string id)
+        public string GetPayload(Int64 id)
         {
             return TranQuery<string>("select Payload from EventPayload where Id = @id",
                 new Dictionary<string, object>
                 {
-                    { "@id", id.ToDbKey() },
+                    { "@id", id },
                 })
                 .SingleOrDefault();
         }
 
-        public int DeletePayload(string id)
+        public int DeletePayload(Int64 id)
         {
             return TranExecute("delete EventPayload where Id = @id",
-                new Dictionary<string, object> { { "@id", id.ToDbKey() } });
+                new Dictionary<string, object> { { "@id", id } });
         }
 
-        public string AddTopicEvent(TopicEvent topicEvent)
+        public Int64 AddTopicEvent(TopicEvent topicEvent)
         {
-            var id = topicEvent.Id != null ? topicEvent.Id : Guid.NewGuid().ToString();
+            if (topicEvent == null) throw new ArgumentNullException("topicEvent");
+            if (topicEvent.Id.HasValue) throw new ArgumentException("topicEvent.Id cannot have a value", "topicEvent");
 
             var headers = topicEvent.Headers != null ? JsonConvert.SerializeObject(topicEvent.Headers) : null; // Just serialization. Not used anymore (filtering uses the original dictionary).
             var parameters = new Dictionary<string, object>
                 {
-                    { "@id", id.ToDbKey() },
                     { "@topicId", topicEvent.TopicId.ToDbKey() },
                     { "@functionalKey", topicEvent.FunctionalKey },
                     { "@publicationDateUtc", topicEvent.PublicationDateUtc },
                     { "@expirationDateUtc", topicEvent.ExpirationDateUtc },
                     { "@headers", headers },
                     { "@priority", topicEvent.Priority },
-                    { "@payloadId", topicEvent.PayloadId.ToDbKey() },
+                    { "@payloadId", topicEvent.PayloadId },
                 };
-            TranExecute("insert into TopicEvent (Id, TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, Headers, Priority, PayloadId) values (@id, @topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @headers, @priority, @payloadId)", parameters);
+            var id = TranQuery<Int64>("insert into TopicEvent (TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, Headers, Priority, PayloadId) values (@topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @headers, @priority, @payloadId)" +
+                ";select SCOPE_IDENTITY() as 'Id'",
+                parameters).SingleOrDefault();
+
             return id;
         }
 
-        public string AddSubscriptionEvent(SubscriptionEvent subscriptionEvent)
+        public Int64 AddSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
-            var id = subscriptionEvent.Id != null ? subscriptionEvent.Id : Guid.NewGuid().ToString();
+            if (subscriptionEvent == null) throw new ArgumentNullException("subscriptionEvent");
+            if (subscriptionEvent.Id.HasValue) throw new ArgumentException("subscriptionEvent.Id cannot have a value", "subscriptionEvent");
 
             var parameters = new Dictionary<string, object>
                 {
-                    { "@id", id.ToDbKey() },
                     { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
-                    { "@topicEventId", subscriptionEvent.TopicEventId.ToDbKey() },
+                    { "@topicEventId", subscriptionEvent.TopicEventId },
                     { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
                     { "@priority", subscriptionEvent.Priority },
-                    { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
+                    { "@payloadId", subscriptionEvent.PayloadId },
                     { "@expirationDateUtc", subscriptionEvent.ExpirationDateUtc },
                     { "@deliveryDelayedUntilUtc", subscriptionEvent.DeliveryDelayedUntilUtc },
                     { "@deliveryCount", default(int) },
@@ -596,19 +599,22 @@ namespace Resonance.Repo.Database
                     { "@deliveryKey", default(string) },
                     { "@invisibleUntilUtc", default(DateTime?) },
                 };
-            TranExecute("insert into SubscriptionEvent (Id, SubscriptionId, TopicEventId, PublicationDateUtc, FunctionalKey, Priority, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryDateUtc, DeliveryKey, InvisibleUntilUtc)"
-                + " values (@id, @subscriptionId, @topicEventId, @publicationDateUtc, @functionalKey, @priority, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryDateUtc, @deliveryKey, @invisibleUntilUtc)", parameters);
+            var id = TranQuery<Int64>("insert into SubscriptionEvent (SubscriptionId, TopicEventId, PublicationDateUtc, FunctionalKey, Priority, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryDateUtc, DeliveryKey, InvisibleUntilUtc)"
+                + " values (@subscriptionId, @topicEventId, @publicationDateUtc, @functionalKey, @priority, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryDateUtc, @deliveryKey, @invisibleUntilUtc)"
+                + ";select SCOPE_IDENTITY() as 'Id'",
+                parameters).SingleOrDefault();
+
             return id;
         }
 
-        private SubscriptionEvent GetSubscriptionEvent(string id)
+        private SubscriptionEvent GetSubscriptionEvent(Int64 id)
         {
             return TranQuery<SubscriptionEvent>("select se.*, s.Ordered from SubscriptionEvent se" + // Ordered flag included for efficiency
                 " join Subscription s on s.Id = se.SubscriptionId" +
                 " where se.Id = @id",
                 new Dictionary<string, object>
                 {
-                    { "@id", id.ToDbKey() },
+                    { "@id", id },
                 })
                 .SingleOrDefault();
         }
@@ -619,12 +625,12 @@ namespace Resonance.Repo.Database
                 " values (@id, @subscriptionId, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @consumedDateUtc)",
                 new Dictionary<string, object>
                 {
-                { "@id", subscriptionEvent.Id.ToDbKey() },
+                { "@id", subscriptionEvent.Id },
                 { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
                 { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                 { "@functionalKey", subscriptionEvent.FunctionalKey },
                 { "@priority", subscriptionEvent.Priority },
-                { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
+                { "@payloadId", subscriptionEvent.PayloadId },
                 { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
                 { "@consumedDateUtc", DateTime.UtcNow },
                 });
@@ -638,12 +644,12 @@ namespace Resonance.Repo.Database
                 " values (@id, @subscriptionId, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @failedDateUtc, @reason, @reasonOther)",
                 new Dictionary<string, object>
                 {
-                    { "@id", subscriptionEvent.Id.ToDbKey() },
+                    { "@id", subscriptionEvent.Id },
                     { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
                     { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
                     { "@priority", subscriptionEvent.Priority },
-                    { "@payloadId", subscriptionEvent.PayloadId.ToDbKey() },
+                    { "@payloadId", subscriptionEvent.PayloadId },
                     { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
                     { "@failedDateUtc", DateTime.UtcNow },
                     { "@reason", (int)reason.Type },
@@ -664,7 +670,7 @@ namespace Resonance.Repo.Database
             return ConsumeNextForSubscription(subscription, visibilityTimeout, maxCount);
         }
 
-        public virtual void MarkConsumed(string id, string deliveryKey)
+        public virtual void MarkConsumed(Int64 id, string deliveryKey)
         {
             var se = GetSubscriptionEvent(id);
             if (se == null) throw new ArgumentException($"No subscription-event found with id {id}. Maybe it has already been consumed (by another). Using a higher visibility timeout may help.");
@@ -690,7 +696,7 @@ namespace Resonance.Repo.Database
                     int rowsUpdated = TranExecute("delete from SubscriptionEvent where Id = @id and DeliveryKey = @deliveryKey",
                         new Dictionary<string, object>
                         {
-                        { "@id", se.Id.ToDbKey() },
+                        { "@id", se.Id },
                         { "@deliveryKey", se.DeliveryKey }, // Make sure we delete the one we just inspected (in race conditions it may have been locked again)
                         });
 
@@ -728,7 +734,7 @@ namespace Resonance.Repo.Database
             } while (!success && allowRetry);
         }
 
-        public virtual void MarkFailed(string id, string deliveryKey, Reason reason)
+        public virtual void MarkFailed(Int64 id, string deliveryKey, Reason reason)
         {
             var se = GetSubscriptionEvent(id);
             if (se == null) throw new ArgumentException($"No subscription-event found with id {id}.");
@@ -744,7 +750,7 @@ namespace Resonance.Repo.Database
                 int rowsUpdated = TranExecute("delete from SubscriptionEvent where Id = @id and DeliveryKey = @deliveryKey",
                     new Dictionary<string, object>
                     {
-                        { "@id", se.Id.ToDbKey() },
+                        { "@id", se.Id },
                         { "@deliveryKey", se.DeliveryKey }, // Make sure we delete the one we just inspected (in race conditions it may have been locked again)
                     });
 

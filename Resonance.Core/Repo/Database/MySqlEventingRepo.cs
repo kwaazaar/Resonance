@@ -64,24 +64,24 @@ namespace Resonance.Repo.Database
         /// </summary>
         /// <param name="sId">SubscriptionEventId</param>
         /// <returns></returns>
-        private ConsumableEvent GetConsumableEvent(string sId)
+        private ConsumableEvent GetConsumableEvent(Int64 sId)
         {
             var query = $"select se.Id, se.DeliveryKey, se.FunctionalKey, se.InvisibleUntilUtc, se.PayloadId" + // Get the minimal amount of data
                 " from SubscriptionEvent se where se.Id = @sId";
             var ce = TranQuery<ConsumableEvent>(query, new { sId = sId }).SingleOrDefault();
-            if (ce != null && ce.PayloadId != null)
+            if (ce != null && ce.PayloadId.HasValue)
             {
-                ce.Payload = GetPayload(ce.PayloadId);
+                ce.Payload = GetPayload(ce.PayloadId.Value);
                 ce.PayloadId = null; // No reason to keep it
             }
             return ce;
         }
 
-        private IEnumerable<string> LockNextSubscriptionEvents(string subscriptionId, bool ordered, int visibilityTimeout, int maxCount)
+        private IEnumerable<Int64> LockNextSubscriptionEvents(string subscriptionId, bool ordered, int visibilityTimeout, int maxCount)
         {
             var maxCountToUse = ordered ? 1 : maxCount; // Fix to one, when using functional ordering
 
-            var lockedIds = new List<string>();
+            var lockedIds = new List<Int64>();
 
             if (!ordered)
             {
@@ -90,7 +90,7 @@ namespace Resonance.Repo.Database
                     var deliveryKey = Guid.NewGuid().ToString();
                     var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout);
 
-                    var query = "set @updatedSeId := '';" +
+                    var query = "set @updatedSeId := 0;" +
                         " update SubscriptionEvent" +
                         " set InvisibleUntilUtc = @invisibleUntilUtc," +
                         "   DeliveryCount = DeliveryCount + 1," +
@@ -112,7 +112,7 @@ namespace Resonance.Repo.Database
                         ");" +
                         "select @updatedSeId;";
 
-                    var sId = TranQuery<string>(query,
+                    var sId = TranQuery<Int64?>(query,
                         new Dictionary<string, object>
                         {
                         { "@subscriptionId", subscriptionId.ToDbKey() },
@@ -120,8 +120,8 @@ namespace Resonance.Repo.Database
                         { "@deliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },
                         }).SingleOrDefault();
-                    if (sId != null && sId.Length > 0) // MySql returns the empty string used to initialize this variable with.
-                        lockedIds.Add(sId);
+                    if (sId.HasValue && sId.Value > 0) // MySql returns the 0 used to initialize this variable with.
+                        lockedIds.Add(sId.Value);
                     else
                         break; // Break out of for-loop
                 }
@@ -134,7 +134,7 @@ namespace Resonance.Repo.Database
                     var deliveryKey = Guid.NewGuid().ToString();
                     var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout);
 
-                    var query = "set @updatedSeId := '';" +
+                    var query = "set @updatedSeId := 0;" +
                         " update SubscriptionEvent" +
                         " set InvisibleUntilUtc = @invisibleUntilUtc," +
                         "   DeliveryCount = DeliveryCount + 1," +
@@ -167,7 +167,7 @@ namespace Resonance.Repo.Database
                         ");" +
                         "select @updatedSeId;";
 
-                    var sId = TranQuery<string>(query,
+                    var sId = TranQuery<Int64?>(query,
                         new Dictionary<string, object>
                         {
                         { "@subscriptionId", subscriptionId.ToDbKey() },
@@ -175,8 +175,8 @@ namespace Resonance.Repo.Database
                         { "@deliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },
                         }).SingleOrDefault();
-                    if (sId != null && sId.Length > 0) // MySql returns the empty string used to initialize this variable with.
-                        lockedIds.Add(sId);
+                    if (sId.HasValue && sId.Value > 0) // MySql returns the 0 used to initialize this variable with.
+                        lockedIds.Add(sId.Value);
                     else
                         break; // Break out of for-loop
                 }

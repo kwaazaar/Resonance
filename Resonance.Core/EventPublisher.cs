@@ -56,7 +56,7 @@ namespace Resonance
                     throw new ArgumentException($"Topic with name {topicName} not found", "topicName");
 
                 // Store payload (outside transaction, no need to lock right now already)
-                string payloadId = (payload != null) ? repo.StorePayload(payload) : null;
+                var payloadId = (payload != null) ? repo.StorePayload(payload) : default(Int64?);
 
                 var subscriptions = repo.GetSubscriptions(topicId: topic.Id).ToList();
 
@@ -73,7 +73,7 @@ namespace Resonance
                         Headers = headers,
                         PayloadId = payloadId,
                     };
-                    string topicEventId = repo.AddTopicEvent(newTopicEvent);
+                    var topicEventId = repo.AddTopicEvent(newTopicEvent);
                     newTopicEvent.Id = topicEventId;
 
                     foreach (var subscription in subscriptions)
@@ -104,7 +104,7 @@ namespace Resonance
                             var newSubscriptionEvent = new SubscriptionEvent
                             {
                                 SubscriptionId = subscription.Id,
-                                TopicEventId = newTopicEvent.Id,
+                                TopicEventId = newTopicEvent.Id.Value,
                                 PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
                                 FunctionalKey = newTopicEvent.FunctionalKey,
                                 PayloadId = newTopicEvent.PayloadId,
@@ -128,11 +128,11 @@ namespace Resonance
                 {
                     repo.RollbackTransaction();
 
-                    if (payloadId != null)
+                    if (payloadId.HasValue)
                     {
                         try
                         {
-                            repo.DeletePayload(payloadId);
+                            repo.DeletePayload(payloadId.Value);
                         }
                         catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
                     }

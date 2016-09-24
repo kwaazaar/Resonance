@@ -108,21 +108,21 @@ namespace Resonance.Demo
             //sw.Stop();
             //Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
 
-            //var ce = consumer.ConsumeNext(subscription1.Name).FirstOrDefault();
-            //if (ce != null)
-            //    consumer.MarkConsumed(ce.Id, ce.DeliveryKey);
+            var ce = consumer.ConsumeNext(subscription1.Name).FirstOrDefault();
+            if (ce != null)
+                consumer.MarkConsumed(ce.Id, ce.DeliveryKey);
 
-            var worker = new EventConsumptionWorker(consumer,
-                "Demo Subscription 2", (ce) =>
-                {
-                    //Console.WriteLine($"Consumed {ce.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
-                    return DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded;
-                }, maxThreads: 10, minBackOffDelayInMs: 0,
-                logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>());
-            worker.Start();
-            Console.WriteLine("Press a key to stop the worker...");
-            Console.ReadKey();
-            worker.Stop();
+            //var worker = new EventConsumptionWorker(consumer,
+            //    "Demo Subscription 2", (ce) =>
+            //    {
+            //        //Console.WriteLine($"Consumed {ce.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
+            //        return DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded;
+            //    }, maxThreads: 10, minBackOffDelayInMs: 0,
+            //    logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>());
+            //worker.Start();
+            //Console.WriteLine("Press a key to stop the worker...");
+            //Console.ReadKey();
+            //worker.Stop();
 
             //consumer.DeleteSubscription(subscription1.Id);
             //publisher.DeleteTopic(topic1.Id, true);

@@ -71,13 +71,13 @@ namespace Resonance
             }
         }
 
-        public void MarkConsumed(string id, string deliveryKey)
+        public void MarkConsumed(Int64 id, string deliveryKey)
         {
             using (var repo = _repoFactory.CreateRepo())
                 repo.MarkConsumed(id, deliveryKey);   
         }
 
-        public void MarkFailed(string id, string deliveryKey, Reason reason)
+        public void MarkFailed(Int64 id, string deliveryKey, Reason reason)
         {
             using (var repo = _repoFactory.CreateRepo())
                 repo.MarkFailed(id, deliveryKey, reason);

@@ -7,12 +7,12 @@ namespace Resonance.Models
 {
     public class ConsumableEvent
     {
-        public string Id { get; set; }
+        public Int64 Id { get; set; }
         public string FunctionalKey { get; set; }
         public string DeliveryKey { get; set; }
         public DateTime InvisibleUntilUtc { get; set; }
         public string Payload { get; set; }
-        internal string PayloadId { get; set; }
+        internal Int64? PayloadId { get; set; }
     }
 
     public class ConsumableEvent<T> : ConsumableEvent

@@ -63,7 +63,7 @@ namespace Resonance.Repo.Database
             {
                 var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout);
 
-                var query = "DECLARE @l_PBEIds TABLE(ID varchar(36))\n"
+                var query = "DECLARE @l_PBEIds TABLE(ID bigint)\n"
                     + ";WITH DE AS ("
                     + $" select TOP {maxCountToUse} se.Id, se.DeliveryKey, se.InvisibleUntilUtc, se.DeliveryCount, se.DeliveryDateUtc" // Top 1!!!
                     + " from SubscriptionEvent se"
@@ -101,7 +101,7 @@ namespace Resonance.Repo.Database
                     var deliveryKey = Guid.NewGuid().ToString();
                     var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout);
 
-                    var query = "DECLARE @l_PBEIds TABLE(ID varchar(36))\n"
+                    var query = "DECLARE @l_PBEIds TABLE(ID bigint)\n"
                         + ";WITH DE AS ("
                         + " select TOP 1 se.Id, se.DeliveryKey, se.InvisibleUntilUtc, se.DeliveryCount, se.DeliveryDateUtc" // Top 1!!!
                         + " from SubscriptionEvent se"
@@ -149,9 +149,9 @@ namespace Resonance.Repo.Database
 
             foreach (var ce in ces)
             {
-                if (ce.PayloadId != null)
+                if (ce.PayloadId.HasValue)
                 {
-                    ce.Payload = GetPayload(ce.PayloadId);
+                    ce.Payload = GetPayload(ce.PayloadId.Value);
                     ce.PayloadId = null; // No reason to keep it
                 }
             }
