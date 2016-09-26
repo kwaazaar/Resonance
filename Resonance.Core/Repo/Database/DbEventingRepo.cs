@@ -76,6 +76,7 @@ namespace Resonance.Repo.Database
                 if (_runningTransaction == null)
                 {
                     _runningTransaction = _conn.BeginTransaction(IsolationLevel.ReadCommitted);
+                    _tranState = TranState.Unchanged;
                 }
                 _tranCount++;
             }
