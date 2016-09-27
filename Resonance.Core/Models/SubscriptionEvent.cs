@@ -8,7 +8,7 @@ namespace Resonance.Models
     public class SubscriptionEvent
     {
         public Int64? Id { get; set; }
-        public string SubscriptionId { get; set; }
+        public Int64 SubscriptionId { get; set; }
         public bool Ordered { get; set; }
         public Int64 TopicEventId { get; set; }
         public DateTime PublicationDateUtc { get; set; }

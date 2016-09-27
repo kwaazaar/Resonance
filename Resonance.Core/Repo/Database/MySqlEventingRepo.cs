@@ -52,7 +52,7 @@ namespace Resonance.Repo.Database
             // TODO: Optimize when not ordered: use old code
 
             // 1. Lock and get ids
-            var lockedIds = LockNextSubscriptionEvents(subscription.Id, subscription.Ordered, visibilityTimeout, maxCount);
+            var lockedIds = LockNextSubscriptionEvents(subscription.Id.Value, subscription.Ordered, visibilityTimeout, maxCount);
 
             // 2. Get se details
             var ces = new List<ConsumableEvent>();
@@ -82,7 +82,7 @@ namespace Resonance.Repo.Database
             return ce;
         }
 
-        private IEnumerable<Int64> LockNextSubscriptionEvents(string subscriptionId, bool ordered, int visibilityTimeout, int maxCount)
+        private IEnumerable<Int64> LockNextSubscriptionEvents(Int64 subscriptionId, bool ordered, int visibilityTimeout, int maxCount)
         {
             var maxCountToUse = ordered ? 1 : maxCount; // Fix to one, when using functional ordering
 
@@ -120,7 +120,7 @@ namespace Resonance.Repo.Database
                     var sId = TranQuery<Int64?>(query,
                         new Dictionary<string, object>
                         {
-                        { "@subscriptionId", subscriptionId.ToDbKey() },
+                        { "@subscriptionId", subscriptionId },
                         { "@utcNow", DateTime.UtcNow },
                         { "@deliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },
@@ -175,7 +175,7 @@ namespace Resonance.Repo.Database
                     var sId = TranQuery<Int64?>(query,
                         new Dictionary<string, object>
                         {
-                        { "@subscriptionId", subscriptionId.ToDbKey() },
+                        { "@subscriptionId", subscriptionId },
                         { "@utcNow", DateTime.UtcNow },
                         { "@deliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },

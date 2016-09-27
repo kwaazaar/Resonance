@@ -23,13 +23,13 @@ namespace Resonance
                 return repo.AddOrUpdateSubscription(subscription);
         }
 
-        public void DeleteSubscription(string id)
+        public void DeleteSubscription(Int64 id)
         {
             using (var repo = _repoFactory.CreateRepo())
                 repo.DeleteSubscription(id);
         }
 
-        public Subscription GetSubscription(string id)
+        public Subscription GetSubscription(Int64 id)
         {
             using (var repo = _repoFactory.CreateRepo())
                 return repo.GetSubscription(id);
@@ -41,7 +41,7 @@ namespace Resonance
                 return repo.GetSubscriptionByName(name);
         }
 
-        public IEnumerable<Subscription> GetSubscriptions(string topicId = null)
+        public IEnumerable<Subscription> GetSubscriptions(Int64? topicId = null)
         {
             using (var repo = _repoFactory.CreateRepo())
                 return repo.GetSubscriptions(topicId).ToList();

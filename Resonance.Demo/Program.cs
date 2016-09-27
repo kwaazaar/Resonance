@@ -53,41 +53,42 @@ namespace Resonance.Demo
             var consumer = serviceProvider.GetRequiredService<IEventConsumer>();
 
             // Make sure the topic exists
-            var topic1 = publisher.AddOrUpdateTopic(new Topic { Id = "c526527a-9d16-4fa5-8ed7-000000000001", Name = "Demo Topic 1" });
-            var topic2 = publisher.AddOrUpdateTopic(new Topic { Id = "c526527a-9d16-4fa5-8ed7-000000000002", Name = "Demo Topic 2" });
-
-            var subscription1 = consumer.AddOrUpdateSubscription(new Subscription
-            {
-                Id = "a526527a-9d16-4fa5-8ed7-000000000001",
-                Name = "Demo Subscription 1",
-                MaxDeliveries = 2,
-                Ordered = true,
-                TopicSubscriptions = new List<TopicSubscription>
+            var topic1 = publisher.GetTopicByName("Demo Topic 1") ?? publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic 1" });
+            var topic2 = publisher.GetTopicByName("Demo Topic 2") ?? publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic 2" });
+            var subscription1 = consumer.GetSubscriptionByName("Demo Subscription 1");
+            if (subscription1 == null)
+                subscription1 = consumer.AddOrUpdateSubscription(new Subscription
                 {
-                    new TopicSubscription
+                    Name = "Demo Subscription 1",
+                    MaxDeliveries = 2,
+                    Ordered = true,
+                    TopicSubscriptions = new List<TopicSubscription>
                     {
-                        TopicId = topic1.Id, Enabled = true,
-                        Filtered = true,
-                        Filters = new List<TopicSubscriptionFilter>
+                        new TopicSubscription
                         {
-                            new TopicSubscriptionFilter { Header = "EventName", MatchExpression = "*" }, // Matches on every "EventName"-header, but header MUST exist!
+                            TopicId = topic1.Id.Value, Enabled = true,
+                            Filtered = true,
+                            Filters = new List<TopicSubscriptionFilter>
+                            {
+                                new TopicSubscriptionFilter { Header = "EventName", MatchExpression = "*" }, // Matches on every "EventName"-header, but header MUST exist!
+                            },
                         },
-                    },
-                    new TopicSubscription { TopicId = topic2.Id, Enabled = true },
-                }
-            });
-            var subscription2 = consumer.AddOrUpdateSubscription(new Subscription
-            {
-                Id = "a526527a-9d16-4fa5-8ed7-000000000002",
-                Name = "Demo Subscription 2",
-                MaxDeliveries = 2,
-                Ordered = false,
-                TopicSubscriptions = new List<TopicSubscription>
+                        new TopicSubscription { TopicId = topic2.Id.Value, Enabled = true },
+                    }
+                });
+            var subscription2 = consumer.GetSubscriptionByName("Demo Subscription 2");
+            if (subscription2 == null)
+                subscription2 = consumer.AddOrUpdateSubscription(new Subscription
                 {
-                    new TopicSubscription { TopicId = topic1.Id, Enabled = true },
-                    new TopicSubscription { TopicId = topic2.Id, Enabled = false }, // Not enabled
-                }
-            });
+                    Name = "Demo Subscription 2",
+                    MaxDeliveries = 2,
+                    Ordered = false,
+                    TopicSubscriptions = new List<TopicSubscription>
+                    {
+                        new TopicSubscription { TopicId = topic1.Id.Value, Enabled = true },
+                        new TopicSubscription { TopicId = topic2.Id.Value, Enabled = false }, // Not enabled
+                    }
+                });
 
             //var sw = new Stopwatch();
             //sw.Start();
@@ -113,7 +114,7 @@ namespace Resonance.Demo
             //    consumer.MarkConsumed(ce.Id, ce.DeliveryKey);
 
             var worker = new EventConsumptionWorker(consumer,
-                "Demo Subscription 1", (ceW) =>
+                "Demo Subscription 2", (ceW) =>
                 {
                     //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     return DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded;
@@ -149,18 +150,18 @@ namespace Resonance.Demo
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
 
             // To use MSSQLServer:
-            var connectionString = config.GetConnectionString("Resonance.MsSql");
-            serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
-            {
-                return new MsSqlEventingRepoFactory(connectionString);
-            });
-
-            // To use MySQL:
-            //var connectionString = config.GetConnectionString("Resonance.MySql");
+            //var connectionString = config.GetConnectionString("Resonance.MsSql");
             //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
             //{
-            //    return new MySqlEventingRepoFactory(connectionString);
+            //    return new MsSqlEventingRepoFactory(connectionString);
             //});
+
+            // To use MySQL:
+            var connectionString = config.GetConnectionString("Resonance.MySql");
+            serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
+            {
+                return new MySqlEventingRepoFactory(connectionString);
+            });
 
             // Configure EventPublisher
             serviceCollection.AddTransient<IEventPublisher, EventPublisher>();

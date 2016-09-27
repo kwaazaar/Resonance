@@ -7,6 +7,6 @@ namespace Resonance.Repo.InternalModels
 {
     public class Identifier
     {
-        public string Id { get; set; }
+        public Int64 Id { get; set; }
     }
 }

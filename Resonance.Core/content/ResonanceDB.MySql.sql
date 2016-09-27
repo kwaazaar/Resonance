@@ -26,7 +26,7 @@ DROP TABLE IF EXISTS `consumedsubscriptionevent`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `consumedsubscriptionevent` (
   `Id` BIGINT(20) UNSIGNED NOT NULL,
-  `SubscriptionId` varchar(36) NOT NULL,
+  `SubscriptionId` BIGINT(20) UNSIGNED NOT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `Priority` int(11) NOT NULL,
@@ -62,7 +62,7 @@ DROP TABLE IF EXISTS `failedsubscriptionevent`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `failedsubscriptionevent` (
   `Id` BIGINT(20) UNSIGNED NOT NULL,
-  `SubscriptionId` varchar(36) NOT NULL,
+  `SubscriptionId` BIGINT(20) UNSIGNED NOT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `Priority` int(11) NOT NULL,
@@ -85,10 +85,10 @@ DROP TABLE IF EXISTS `lastconsumedsubscriptionevent`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `lastconsumedsubscriptionevent` (
-  `SubscriptionId` varchar(36) NOT NULL,
+  `SubscriptionId` BIGINT(20) UNSIGNED NOT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 NOT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
-  PRIMARY KEY (`SubscriptionId`,`FunctionalKey`)
+  PRIMARY KEY (`FunctionalKey`, `SubscriptionId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -100,8 +100,8 @@ DROP TABLE IF EXISTS `subscription`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `subscription` (
-  `Id` varchar(36) NOT NULL,
-  `Name` varchar(36) CHARACTER SET utf8mb4 NOT NULL,
+  `Id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `Name` varchar(50) CHARACTER SET utf8mb4 NOT NULL,
   `Ordered` tinyint(1) NOT NULL,
   `TimeToLive` int(11) DEFAULT NULL COMMENT 'Time to live in seconds',
   `MaxDeliveries` int(11) NOT NULL,
@@ -120,7 +120,7 @@ DROP TABLE IF EXISTS `subscriptionevent`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `subscriptionevent` (
   `Id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-  `SubscriptionId` varchar(36) NOT NULL,
+  `SubscriptionId` BIGINT(20) UNSIGNED NOT NULL,
   `TopicEventId` BIGINT(20) UNSIGNED NOT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
@@ -136,7 +136,7 @@ CREATE TABLE `subscriptionevent` (
   KEY `FK_SubscriptionEvent_EventPayload` (`PayloadId`),
   KEY `FK_SubscriptionEvent_TopicEvent` (`TopicEventId`),
   KEY `IX_SubscriptionEvent_FindOrdered` (`Id`,`SubscriptionId`,`PublicationDateUtc`,`Priority`,`FunctionalKey`,`DeliveryDelayedUntilUtc`,`ExpirationDateUtc`,`DeliveryCount`,`DeliveryKey`,`PayloadId`) USING BTREE,
-  KEY `IX_SubscriptionEvent_Invisible` (`SubscriptionId`,`InvisibleUntilUtc`,`Id`,`FunctionalKey`) USING BTREE,
+  KEY `IX_SubscriptionEvent_Invisible` (`InvisibleUntilUtc`,`SubscriptionId`,`FunctionalKey`, `Id`) USING BTREE,
   CONSTRAINT `FK_SubscriptionEvent_EventPayload` FOREIGN KEY (`PayloadId`) REFERENCES `eventpayload` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `FK_SubscriptionEvent_TopicEvent` FOREIGN KEY (`TopicEventId`) REFERENCES `topicevent` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -150,8 +150,8 @@ DROP TABLE IF EXISTS `topic`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `topic` (
-  `Id` varchar(36) NOT NULL,
-  `Name` varchar(36) CHARACTER SET utf8mb4 NOT NULL,
+  `Id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `Name` varchar(50) CHARACTER SET utf8mb4 NOT NULL,
   `Notes` varchar(500) CHARACTER SET utf8mb4 DEFAULT NULL,
   PRIMARY KEY (`Id`),
   UNIQUE KEY `UK_Topic_Name` (`Name`)
@@ -167,7 +167,7 @@ DROP TABLE IF EXISTS `topicevent`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `topicevent` (
   `Id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-  `TopicId` varchar(36) NOT NULL,
+  `TopicId` BIGINT(20) UNSIGNED NOT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `ExpirationDateUtc` datetime(6) DEFAULT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
@@ -188,9 +188,9 @@ DROP TABLE IF EXISTS `topicsubscription`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `topicsubscription` (
-  `Id` varchar(36) NOT NULL,
-  `TopicId` varchar(36) NOT NULL,
-  `SubscriptionId` varchar(36) NOT NULL,
+  `Id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `TopicId` BIGINT(20) UNSIGNED NOT NULL,
+  `SubscriptionId` BIGINT(20) UNSIGNED NOT NULL,
   `Enabled` tinyint(1) NOT NULL,
   `Filtered` tinyint(1) NOT NULL,
   PRIMARY KEY (`Id`),
@@ -209,8 +209,8 @@ DROP TABLE IF EXISTS `topicsubscriptionfilter`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `topicsubscriptionfilter` (
-  `Id` varchar(36) NOT NULL,
-  `TopicSubscriptionId` varchar(36) NOT NULL,
+  `Id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `TopicSubscriptionId` BIGINT(20) UNSIGNED NOT NULL,
   `Header` varchar(100) CHARACTER SET utf8mb4 NOT NULL,
   `MatchExpression` varchar(100) CHARACTER SET utf8mb4 NOT NULL,
   PRIMARY KEY (`Id`),

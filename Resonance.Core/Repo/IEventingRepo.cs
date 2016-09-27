@@ -20,15 +20,15 @@ namespace Resonance.Repo
 
         // Topic & subscription management
         IEnumerable<Topic> GetTopics(string partOfName = null);
-        Topic GetTopic(string id);
+        Topic GetTopic(Int64 id);
         Topic GetTopicByName(string name);
         Topic AddOrUpdateTopic(Topic topic);
-        void DeleteTopic(string id, bool inclSubscriptions);
-        IEnumerable<Subscription> GetSubscriptions(string topicId = null);
-        Subscription GetSubscription(string id);
+        void DeleteTopic(Int64 id, bool inclSubscriptions);
+        IEnumerable<Subscription> GetSubscriptions(Int64? topicId = null);
+        Subscription GetSubscription(Int64 id);
         Subscription GetSubscriptionByName(string name);
         Subscription AddOrUpdateSubscription(Subscription subscription);
-        void DeleteSubscription(string id);
+        void DeleteSubscription(Int64 id);
 
         // Publication
         Int64 StorePayload(string payload);

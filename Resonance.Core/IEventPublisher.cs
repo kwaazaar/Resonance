@@ -12,9 +12,9 @@ namespace Resonance
         TopicEvent Publish<T>(string topicName, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, Dictionary<string, string> headers=null, T payload = null) where T : class;
 
         IEnumerable<Topic> GetTopics(string partOfName = null);
-        Topic GetTopic(string id);
+        Topic GetTopic(Int64 id);
         Topic GetTopicByName(string name);
         Topic AddOrUpdateTopic(Topic topic);
-        void DeleteTopic(string id, bool inclSubscriptions);
+        void DeleteTopic(Int64 id, bool inclSubscriptions);
     }
 }

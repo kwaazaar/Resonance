@@ -23,13 +23,13 @@ namespace Resonance
                 return repo.AddOrUpdateTopic(topic);
         }
 
-        public void DeleteTopic(string id, bool inclSubscriptions)
+        public void DeleteTopic(Int64 id, bool inclSubscriptions)
         {
             using (var repo = _repoFactory.CreateRepo())
                 repo.DeleteTopic(id, inclSubscriptions);
         }
 
-        public Topic GetTopic(string id)
+        public Topic GetTopic(Int64 id)
         {
             using (var repo = _repoFactory.CreateRepo())
                 return repo.GetTopic(id);
@@ -66,7 +66,7 @@ namespace Resonance
                     // Store topic event
                     var newTopicEvent = new TopicEvent
                     {
-                        TopicId = topic.Id,
+                        TopicId = topic.Id.Value,
                         PublicationDateUtc = publicationDateUtc.GetValueOrDefault(DateTime.UtcNow),
                         FunctionalKey = functionalKey,
                         ExpirationDateUtc = expirationDateUtc,
@@ -80,7 +80,7 @@ namespace Resonance
                     {
                         // Create SubscriptionEvents for topicsubscriptions for the specified topic that are enabled
                         foreach (var topicSubscription in subscription.TopicSubscriptions
-                            .Where((ts) => ts.TopicId.Equals(topic.Id, StringComparison.OrdinalIgnoreCase)) // Correct topic
+                            .Where((ts) => ts.TopicId == topic.Id.Value) // Correct topic
                             .Where((ts) => ts.Enabled) // Enabled
                             .Where((ts) => !ts.Filtered || CheckFilters(ts.Filters, headers))) // Filters match
                         {
@@ -103,7 +103,7 @@ namespace Resonance
 
                             var newSubscriptionEvent = new SubscriptionEvent
                             {
-                                SubscriptionId = subscription.Id,
+                                SubscriptionId = subscription.Id.Value,
                                 TopicEventId = newTopicEvent.Id.Value,
                                 PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
                                 FunctionalKey = newTopicEvent.FunctionalKey,

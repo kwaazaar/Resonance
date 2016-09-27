@@ -191,8 +191,8 @@ namespace Resonance.Repo.Database
         #region Topic and Subscription Management
         public Subscription AddOrUpdateSubscription(Subscription subscription)
         {
-            Subscription existingSubscription = (subscription.Id != null)
-                            ? existingSubscription = GetSubscription(subscription.Id)
+            Subscription existingSubscription = (subscription.Id.HasValue)
+                            ? existingSubscription = GetSubscription(subscription.Id.Value)
                             : null;
 
             if (existingSubscription != null) // update
@@ -202,7 +202,7 @@ namespace Resonance.Repo.Database
                 {
                     var parameters = new Dictionary<string, object>
                     {
-                        { "@id", subscription.Id.ToDbKey() },
+                        { "@id", subscription.Id },
                         { "@name", subscription.Name },
                         { "@deliveryDelay", subscription.DeliveryDelay },
                         { "@maxDeliveries", subscription.MaxDeliveries },
@@ -212,8 +212,8 @@ namespace Resonance.Repo.Database
                     TranExecute("update Subscription set Name = @name, DeliveryDelay = @deliveryDelay, MaxDeliveries = @maxDeliveries, Ordered = @ordered, TimeToLive = @timeToLive where Id = @id", parameters);
 
                     // Update TopicSubscriptions (by removing them and rebuilding them again)
-                    RemoveTopicSubscriptions(subscription.Id);
-                    AddTopicSubscriptions(subscription.Id, subscription.TopicSubscriptions);
+                    RemoveTopicSubscriptions(subscription.Id.Value);
+                    AddTopicSubscriptions(subscription.Id.Value, subscription.TopicSubscriptions);
 
                     CommitTransaction();
                 }
@@ -223,25 +223,26 @@ namespace Resonance.Repo.Database
                     throw;
                 }
 
-                return GetSubscription(subscription.Id);
+                return GetSubscription(subscription.Id.Value);
             }
             else
             {
-                var subscriptionId = subscription.Id != null ? subscription.Id : Guid.NewGuid().ToString();
+                Int64 subscriptionId = Int64.MinValue;
 
                 BeginTransaction();
                 try
                 {
                     var parameters = new Dictionary<string, object>
                         {
-                            { "@id", subscriptionId.ToDbKey() },
                             { "@name", subscription.Name },
                             { "@deliveryDelay", subscription.DeliveryDelay },
                             { "@maxDeliveries", subscription.MaxDeliveries },
                             { "@ordered", subscription.Ordered },
                             { "@timeToLive", subscription.TimeToLive },
                         };
-                    TranExecute("insert into Subscription (Id, Name, DeliveryDelay, MaxDeliveries, Ordered, TimeToLive) values (@id, @name, @deliveryDelay, @maxDeliveries, @ordered, @timeToLive)", parameters);
+                    subscriptionId = TranQuery<Int64>("insert into Subscription (Name, DeliveryDelay, MaxDeliveries, Ordered, TimeToLive) values (@name, @deliveryDelay, @maxDeliveries, @ordered, @timeToLive)"
+                        + $";select {GetLastAutoIncrementValue} as 'Id'",
+                        parameters).Single();
                     AddTopicSubscriptions(subscriptionId, subscription.TopicSubscriptions);
                     CommitTransaction();
                 }
@@ -255,37 +256,35 @@ namespace Resonance.Repo.Database
             }
         }
 
-        private void AddTopicSubscriptions(string subscriptionId, List<TopicSubscription> topicSubscriptions)
+        private void AddTopicSubscriptions(Int64 subscriptionId, List<TopicSubscription> topicSubscriptions)
         {
             BeginTransaction();
             try
             {
                 foreach (var topicSubscription in topicSubscriptions)
                 {
-                    var topicSubscriptionId = topicSubscription.Id != null ? topicSubscription.Id : Guid.NewGuid().ToString();
                     var parameters = new Dictionary<string, object>
                         {
-                            { "@id", topicSubscriptionId.ToDbKey() },
-                            { "@topicId", topicSubscription.TopicId.ToDbKey() },
-                            { "@subscriptionId", subscriptionId.ToDbKey() },
+                            { "@topicId", topicSubscription.TopicId },
+                            { "@subscriptionId", subscriptionId },
                             { "@enabled", topicSubscription.Enabled },
                             { "@filtered", topicSubscription.Filtered },
                         };
-                    TranExecute("insert into TopicSubscription (Id, TopicId, SubscriptionId, Enabled, Filtered) values (@id, @topicId, @subscriptionId, @enabled, @filtered)", parameters);
+                    var topicSubscriptionId = TranQuery<Int64>("insert into TopicSubscription (TopicId, SubscriptionId, Enabled, Filtered) values (@topicId, @subscriptionId, @enabled, @filtered)"
+                        + $";select {GetLastAutoIncrementValue} as 'Id'",
+                        parameters).Single();
 
                     if (topicSubscription.Filters != null)
                     {
                         foreach (var filter in topicSubscription.Filters)
                         {
-                            var topicSubscriptionFilterId = filter.Id != null ? filter.Id : Guid.NewGuid().ToString();
                             parameters = new Dictionary<string, object>
-                        {
-                            { "@id", topicSubscriptionFilterId.ToDbKey() },
-                            { "@topicSubscriptionId", topicSubscriptionId.ToDbKey() },
-                            { "@header", filter.Header },
-                            { "@matchExpression", filter.MatchExpression },
-                        };
-                            TranExecute("insert into TopicSubscriptionFilter (Id, TopicSubscriptionId, Header, MatchExpression) values (@id, @topicSubscriptionId, @header, @matchExpression)", parameters);
+                            {
+                                { "@topicSubscriptionId", topicSubscriptionId },
+                                { "@header", filter.Header },
+                                { "@matchExpression", filter.MatchExpression },
+                            };
+                            TranExecute("insert into TopicSubscriptionFilter (TopicSubscriptionId, Header, MatchExpression) values (@topicSubscriptionId, @header, @matchExpression)", parameters);
                         }
                     }
                 }
@@ -298,12 +297,12 @@ namespace Resonance.Repo.Database
             }
         }
 
-        private void RemoveTopicSubscriptions(string subscriptionId)
+        private void RemoveTopicSubscriptions(Int64 subscriptionId)
         {
             BeginTransaction();
             try
             {
-                var parameters = new Dictionary<string, object> { { "@subscriptionId", subscriptionId.ToDbKey() } };
+                var parameters = new Dictionary<string, object> { { "@subscriptionId", subscriptionId } };
 
                 // Delete topicsubscriptionfilters
                 var query = "delete tsf from TopicSubscriptionFilter tsf" +
@@ -327,36 +326,36 @@ namespace Resonance.Repo.Database
 
         public Topic AddOrUpdateTopic(Topic topic)
         {
-            Topic existingTopic = (topic.Id != null)
-                ? existingTopic = GetTopic(topic.Id)
+            Topic existingTopic = (topic.Id.HasValue)
+                ? existingTopic = GetTopic(topic.Id.Value)
                 : null;
 
             if (existingTopic != null) // update
             {
                 var parameters = new Dictionary<string, object>
                 {
-                    { "@id", topic.Id.ToDbKey() },
+                    { "@id", topic.Id.Value },
                     { "@name", topic.Name },
                     { "@notes", topic.Notes },
                 };
                 TranExecute("update Topic set Name = @name, Notes = @notes where Id = @id", parameters);
-                return GetTopic(topic.Id);
+                return GetTopic(topic.Id.Value);
             }
             else
             {
-                var topicId = topic.Id != null ? topic.Id : Guid.NewGuid().ToString();
                 var parameters = new Dictionary<string, object>
                 {
-                    { "@id", topicId.ToDbKey() },
                     { "@name", topic.Name },
                     { "@notes", topic.Notes },
                 };
-                TranExecute("insert into Topic (Id, Name, Notes) values (@id, @name, @notes)", parameters);
+                var topicId = TranQuery<Int64>("insert into Topic (Name, Notes) values (@name, @notes)"
+                    + $";select {GetLastAutoIncrementValue} as 'Id'",
+                    parameters).Single();
                 return GetTopic(topicId);
             }
         }
 
-        public void DeleteSubscription(string id)
+        public void DeleteSubscription(Int64 id)
         {
             BeginTransaction();
             try
@@ -370,7 +369,7 @@ namespace Resonance.Repo.Database
                 TranExecute("delete from Subscription where Id = @id",
                     new Dictionary<string, object>
                     {
-                        { "@id", id.ToDbKey() },
+                        { "@id", id },
                     });
                 CommitTransaction();
             }
@@ -381,7 +380,7 @@ namespace Resonance.Repo.Database
             }
         }
 
-        public void DeleteTopic(string id, bool inclSubscriptions)
+        public void DeleteTopic(Int64 id, bool inclSubscriptions)
         {
             BeginTransaction();
             try
@@ -394,8 +393,8 @@ namespace Resonance.Repo.Database
                     {
                         var parameters = new Dictionary<string, object>
                     {
-                        { "@subscriptionId", subscription.Id.ToDbKey() },
-                        { "@topicId", id.ToDbKey() },
+                        { "@subscriptionId", subscription.Id },
+                        { "@topicId", id },
                     };
 
                         // Delete topicsubscriptionfilters
@@ -414,7 +413,7 @@ namespace Resonance.Repo.Database
                 TranExecute("delete from Topic where Id = @id", // No check on rowcount, if it aint there, it's fine
                     new Dictionary<string, object>
                     {
-                        { "@id", id.ToDbKey() },
+                        { "@id", id },
                     });
 
                 CommitTransaction();
@@ -431,15 +430,15 @@ namespace Resonance.Repo.Database
         /// </summary>
         /// <param name="topicId"></param>
         /// <returns></returns>
-        public IEnumerable<Subscription> GetSubscriptions(string topicId = null)
+        public IEnumerable<Subscription> GetSubscriptions(Int64? topicId = null)
         {
             var parameters = new Dictionary<string, object>
                 {
-                    { "@topicId", topicId != null ? topicId.ToDbKey() : null },
+                    { "@topicId", topicId },
                 };
 
             var query = "select s.Id from Subscription s";
-            if (topicId != null)
+            if (topicId.HasValue)
             {
                 query = "select s.Id, ts.TopicId from Subscription s"
                     + " join TopicSubscription ts on ts.SubscriptionId = s.Id and ts.TopicId = @topicId"
@@ -447,27 +446,30 @@ namespace Resonance.Repo.Database
             }
 
             var matchedSubscriptions = TranQuery<Identifier>(query, parameters);
+            var subs = new List<Subscription>();
             foreach (var id in matchedSubscriptions.Select(ms => ms.Id))
             {
-                yield return GetSubscription(id);
+                subs.Add(GetSubscription(id));
             }
+
+            return subs;
         }
 
-        public Subscription GetSubscription(string id)
+        public Subscription GetSubscription(Int64 id)
         {
             var subscription = TranQuery<Subscription>("select * from Subscription where id = @id",
-                new Dictionary<string, object> { { "@id", id.ToDbKey() } })
+                new Dictionary<string, object> { { "@id", id } })
                 .SingleOrDefault();
             if (subscription == null)
                 return null;
 
             // Add topic-subscriptions
             var topicSubscriptions = TranQuery<TopicSubscription>("select * from TopicSubscription where SubscriptionId = @id",
-                new Dictionary<string, object> { { "@id", id.ToDbKey() } }).ToList();
+                new Dictionary<string, object> { { "@id", id } }).ToList();
             foreach (var topicSubscription in topicSubscriptions)
             {
                 var topicSubscriptionFilters = TranQuery<TopicSubscriptionFilter>("select * from TopicSubscriptionFilter where TopicSubscriptionId = @topicSubscriptionId",
-                    new Dictionary<string, object> { { "@topicSubscriptionId", topicSubscription.Id.ToDbKey() } }).ToList();
+                    new Dictionary<string, object> { { "@topicSubscriptionId", topicSubscription.Id } }).ToList();
                 topicSubscription.Filters = topicSubscriptionFilters;
             }
             subscription.TopicSubscriptions = topicSubscriptions;
@@ -484,11 +486,11 @@ namespace Resonance.Repo.Database
 
             // Add topic-subscriptions
             var topicSubscriptions = TranQuery<TopicSubscription>("select * from TopicSubscription where SubscriptionId = @id",
-                new Dictionary<string, object> { { "@id", subscription.Id.ToDbKey() } }).ToList();
+                new Dictionary<string, object> { { "@id", subscription.Id } }).ToList();
             foreach (var topicSubscription in topicSubscriptions)
             {
                 var topicSubscriptionFilters = TranQuery<TopicSubscriptionFilter>("select * from TopicSubscriptionFilter where TopicSubscriptionId = @topicSubscriptionId",
-                    new Dictionary<string, object> { { "@topicSubscriptionId", topicSubscription.Id.ToDbKey() } }).ToList();
+                    new Dictionary<string, object> { { "@topicSubscriptionId", topicSubscription.Id } }).ToList();
                 topicSubscription.Filters = topicSubscriptionFilters;
             }
             subscription.TopicSubscriptions = topicSubscriptions;
@@ -496,11 +498,11 @@ namespace Resonance.Repo.Database
             return subscription;
         }
 
-        public Topic GetTopic(string id)
+        public Topic GetTopic(Int64 id)
         {
             var parameters = new Dictionary<string, object>
                 {
-                    { "@id", id.ToDbKey() },
+                    { "@id", id },
                 };
 
             return TranQuery<Topic>("select * from Topic where id = @id", parameters)
@@ -570,7 +572,7 @@ namespace Resonance.Repo.Database
             var headers = topicEvent.Headers != null ? JsonConvert.SerializeObject(topicEvent.Headers) : null; // Just serialization. Not used anymore (filtering uses the original dictionary).
             var parameters = new Dictionary<string, object>
                 {
-                    { "@topicId", topicEvent.TopicId.ToDbKey() },
+                    { "@topicId", topicEvent.TopicId },
                     { "@functionalKey", topicEvent.FunctionalKey },
                     { "@publicationDateUtc", topicEvent.PublicationDateUtc },
                     { "@expirationDateUtc", topicEvent.ExpirationDateUtc },
@@ -580,7 +582,7 @@ namespace Resonance.Repo.Database
                 };
             var id = TranQuery<Int64>("insert into TopicEvent (TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, Headers, Priority, PayloadId) values (@topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @headers, @priority, @payloadId)" +
                 $";select {GetLastAutoIncrementValue} as 'Id'",
-                parameters).SingleOrDefault();
+                parameters).Single();
 
             return id;
         }
@@ -592,7 +594,7 @@ namespace Resonance.Repo.Database
 
             var parameters = new Dictionary<string, object>
                 {
-                    { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
+                    { "@subscriptionId", subscriptionEvent.SubscriptionId },
                     { "@topicEventId", subscriptionEvent.TopicEventId },
                     { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
@@ -608,7 +610,7 @@ namespace Resonance.Repo.Database
             var id = TranQuery<Int64>("insert into SubscriptionEvent (SubscriptionId, TopicEventId, PublicationDateUtc, FunctionalKey, Priority, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryDateUtc, DeliveryKey, InvisibleUntilUtc)"
                 + " values (@subscriptionId, @topicEventId, @publicationDateUtc, @functionalKey, @priority, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryDateUtc, @deliveryKey, @invisibleUntilUtc)"
                 + $";select {GetLastAutoIncrementValue} as 'Id'",
-                parameters).SingleOrDefault();
+                parameters).Single();
 
             return id;
         }
@@ -632,7 +634,7 @@ namespace Resonance.Repo.Database
                 new Dictionary<string, object>
                 {
                 { "@id", subscriptionEvent.Id },
-                { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
+                { "@subscriptionId", subscriptionEvent.SubscriptionId },
                 { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                 { "@functionalKey", subscriptionEvent.FunctionalKey },
                 { "@priority", subscriptionEvent.Priority },
@@ -651,7 +653,7 @@ namespace Resonance.Repo.Database
                 new Dictionary<string, object>
                 {
                     { "@id", subscriptionEvent.Id },
-                    { "@subscriptionId", subscriptionEvent.SubscriptionId.ToDbKey() },
+                    { "@subscriptionId", subscriptionEvent.SubscriptionId },
                     { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
                     { "@priority", subscriptionEvent.Priority },
@@ -718,8 +720,10 @@ namespace Resonance.Repo.Database
                     if (se.Ordered && se.FunctionalKey != null) // Only makes sense with a functional key
                     {
                         rowsUpdated = UpdateLastConsumedSubscriptionEvent(se);
-                        if (rowsUpdated == 0 || rowsUpdated > 2) // On MySql an upsert (on duplicate key...) will report 2 rows hit (by design)
+                        if (rowsUpdated > 2) // On MySql an upsert (on duplicate key...) will report 2 rows hit (by design)
                             throw new InvalidOperationException($"Failed to upsert LastConsumedSubscriptionEvent for SubscriptionEvent with id {id}.");
+                        else if (rowsUpdated == 0)
+                            System.Diagnostics.Debug.WriteLine($"Warning: combination of SubscriptionId ({se.SubscriptionId}), FunctionalKey ({se.FunctionalKey}) and PublicationDateUtc ({se.PublicationDateUtc}) is found to be not unique for SubscriptionEvent with Id {se.Id}. Functional ordering cannot be guaranteed.");
                     }
 
                     CommitTransaction();

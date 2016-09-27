@@ -13,10 +13,10 @@ namespace Resonance
         void MarkConsumed(Int64 id, string deliveryKey);
         void MarkFailed(Int64 id, string deliveryKey, Reason reason);
 
-        IEnumerable<Subscription> GetSubscriptions(string topicId = null);
-        Subscription GetSubscription(string id);
+        IEnumerable<Subscription> GetSubscriptions(Int64? topicId = null);
+        Subscription GetSubscription(Int64 id);
         Subscription GetSubscriptionByName(string name);
         Subscription AddOrUpdateSubscription(Subscription subscription);
-        void DeleteSubscription(string id);
+        void DeleteSubscription(Int64 id);
     }
 }

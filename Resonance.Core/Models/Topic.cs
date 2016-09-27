@@ -8,7 +8,7 @@ namespace Resonance.Models
 {
     public class Topic
     {
-        public string Id { get; set; }
+        public Int64? Id { get; set; }
         public string Name { get; set; }
         public string Notes { get; set; }
     }

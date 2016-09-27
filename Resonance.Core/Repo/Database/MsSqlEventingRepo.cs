@@ -92,7 +92,7 @@ namespace Resonance.Repo.Database
                 ces = TranQuery<ConsumableEvent>(query,
                         new Dictionary<string, object>
                         {
-                            { "@subscriptionId", subscription.Id.ToDbKey() },
+                            { "@subscriptionId", subscription.Id.Value },
                             { "@utcNow", DateTime.UtcNow },
                             { "@invisibleUntilUtc", invisibleUntilUtc },
                         }).ToList();
@@ -140,7 +140,7 @@ namespace Resonance.Repo.Database
                     var cesInLoop = TranQuery<ConsumableEvent>(query,
                                         new Dictionary<string, object>
                                         {
-                                            { "@subscriptionId", subscription.Id.ToDbKey() },
+                                            { "@subscriptionId", subscription.Id.Value },
                                             { "@utcNow", DateTime.UtcNow },
                                             { "@deliveryKey", deliveryKey },
                                             { "@invisibleUntilUtc", invisibleUntilUtc },

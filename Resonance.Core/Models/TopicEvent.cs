@@ -8,7 +8,7 @@ namespace Resonance.Models
     public class TopicEvent
     {
         public Int64? Id { get; set; }
-        public string TopicId { get; set; }
+        public Int64 TopicId { get; set; }
         public DateTime? PublicationDateUtc { get; set; }
         public DateTime? ExpirationDateUtc { get; set; }
         public string FunctionalKey { get; set; }

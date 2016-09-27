@@ -8,7 +8,7 @@ namespace Resonance.Models
 {
     public class Subscription
     {
-        public string Id { get; set; }
+        public Int64? Id { get; set; }
         public string Name { get; set; }
         public List<TopicSubscription> TopicSubscriptions { get; set; }
         public bool Ordered { get; set; }
@@ -19,8 +19,8 @@ namespace Resonance.Models
 
     public class TopicSubscription
     {
-        public string Id { get; set; }
-        public string TopicId { get; set; }
+        public Int64? Id { get; set; }
+        public Int64 TopicId { get; set; }
         public bool Enabled { get; set; }
         /// <summary>
         /// Indicates wheter this subscriptions is filtered, meaning not all messages of the topic will be propagated, but only the ones that match the specified filter.
@@ -35,7 +35,7 @@ namespace Resonance.Models
 
     public class TopicSubscriptionFilter
     {
-        public string Id { get; set; }
+        public Int64? Id { get; set; }
         /// <summary>
         /// The header to check for
         /// </summary>
