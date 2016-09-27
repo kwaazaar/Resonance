@@ -11,3 +11,5 @@ before_test:
 - cmd: sqlcmd -S "(local)\SQL2016" -U "sa" -P "Password12!" -i "Resonance.Core\content\ResonanceDB.MsSql.sql"
 build:
   verbosity: minimal
+test_script:
+- cmd: dotnet test
