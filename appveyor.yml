@@ -1,0 +1,13 @@
+version: 1.0.{build}
+services:
+- mssql2016
+- mysql
+nuget:
+  project_feed: true
+  disable_publish_on_pr: true
+before_build:
+- cmd: dotnet restore
+before_test:
+- cmd: sqlcmd -S "(local)\SQL2016" -U "sa" -P "Password12!" -i "Resonance.Core\content\ResonanceDB.MsSql.sql
+build:
+  verbosity: minimal
