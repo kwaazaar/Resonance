@@ -91,7 +91,7 @@ namespace Resonance.Api.Controllers
                 return NotFound($"No subscription found with name {name}");
             else
             {
-                _consumer.DeleteSubscription(existingSub.Id);
+                _consumer.DeleteSubscription(existingSub.Id.Value);
                 return Ok();
             }
         }
