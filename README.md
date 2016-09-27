@@ -1,4 +1,5 @@
-# Resonance
+# Resonance [![Build status](https://ci.appveyor.com/api/projects/status/3wu0str4v3e8hgx4/branch/master?svg=true)](https://ci.appveyor.com/project/RobertTeKaat/resonance/branch/master)
+
 Messaging library, supporting pub-sub, using MS SQL Server or MySql Server for storage.
 Ideal for implementing a (business) event driven architecture, CQRS, pub-sub, microservices, etc.
 
