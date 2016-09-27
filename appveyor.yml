@@ -10,9 +10,6 @@ before_build:
 before_test:
 - cmd: sqlcmd -S "(local)\SQL2016" -U "sa" -P "Password12!" -i "Resonance.Core\content\ResonanceDB.MsSql.sql"
 build_script:
-- cmd: dotnet build -c Release
+- cmd: dotnet build Resonance.Core -c Release
 test_script:
-- cmd: >-
-    cd Resonance.Tests
-
-    dotnet test
+- cmd: dotnet test Resonance.Tests -c Release
