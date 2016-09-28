@@ -24,7 +24,7 @@ namespace Resonance.Tests.Publishing
         public void AddTopic()
         {
             // Arrange
-            var topicName = "Publishing.AddTopic";
+            var topicName = "Publishing.TopicTests.AddTopic";
             var topicNotes = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
 
             // Act
@@ -41,7 +41,7 @@ namespace Resonance.Tests.Publishing
         public void UpdateTopic()
         {
             // Arrange
-            var topicName = "Publishing.UpdateTopic";
+            var topicName = "Publishing.TopicTests.UpdateTopic";
             var topicNotes = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
 
             // Act
@@ -59,7 +59,7 @@ namespace Resonance.Tests.Publishing
         public void DeleteTopic()
         {
             // Arrange
-            var topicName = "Publishing.DeleteTopic";
+            var topicName = "Publishing.TopicTests.DeleteTopic";
             var topicNotes = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
 
             // Act
@@ -103,7 +103,7 @@ namespace Resonance.Tests.Publishing
         public void GetTopicById()
         {
             // Arrange
-            var topicName = "Publishing.GetTopicById";
+            var topicName = "Publishing.TopicTests.GetTopicById";
             _publisher.AddOrUpdateTopic(new Topic { Name = Guid.NewGuid().ToString() }); // Add another to make sure it actually finds it
             var topicId = _publisher.AddOrUpdateTopic(new Topic { Name = topicName }).Id.Value;
 
@@ -119,7 +119,7 @@ namespace Resonance.Tests.Publishing
         public void GetTopicByName()
         {
             // Arrange
-            var topicName = "Publishing.GetTopicByName";
+            var topicName = "Publishing.TopicTests.GetTopicByName";
             _publisher.AddOrUpdateTopic(new Topic { Name = topicName + "!" }); // Add look-a-likes
             _publisher.AddOrUpdateTopic(new Topic { Name = "!" + topicName });
             var topicToBeFound = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
@@ -138,7 +138,7 @@ namespace Resonance.Tests.Publishing
         public void GetTopics()
         {
             // Arrange
-            var topicName = "Publishing.GetTopics";
+            var topicName = "Publishing.TopicTests.GetTopics";
             _publisher.AddOrUpdateTopic(new Topic { Name = Guid.NewGuid().ToString() });
             _publisher.AddOrUpdateTopic(new Topic { Name = topicName + "1" });
             _publisher.AddOrUpdateTopic(new Topic { Name = topicName + "2" });
