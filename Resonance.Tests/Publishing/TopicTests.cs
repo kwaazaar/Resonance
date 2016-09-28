@@ -12,10 +12,12 @@ namespace Resonance.Tests.Publishing
     public class TopicTests
     {
         private readonly IEventPublisher _publisher;
+        private readonly IEventConsumer _consumer;
 
         public TopicTests(EventingRepoFactoryFixture fixture)
         {
             _publisher = new EventPublisher(fixture.RepoFactory);
+            _consumer = new EventConsumer(fixture.RepoFactory);
         }
 
         [Fact]
@@ -62,10 +64,39 @@ namespace Resonance.Tests.Publishing
 
             // Act
             var addedTopic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName, Notes = topicNotes });
-            _publisher.DeleteTopic(addedTopic.Id.Value, true); // No subscriptions to delete, must add to future test
+            _publisher.DeleteTopic(addedTopic.Id.Value, true);
 
             // Assert
             Assert.Null(_publisher.GetTopic(addedTopic.Id.Value));
+
+            // Act
+            var addedTopicWithSubscriptions = _publisher.AddOrUpdateTopic(new Topic { Name = topicName + "_WithSubs", Notes = topicNotes });
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = addedTopicWithSubscriptions.Name + "_Sub1",
+                TopicSubscriptions = new List<TopicSubscription>
+                {
+                    new TopicSubscription
+                    {
+                        TopicId = addedTopicWithSubscriptions.Id.Value, Enabled = true, Filtered = true,
+                        Filters = new List<TopicSubscriptionFilter>
+                        {
+                            new TopicSubscriptionFilter { Header = "EventType", MatchExpression = "Order.*" },
+                        },
+                    },
+                },
+            });
+            _publisher.Publish(addedTopicWithSubscriptions.Name, payload: "test"); // Make sure there are also TopicEvents and SubscriptionEvents
+
+            // Assert/act
+            Assert.ThrowsAny<Exception>(() => _publisher.DeleteTopic(addedTopicWithSubscriptions.Id.Value, false));
+            Assert.NotNull(_publisher.GetTopic(addedTopicWithSubscriptions.Id.Value));
+
+            // Act
+            _publisher.DeleteTopic(addedTopicWithSubscriptions.Id.Value, true);
+            
+            // Assert
+            Assert.Null(_publisher.GetTopic(addedTopicWithSubscriptions.Id.Value));
         }
 
         [Fact]
