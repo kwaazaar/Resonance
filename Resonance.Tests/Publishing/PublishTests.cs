@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -66,6 +67,7 @@ namespace Resonance.Tests.Publishing
 
             // Act
             var topicEvent = _publisher.Publish(topicName);
+            Thread.Sleep(TimeSpan.FromMilliseconds(200)); // To make sure that DateTime.UtcNow returns a later datetime than during the Publish-call
 
             // Assert
             Assert.NotNull(topicEvent.Id);
