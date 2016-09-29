@@ -16,5 +16,5 @@ build_script:
 test_script:
 - cmd: |-
     dotnet test Resonance.Tests -c Release
-	SET useMySql=true
+    SET useMySql=true
     dotnet test Resonance.Tests -c Release
