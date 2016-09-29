@@ -19,6 +19,7 @@ namespace Resonance.Tests
             : base()
         {
             var useMySql = (this.Configuration["UseMySql"] == "true"); // Can be set from environment variable
+            Console.WriteLine("Running tests on " + (useMySql ? "MySQL" : "MS SQL Server"));
             var connectionString = this.Configuration.GetConnectionString(useMySql ? "Resonance.MySql" : "Resonance.MsSql");
 
             if (useMySql)
