@@ -15,8 +15,8 @@ namespace Resonance.Tests
             var builder = new ConfigurationBuilder()
                             //.SetBasePath(PlatformServices.Default.Application.ApplicationBasePath)
                             .SetBasePath(AppContext.BaseDirectory)
-                            .AddJsonFile("xunit.runner.json", optional: false, reloadOnChange: false);
-            builder.AddEnvironmentVariables();
+                            .AddJsonFile("xunit.runner.json", optional: false, reloadOnChange: false)
+                            .AddEnvironmentVariables();
             var config = builder.Build();
             this.Configuration = config;
         }

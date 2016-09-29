@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
+using MySql.Data.MySqlClient;
 using Resonance.Repo;
 using Resonance.Repo.Database;
 using System;
@@ -17,13 +18,26 @@ namespace Resonance.Tests
         public EventingRepoFactoryFixture()
             : base()
         {
-            var connectionString = this.Configuration.GetConnectionString("Resonance.MsSql");
-            RepoFactory = new MsSqlEventingRepoFactory(connectionString);
+            var useMySql = (this.Configuration["UseMySql"] == "true"); // Can be set from environment variable
+            var connectionString = this.Configuration.GetConnectionString(useMySql ? "Resonance.MySql" : "Resonance.MsSql");
 
-            using (var conn = new SqlConnection(connectionString))
+            if (useMySql)
             {
-                conn.Open();
-                CleanDb(conn);
+                RepoFactory = new MySqlEventingRepoFactory(connectionString);
+                using (var conn = new MySqlConnection(connectionString))
+                {
+                    conn.Open();
+                    CleanDb(conn);
+                }
+            }
+            else
+            {
+                RepoFactory = new MsSqlEventingRepoFactory(connectionString);
+                using (var conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+                    CleanDb(conn);
+                }
             }
         }
 
