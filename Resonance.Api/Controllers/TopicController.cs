@@ -9,24 +9,24 @@ using Microsoft.Extensions.Logging;
 
 namespace Resonance.Api.Controllers
 {
-    [Route("subscriptions")]
-    public class SubscriptionController : Controller
+    [Route("topics")]
+    public class TopicController : Controller
     {
-        private IEventConsumer _consumer;
-        private ILogger<SubscriptionController> _logger;
+        private IEventPublisher _publisher;
+        private ILogger<TopicController> _logger;
 
-        public SubscriptionController(IEventConsumer consumer, ILogger<SubscriptionController> logger)
+        public TopicController(IEventPublisher publisher, ILogger<TopicController> logger)
         {
-            _consumer = consumer;
+            _publisher = publisher;
             _logger = logger;
         }
 
-        [HttpGet]
-        public IActionResult Get()
+        [HttpGet()]
+        public IActionResult GetTopics(string partOfName)
         {
             try
             {
-                return Ok(_consumer.GetSubscriptions());
+                return Ok(_publisher.GetTopics(partOfName));
             }
             catch (Exception ex)
             {
@@ -36,13 +36,13 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpGet("{name}")]
-        public IActionResult Get(string name)
+        public IActionResult GetTopic(string name)
         {
             try
             {
-                var sub = _consumer.GetSubscriptionByName(name);
-                if (sub != null)
-                    return Ok(sub);
+                var topic = _publisher.GetTopicByName(name);
+                if (topic != null)
+                    return Ok(topic);
                 else
                     return NotFound();
             }
@@ -54,13 +54,13 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpPost]
-        public IActionResult Post([FromBody]Subscription sub)
+        public IActionResult Post([FromBody]Topic topic)
         {
-            if (sub != null && TryValidateModel(sub))
+            if (topic != null && TryValidateModel(topic))
             {
                 try
                 {
-                    return Ok(_consumer.AddOrUpdateSubscription(sub));
+                    return Ok(_publisher.AddOrUpdateTopic(topic));
                 }
                 catch (ArgumentException argEx)
                 {
@@ -77,19 +77,19 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpPut("{name}")]
-        public IActionResult Put(string name, [FromBody]Subscription sub)
+        public IActionResult Put(string name, [FromBody]Topic topic)
         {
-            if (sub != null && TryValidateModel(sub))
+            if (topic != null && TryValidateModel(topic))
             {
                 try
                 {
-                    var existingSub = _consumer.GetSubscriptionByName(name);
-                    if (existingSub == null)
-                        return NotFound($"No subscription found with name {name}");
-                    if (existingSub.Id != sub.Id)
-                        return BadRequest("Id of subscription cannot be modified");
+                    var existingTopic = _publisher.GetTopicByName(name);
+                    if (existingTopic == null)
+                        return NotFound($"No topic found with name {name}");
+                    if (existingTopic.Id != topic.Id)
+                        return BadRequest("Id of topic cannot be modified");
 
-                    return Ok(_consumer.AddOrUpdateSubscription(sub));
+                    return Ok(_publisher.AddOrUpdateTopic(topic));
                 }
                 catch (ArgumentException argEx)
                 {
@@ -106,19 +106,19 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpDelete("{name}")]
-        public IActionResult Delete(string name)
+        public IActionResult Delete(string name, bool? includingSubscriptions)
         {
             if (String.IsNullOrWhiteSpace(name))
-                return BadRequest("Subscription name not provided");
+                return BadRequest("Topic name not provided");
 
             try
             {
-                var existingSub = _consumer.GetSubscriptionByName(name);
-                if (existingSub == null)
-                    return NotFound($"No subscription found with name {name}");
+                var existingTopic = _publisher.GetTopicByName(name);
+                if (existingTopic == null)
+                    return NotFound($"No topic found with name {name}");
                 else
                 {
-                    _consumer.DeleteSubscription(existingSub.Id.Value);
+                    _publisher.DeleteTopic(existingTopic.Id.Value, includingSubscriptions.GetValueOrDefault(true));
                     return Ok();
                 }
             }
