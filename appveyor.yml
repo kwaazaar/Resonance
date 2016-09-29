@@ -1,4 +1,4 @@
-version: 1.0.{build}
+version: 0.2.3.{build}
 services:
 - mssql2016
 - mysql

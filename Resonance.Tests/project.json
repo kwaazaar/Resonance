@@ -2,9 +2,7 @@
   "buildOptions": {
     "copyToOutput": {
       "include": [
-        "xunit.runner.json",
-        "..\\Resonance.Core\\content\\ResonanceDB.MsSql.sql",
-        "..\\Resonance.Core\\content\\ResonanceDB.MySql.sql"
+        "xunit.runner.json"
       ]
     }
   },
@@ -12,7 +10,7 @@
   "testRunner": "xunit",
   "dependencies": {
     "xunit": "2.2.0-beta2-build3300",
-    "Resonance.Core": "0.2.2",
+    "Resonance.Core": "0.2.3",
     "Microsoft.Extensions.Configuration.Json": "1.0.0",
     "Microsoft.Extensions.Configuration.FileExtensions": "1.0.0",
     "Microsoft.Extensions.Configuration.EnvironmentVariables": "1.0.0",
