@@ -13,7 +13,8 @@ Ideal for implementing a (business) event driven architecture, CQRS, pub-sub, mi
 * Max-deliveries (per subscription) to maximize the number of retries/redeliveries
 * Filtered subscriptions (only matched messages go through)
 * Targets both .NET Core and the regular .NET Framework (4.5.2)
-* Supports Microsoft SQL Server and MySql (coming soon)
+* Supports both Microsoft SQL Server (2012+ and SQL Azure) and MySql (5.5+)
+* ASP.NET Core REST-api supporting all functionality
  
 ## How to get it ##
 Easiest way is to install the NuGet package [Resonance.Core](https://www.nuget.org/packages/Resonance.Core/).
@@ -139,3 +140,6 @@ As stated before, messages are delivered first-in first-out. However, if a messa
 
 ### Delivery delay
 Published messages will normally be delivered immediatly, it the subscription queue was empty. If for some reason messages should not be processed immediately, eg: to allow other systems (having their own subscriptions) to process it first, a delivery delay can be specified on the subscription (warning: do not use in conjuction with functional ordering, unless you know exactly what you are doing).
+
+### Processing suspension (EventConsumptionWorker)
+When continuously processing messages using the EventConsumptionWorker, there may be a reason why processing must be suspended temporarely. This may be the case when messages must be sent to a different system which appears to be offline. Instead of continue making many attempts every second, perhaps causing many messages to reach their MaxDeliveries-setting, it can be more sane to just wait for some time before trying again. This can be done by returning a ConsumeResult.MustSuspend from the EventConsumptionWorkers' consumeAction.
