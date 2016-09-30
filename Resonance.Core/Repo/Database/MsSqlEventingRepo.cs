@@ -42,7 +42,7 @@ namespace Resonance.Repo.Database
             get { return "SCOPE_IDENTITY()"; }
         }
 
-        public override int UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
+        public override async Task<int> UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
             var query = "MERGE LastConsumedSubscriptionEvent AS target" +
                             " USING(SELECT @subscriptionId, @functionalKey) as source(SubscriptionId, FunctionalKey)" +
@@ -50,7 +50,7 @@ namespace Resonance.Repo.Database
                             " WHEN MATCHED THEN UPDATE SET PublicationDateUtc = @publicationDateUtc" +
                             " WHEN NOT MATCHED THEN INSERT(SubscriptionId, FunctionalKey, PublicationDateUtc) VALUES(source.SubscriptionId, source.FunctionalKey, @publicationDateUtc);";
 
-            return TranExecute(query, new Dictionary<string, object>
+            return await TranExecuteAsync(query, new Dictionary<string, object>
             {
                 { "@subscriptionId", subscriptionEvent.SubscriptionId },
                 { "@functionalKey", subscriptionEvent.FunctionalKey },
@@ -58,11 +58,11 @@ namespace Resonance.Repo.Database
             });
         }
 
-        protected override IEnumerable<ConsumableEvent> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
+        protected override async Task<IEnumerable<ConsumableEvent>> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
         {
             int maxCountToUse = maxCount;
 
-            List<ConsumableEvent> ces = null;
+            var ces = new List<ConsumableEvent>();
 
             if (!subscription.Ordered)
             {
@@ -89,18 +89,16 @@ namespace Resonance.Repo.Database
                     + " from SubscriptionEvent se"
                     + " join @l_PBEIds pbe on pbe.Id = se.Id";
 
-                ces = TranQuery<ConsumableEvent>(query,
+                ces.AddRange(await TranQueryAsync<ConsumableEvent>(query,
                         new Dictionary<string, object>
                         {
                             { "@subscriptionId", subscription.Id.Value },
                             { "@utcNow", DateTime.UtcNow },
                             { "@invisibleUntilUtc", invisibleUntilUtc },
-                        }).ToList();
+                        }));
             }
             else // Functional ordering
             {
-                ces = new List<ConsumableEvent>();
-
                 for (int i = 0; i < maxCountToUse; i++) // Ordered altijd per 1 raadplegen
                 {
                     var deliveryKey = Guid.NewGuid().ToString();
@@ -137,15 +135,15 @@ namespace Resonance.Repo.Database
                         + " from SubscriptionEvent se"
                         + " join @l_PBEIds pbe on pbe.Id = se.Id";
 
-                    var cesInLoop = TranQuery<ConsumableEvent>(query,
+                    var cesInLoop = await TranQueryAsync<ConsumableEvent>(query,
                                         new Dictionary<string, object>
                                         {
                                             { "@subscriptionId", subscription.Id.Value },
                                             { "@utcNow", DateTime.UtcNow },
                                             { "@deliveryKey", deliveryKey },
                                             { "@invisibleUntilUtc", invisibleUntilUtc },
-                                        }).ToList();
-                    if (cesInLoop.Count > 0)
+                                        });
+                    if (cesInLoop.Count() > 0)
                         ces.AddRange(cesInLoop);
                     else
                         break; // Nothing found anymore, escape from the for-loop
@@ -156,7 +154,7 @@ namespace Resonance.Repo.Database
             {
                 if (ce.PayloadId.HasValue)
                 {
-                    ce.Payload = GetPayload(ce.PayloadId.Value);
+                    ce.Payload = await GetPayload(ce.PayloadId.Value);
                     ce.PayloadId = null; // No reason to keep it
                 }
             }

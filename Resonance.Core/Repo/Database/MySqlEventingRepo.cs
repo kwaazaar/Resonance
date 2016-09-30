@@ -33,13 +33,13 @@ namespace Resonance.Repo.Database
             get { return "LAST_INSERT_ID()"; }
         }
 
-        public override int UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
+        public override async Task<int> UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
             var query = "INSERT INTO LastConsumedSubscriptionEvent (SubscriptionId, FunctionalKey, PublicationDateUtc)" +
                 " VALUES(@subscriptionId, @functionalKey, @publicationDateUtc)" +
                 " ON DUPLICATE KEY UPDATE PublicationDateUtc = @publicationDateUtc";
 
-            return TranExecute(query, new Dictionary<string, object>
+            return await TranExecuteAsync(query, new Dictionary<string, object>
             {
                 { "@subscriptionId", subscriptionEvent.SubscriptionId },
                 { "@functionalKey", subscriptionEvent.FunctionalKey },
@@ -47,18 +47,18 @@ namespace Resonance.Repo.Database
             });
         }
 
-        protected override IEnumerable<ConsumableEvent> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
+        protected override async Task<IEnumerable<ConsumableEvent>> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
         {
             // TODO: Optimize when not ordered: use old code
 
             // 1. Lock and get ids
-            var lockedIds = LockNextSubscriptionEvents(subscription.Id.Value, subscription.Ordered, visibilityTimeout, maxCount);
+            var lockedIds = await LockNextSubscriptionEvents(subscription.Id.Value, subscription.Ordered, visibilityTimeout, maxCount);
 
             // 2. Get se details
             var ces = new List<ConsumableEvent>();
             foreach (var sId in lockedIds)
             {
-                ces.Add(GetConsumableEvent(sId));
+                ces.Add(await GetConsumableEvent(sId));
             }
 
             return ces;
@@ -69,20 +69,21 @@ namespace Resonance.Repo.Database
         /// </summary>
         /// <param name="sId">SubscriptionEventId</param>
         /// <returns></returns>
-        private ConsumableEvent GetConsumableEvent(Int64 sId)
+        private async Task<ConsumableEvent> GetConsumableEvent(Int64 sId)
         {
             var query = $"select se.Id, se.DeliveryKey, se.FunctionalKey, se.InvisibleUntilUtc, se.PayloadId" + // Get the minimal amount of data
                 " from SubscriptionEvent se where se.Id = @sId";
-            var ce = TranQuery<ConsumableEvent>(query, new { sId = sId }).SingleOrDefault();
+            var ces = await TranQueryAsync<ConsumableEvent>(query, new { sId = sId });
+            var ce = ces.SingleOrDefault();
             if (ce != null && ce.PayloadId.HasValue)
             {
-                ce.Payload = GetPayload(ce.PayloadId.Value);
+                ce.Payload = await GetPayload(ce.PayloadId.Value);
                 ce.PayloadId = null; // No reason to keep it
             }
             return ce;
         }
 
-        private IEnumerable<Int64> LockNextSubscriptionEvents(Int64 subscriptionId, bool ordered, int visibilityTimeout, int maxCount)
+        private async Task<IEnumerable<Int64>> LockNextSubscriptionEvents(Int64 subscriptionId, bool ordered, int visibilityTimeout, int maxCount)
         {
             var maxCountToUse = ordered ? 1 : maxCount; // Fix to one, when using functional ordering
 
@@ -117,14 +118,15 @@ namespace Resonance.Repo.Database
                         ");" +
                         "select @updatedSeId;";
 
-                    var sId = TranQuery<Int64?>(query,
+                    var sIds = await TranQueryAsync<Int64?>(query,
                         new Dictionary<string, object>
                         {
                         { "@subscriptionId", subscriptionId },
                         { "@utcNow", DateTime.UtcNow },
                         { "@deliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },
-                        }).SingleOrDefault();
+                        });
+                    var sId = sIds.SingleOrDefault();
                     if (sId.HasValue && sId.Value > 0) // MySql returns the 0 used to initialize this variable with.
                         lockedIds.Add(sId.Value);
                     else
@@ -172,14 +174,15 @@ namespace Resonance.Repo.Database
                         ");" +
                         "select @updatedSeId;";
 
-                    var sId = TranQuery<Int64?>(query,
+                    var sIds = await TranQueryAsync<Int64?>(query,
                         new Dictionary<string, object>
                         {
                         { "@subscriptionId", subscriptionId },
                         { "@utcNow", DateTime.UtcNow },
                         { "@deliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },
-                        }).SingleOrDefault();
+                        });
+                    var sId = sIds.SingleOrDefault();
                     if (sId.HasValue && sId.Value > 0) // MySql returns the 0 used to initialize this variable with.
                         lockedIds.Add(sId.Value);
                     else

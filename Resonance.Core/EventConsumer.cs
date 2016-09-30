@@ -17,70 +17,74 @@ namespace Resonance
             _repoFactory = repoFactory;
         }
 
-        public Subscription AddOrUpdateSubscription(Subscription subscription)
+        public async Task<Subscription> AddOrUpdateSubscription(Subscription subscription)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return repo.AddOrUpdateSubscription(subscription);
+                return await repo.AddOrUpdateSubscription(subscription);
         }
 
-        public void DeleteSubscription(Int64 id)
+        public async Task DeleteSubscription(Int64 id)
         {
             using (var repo = _repoFactory.CreateRepo())
-                repo.DeleteSubscription(id);
+                await repo.DeleteSubscription(id);
         }
 
-        public Subscription GetSubscription(Int64 id)
+        public async Task<Subscription> GetSubscription(Int64 id)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return repo.GetSubscription(id);
+                return await repo.GetSubscription(id);
         }
 
-        public Subscription GetSubscriptionByName(string name)
+        public async Task<Subscription> GetSubscriptionByName(string name)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return repo.GetSubscriptionByName(name);
+                return await repo.GetSubscriptionByName(name);
         }
 
-        public IEnumerable<Subscription> GetSubscriptions(Int64? topicId = null)
+        public async Task<IEnumerable<Subscription>> GetSubscriptions(Int64? topicId = null)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return repo.GetSubscriptions(topicId).ToList();
+                return await repo.GetSubscriptions(topicId);
         }
 
-        public IEnumerable<ConsumableEvent> ConsumeNext(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
+        public async Task<IEnumerable<ConsumableEvent>> ConsumeNext(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return repo.ConsumeNext(subscriptionName, visibilityTimeout, maxCount);
+                return await repo.ConsumeNext(subscriptionName, visibilityTimeout, maxCount);
         }
 
-        public IEnumerable<ConsumableEvent<T>> ConsumeNext<T>(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
+        public async Task<IEnumerable<ConsumableEvent<T>>> ConsumeNext<T>(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
         {
-            foreach (var ce in ConsumeNext(subscriptionName, visibilityTimeout, maxCount))
+            var ces = new List<ConsumableEvent<T>>();
+
+            foreach (var ce in await ConsumeNext(subscriptionName, visibilityTimeout, maxCount))
             {
                 // Deserialize the payload
-                T payloadAsObject = JsonConvert.DeserializeObject<T>(ce.Payload);
+                T payloadAsObject = await Task.Factory.StartNew(() => JsonConvert.DeserializeObject<T>(ce.Payload));
 
-                yield return new ConsumableEvent<T>
+                ces.Add(new ConsumableEvent<T>
                 {
                     Id = ce.Id,
                     FunctionalKey = ce.FunctionalKey,
                     DeliveryKey = ce.DeliveryKey,
                     InvisibleUntilUtc = ce.InvisibleUntilUtc,
                     Payload = payloadAsObject,
-                };
+                });
             }
+
+            return ces;
         }
 
-        public void MarkConsumed(Int64 id, string deliveryKey)
+        public async Task MarkConsumed(Int64 id, string deliveryKey)
         {
             using (var repo = _repoFactory.CreateRepo())
-                repo.MarkConsumed(id, deliveryKey);   
+                await repo.MarkConsumed(id, deliveryKey);   
         }
 
-        public void MarkFailed(Int64 id, string deliveryKey, Reason reason)
+        public async Task MarkFailed(Int64 id, string deliveryKey, Reason reason)
         {
             using (var repo = _repoFactory.CreateRepo())
-                repo.MarkFailed(id, deliveryKey, reason);
+                await repo.MarkFailed(id, deliveryKey, reason);
         }
     }
 }

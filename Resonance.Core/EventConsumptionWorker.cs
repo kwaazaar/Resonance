@@ -188,11 +188,11 @@ namespace Resonance
         /// Gets and executes workitems
         /// </summary>
         /// <remarks>Invokes PollingException if the TryGetWork or ExecuteWork throw an exception.</remarks>
-        private void TryExecuteWorkItems()
+        private async Task TryExecuteWorkItems()
         {
             try
             {
-                var workitems = this.TryGetWork(this._maxThreads);
+                var workitems = await this.TryGetWork(this._maxThreads);
                 if (workitems == null || (!workitems.Any<ConsumableEvent>())) // No result or empty list
                 {
                     this._attempts++;
@@ -278,11 +278,11 @@ namespace Resonance
         /// </summary>
         /// <param name="maxWorkItems">The maximum number of workitems to be returned</param>
         /// <returns>A list of workitems or null/empty list when no work to be done</returns>
-        protected virtual IEnumerable<ConsumableEvent> TryGetWork(int maxWorkItems)
+        protected virtual async Task<IEnumerable<ConsumableEvent>> TryGetWork(int maxWorkItems)
         {
             try
             {
-                var consEvent = _eventConsumer.ConsumeNext(_subscriptionName, _visibilityTimeout, maxWorkItems);
+                var consEvent = await _eventConsumer.ConsumeNext(_subscriptionName, _visibilityTimeout, maxWorkItems);
                 return consEvent;
             }
             catch (Exception ex)

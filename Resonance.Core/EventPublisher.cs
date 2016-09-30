@@ -17,48 +17,48 @@ namespace Resonance
             _repoFactory = repoFactory;
         }
 
-        public Topic AddOrUpdateTopic(Topic topic)
+        public async Task<Topic> AddOrUpdateTopic(Topic topic)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return repo.AddOrUpdateTopic(topic);
+                return await repo.AddOrUpdateTopic(topic);
         }
 
-        public void DeleteTopic(Int64 id, bool inclSubscriptions)
+        public async Task DeleteTopic(Int64 id, bool inclSubscriptions)
         {
             using (var repo = _repoFactory.CreateRepo())
-                repo.DeleteTopic(id, inclSubscriptions);
+                await repo.DeleteTopic(id, inclSubscriptions);
         }
 
-        public Topic GetTopic(Int64 id)
+        public async Task<Topic> GetTopic(Int64 id)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return repo.GetTopic(id);
+                return await repo.GetTopic(id);
         }
 
-        public Topic GetTopicByName(string name)
+        public async Task<Topic> GetTopicByName(string name)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return repo.GetTopicByName(name);
+                return await repo.GetTopicByName(name);
         }
 
-        public IEnumerable<Topic> GetTopics(string partOfName = null)
+        public async Task<IEnumerable<Topic>> GetTopics(string partOfName = null)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return repo.GetTopics(partOfName).ToList();
+                return await repo.GetTopics(partOfName);
         }
 
-        public TopicEvent Publish(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, string payload = null)
+        public async Task<TopicEvent> Publish(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, string payload = null)
         {
             using (var repo = _repoFactory.CreateRepo())
             {
-                var topic = repo.GetTopicByName(topicName);
+                var topic = await repo.GetTopicByName(topicName);
                 if (topic == null)
                     throw new ArgumentException($"Topic with name {topicName} not found", "topicName");
 
                 // Store payload (outside transaction, no need to lock right now already)
-                var payloadId = (payload != null) ? repo.StorePayload(payload) : default(Int64?);
+                var payloadId = (payload != null) ? await repo.StorePayload(payload) : default(Int64?);
 
-                var subscriptions = repo.GetSubscriptions(topicId: topic.Id).ToList();
+                var subscriptions = await repo.GetSubscriptions(topicId: topic.Id);
 
                 repo.BeginTransaction();
                 try
@@ -73,7 +73,7 @@ namespace Resonance
                         Headers = headers,
                         PayloadId = payloadId,
                     };
-                    var topicEventId = repo.AddTopicEvent(newTopicEvent);
+                    var topicEventId = await repo.AddTopicEvent(newTopicEvent);
                     newTopicEvent.Id = topicEventId;
 
                     foreach (var subscription in subscriptions)
@@ -115,7 +115,7 @@ namespace Resonance
                                 DeliveryKey = null,
                                 InvisibleUntilUtc = null,
                             };
-                            repo.AddSubscriptionEvent(newSubscriptionEvent);
+                            await repo.AddSubscriptionEvent(newSubscriptionEvent);
                         }
                     }
 
@@ -132,7 +132,7 @@ namespace Resonance
                     {
                         try
                         {
-                            repo.DeletePayload(payloadId.Value);
+                            await repo.DeletePayload(payloadId.Value);
                         }
                         catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
                     }
@@ -141,13 +141,13 @@ namespace Resonance
             }
         }
 
-        public TopicEvent Publish<T>(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, T payload = null) where T : class
+        public async Task<TopicEvent> Publish<T>(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, T payload = null) where T : class
         {
             string payloadAsString = null;
             if (payload != null)
-                payloadAsString = JsonConvert.SerializeObject(payload); // No specific parameters: the consumer must understand the json as well
+                payloadAsString = await Task.Factory.StartNew(() => JsonConvert.SerializeObject(payload)); // No specific parameters: the consumer must understand the json as well
 
-            return Publish(topicName, publicationDateUtc, expirationDateUtc, functionalKey, headers, payloadAsString);
+            return await Publish(topicName, publicationDateUtc, expirationDateUtc, functionalKey, headers, payloadAsString);
         }
 
         private bool CheckFilters(List<TopicSubscriptionFilter> filters, Dictionary<string, string> headers)

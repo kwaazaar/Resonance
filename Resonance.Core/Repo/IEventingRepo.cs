@@ -19,29 +19,29 @@ namespace Resonance.Repo
         void CommitTransaction();
 
         // Topic & subscription management
-        IEnumerable<Topic> GetTopics(string partOfName = null);
-        Topic GetTopic(Int64 id);
-        Topic GetTopicByName(string name);
-        Topic AddOrUpdateTopic(Topic topic);
-        void DeleteTopic(Int64 id, bool inclSubscriptions);
-        IEnumerable<Subscription> GetSubscriptions(Int64? topicId = null);
-        Subscription GetSubscription(Int64 id);
-        Subscription GetSubscriptionByName(string name);
-        Subscription AddOrUpdateSubscription(Subscription subscription);
-        void DeleteSubscription(Int64 id);
+        Task<IEnumerable<Topic>> GetTopics(string partOfName = null);
+        Task<Topic> GetTopic(Int64 id);
+        Task<Topic> GetTopicByName(string name);
+        Task<Topic> AddOrUpdateTopic(Topic topic);
+        Task DeleteTopic(Int64 id, bool inclSubscriptions);
+        Task<IEnumerable<Subscription>> GetSubscriptions(Int64? topicId = null);
+        Task<Subscription> GetSubscription(Int64 id);
+        Task<Subscription> GetSubscriptionByName(string name);
+        Task<Subscription> AddOrUpdateSubscription(Subscription subscription);
+        Task DeleteSubscription(Int64 id);
 
         // Publication
-        Int64 StorePayload(string payload);
-        string GetPayload(Int64 id);
-        int DeletePayload(Int64 id);
-        Int64 AddTopicEvent(TopicEvent topicEvent);
-        Int64 AddSubscriptionEvent(SubscriptionEvent subscriptionEvent);
+        Task<Int64> StorePayload(string payload);
+        Task<string> GetPayload(Int64 id);
+        Task<int> DeletePayload(Int64 id);
+        Task<Int64> AddTopicEvent(TopicEvent topicEvent);
+        Task<Int64> AddSubscriptionEvent(SubscriptionEvent subscriptionEvent);
 
         // Consumption
         //IEnumerable<SubscriptionEventIdentifier> FindConsumableEventsForSubscription(Subscription subscription, int maxCount);
         //bool TryLockConsumableEvent(SubscriptionEventIdentifier sId, string deliveryKey, DateTime invisibleUntilUtc);
-        IEnumerable<ConsumableEvent> ConsumeNext(string subscriptionName, int visibilityTimeout, int maxCount = 1);
-        void MarkConsumed(Int64 id, string deliveryKey);
-        void MarkFailed(Int64 id, string deliveryKey, Reason reason);
+        Task<IEnumerable<ConsumableEvent>> ConsumeNext(string subscriptionName, int visibilityTimeout, int maxCount = 1);
+        Task MarkConsumed(Int64 id, string deliveryKey);
+        Task MarkFailed(Int64 id, string deliveryKey, Reason reason);
     }
 }
