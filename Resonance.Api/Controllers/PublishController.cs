@@ -23,6 +23,7 @@ namespace Resonance.Api.Controllers
 
         [HttpGet("{name}/{functionalKey?}")]
         [HttpPost("{name}/{functionalKey?}")]
+        [ProducesResponseType(typeof(TopicEvent), 200)]
         public async Task<IActionResult> Publish([FromRoute]string name, [FromRoute]string functionalKey = null,
             [FromQuery]DateTime? publicationDateUtc = null, [FromQuery]DateTime? expirationDateUtc = null, [FromQuery]string payload = null)
         {
@@ -41,7 +42,7 @@ namespace Resonance.Api.Controllers
                     payload = await new StreamReader(Request.Body).ReadToEndAsync();
 
                 // Now publish
-                var te = _publisher.Publish(topicName: name, publicationDateUtc: publicationDateUtc, expirationDateUtc: expirationDateUtc, functionalKey: functionalKey, headers: headers, payload: payload);
+                var te = await _publisher.Publish(topicName: name, publicationDateUtc: publicationDateUtc, expirationDateUtc: expirationDateUtc, functionalKey: functionalKey, headers: headers, payload: payload);
                 return Ok(te);
             }
             catch (ArgumentException argEx)

@@ -26,29 +26,29 @@ namespace Resonance.Tests.Consuming
             // Arrange
             var topicName = "StandardOrderingTests.PublicationDate_Default";
             var subName = topicName + "_Sub1";
-            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName }).Result;
             var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
             {
                 Name = subName, // When ordered not set, delivery should still be ordered on publicationdateutc
                 TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
-            });
+            }).Result;
 
-            _publisher.Publish(topicName, payload: "1");
-            _publisher.Publish(topicName, payload: "2");
-            _publisher.Publish(topicName, payload: "3");
+            _publisher.Publish(topicName, payload: "1").Wait();
+            _publisher.Publish(topicName, payload: "2").Wait();
+            _publisher.Publish(topicName, payload: "3").Wait();
 
             var visibilityTimeout = 2;
-            var ce1 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
-            var ce2 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
-            var ce3 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
+            var ce1 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            var ce2 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            var ce3 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
             Assert.Equal("1", ce1.Payload);
             Assert.Equal("2", ce2.Payload);
             Assert.Equal("3", ce3.Payload);
-            _consumer.MarkConsumed(ce2.Id, ce2.DeliveryKey); // ce2 should be gone
+            _consumer.MarkConsumed(ce2.Id, ce2.DeliveryKey).Wait(); // ce2 should be gone
 
             Thread.Sleep(TimeSpan.FromSeconds(visibilityTimeout + 1)); // Wait until visibilitytimeout of all items (+1) has expired
-            ce1 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
-            ce3 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
+            ce1 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            ce3 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
             Assert.Equal("1", ce1.Payload);
             Assert.Equal("3", ce3.Payload);
         }
@@ -59,29 +59,29 @@ namespace Resonance.Tests.Consuming
             // Arrange
             var topicName = "StandardOrderingTests.PublicationDate_Custom";
             var subName = topicName + "_Sub1";
-            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName }).Result;
             var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
             {
                 Name = subName, // When ordered not set, delivery should still be ordered on publicationdateutc
                 TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
-            });
+            }).Result;
 
-            _publisher.Publish(topicName, payload: "1", publicationDateUtc: DateTime.UtcNow.AddSeconds(1));
-            _publisher.Publish(topicName, payload: "2", publicationDateUtc: DateTime.UtcNow);
-            _publisher.Publish(topicName, payload: "3", publicationDateUtc: DateTime.UtcNow.AddSeconds(2));
+            _publisher.Publish(topicName, payload: "1", publicationDateUtc: DateTime.UtcNow.AddSeconds(1)).Wait();
+            _publisher.Publish(topicName, payload: "2", publicationDateUtc: DateTime.UtcNow).Wait();
+            _publisher.Publish(topicName, payload: "3", publicationDateUtc: DateTime.UtcNow.AddSeconds(2)).Wait();
 
             var visibilityTimeout = 2;
-            var ce1 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
-            var ce2 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
-            var ce3 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
+            var ce1 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            var ce2 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            var ce3 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
             Assert.Equal("2", ce1.Payload);
             Assert.Equal("1", ce2.Payload);
             Assert.Equal("3", ce3.Payload);
-            _consumer.MarkConsumed(ce1.Id, ce1.DeliveryKey); // ce1 should be gone
+            _consumer.MarkConsumed(ce1.Id, ce1.DeliveryKey).Wait(); // ce1 should be gone
 
             Thread.Sleep(TimeSpan.FromSeconds(visibilityTimeout + 1)); // Wait until visibilitytimeout of all items (+1) has expired
-            ce2 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
-            ce3 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
+            ce2 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            ce3 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
             Assert.Equal("1", ce2.Payload);
             Assert.Equal("3", ce3.Payload);
         }

@@ -162,21 +162,21 @@ namespace Resonance
                 throw new InvalidOperationException("Task is already running or has not yet finished stopping");
 
             this._cancellationToken = new CancellationTokenSource();
-            this._internalTask = Task.Factory.StartNew(() =>
+            this._internalTask = Task.Factory.StartNew(async () =>
             {
                 while (!this._cancellationToken.IsCancellationRequested)
                 {
                     var suspendedUntilUtc = _suspendedUntilUtc;
                     if (!_suspendedUntilUtc.HasValue)
-                        this.TryExecuteWorkItems();
+                        await this.TryExecuteWorkItems();
                     else
                     {
                         try
-                        { 
+                        {
                             // Suspend processing
-                            Task.WaitAll(new Task[] { Task.Delay(suspendedUntilUtc.Value - DateTime.UtcNow) }, _cancellationToken.Token);
+                            await Task.Delay(suspendedUntilUtc.Value - DateTime.UtcNow, _cancellationToken.Token);
                         }
-                        catch (OperationCanceledException) { }
+                        catch (OperationCanceledException) { } // Because the delay was cancelled through the _cancellationToken
                         lock (_suspendTimeoutLock)
                             _suspendedUntilUtc = null;
                     }

@@ -22,14 +22,14 @@ namespace Resonance.Api.Controllers
 
         [HttpGet]
         [Route("consumed/{id}/{deliverykey}")]
-        public IActionResult MarkConsumed(long id, string deliveryKey)
+        public async Task<IActionResult> MarkConsumed(long id, string deliveryKey)
         {
             if ((id == 0) || String.IsNullOrWhiteSpace(deliveryKey))
                 return BadRequest("id and deliverykey must be specified");
 
             try
             {
-                _consumer.MarkConsumed(id, deliveryKey);
+                await _consumer.MarkConsumed(id, deliveryKey);
                 return Ok();
             }
             catch (ArgumentException argEx)
@@ -45,14 +45,14 @@ namespace Resonance.Api.Controllers
 
         [HttpGet]
         [Route("failed/{id}/{deliverykey}")]
-        public IActionResult MarkFailed(long id, string deliveryKey, string reason = null)
+        public async Task<IActionResult> MarkFailed(long id, string deliveryKey, string reason = null)
         {
             if ((id == 0) || String.IsNullOrWhiteSpace(deliveryKey))
                 return BadRequest("id and deliverykey must be specified");
 
             try
             {
-                _consumer.MarkFailed(id, deliveryKey, Reason.Other(reason ?? string.Empty));
+                await _consumer.MarkFailed(id, deliveryKey, Reason.Other(reason ?? string.Empty));
                 return Ok();
             }
             catch (ArgumentException argEx)

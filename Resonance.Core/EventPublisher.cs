@@ -76,13 +76,13 @@ namespace Resonance
                     var topicEventId = await repo.AddTopicEvent(newTopicEvent);
                     newTopicEvent.Id = topicEventId;
 
-                    foreach (var subscription in subscriptions)
-                    {
-                        // Create SubscriptionEvents for topicsubscriptions for the specified topic that are enabled
-                        foreach (var topicSubscription in subscription.TopicSubscriptions
-                            .Where((ts) => ts.TopicId == topic.Id.Value) // Correct topic
-                            .Where((ts) => ts.Enabled) // Enabled
-                            .Where((ts) => !ts.Filtered || CheckFilters(ts.Filters, headers))) // Filters match
+                    // Determine for which subscriptions the topic must be published
+                    var subscriptionsMatching = subscriptions
+                        .Where((s) => s.TopicSubscriptions.Any((ts) => ((ts.TopicId == topic.Id.Value) && ts.Enabled && (!ts.Filtered || CheckFilters(ts.Filters, headers)))))
+                        .Distinct(); // Nessecary when one subscription has more than once topicsubscription for the same topic (probably with different filters)
+
+                    // Create tasks for each subscription
+                    var subTasks = subscriptionsMatching.Select((subscription) =>
                         {
                             // By default a SubscriptionEvent takes expirationdate of TopicEvent
                             var subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
@@ -115,14 +115,34 @@ namespace Resonance
                                 DeliveryKey = null,
                                 InvisibleUntilUtc = null,
                             };
-                            await repo.AddSubscriptionEvent(newSubscriptionEvent);
-                        }
-                    }
+                            return repo.AddSubscriptionEvent(newSubscriptionEvent);
+                        });
 
+                    // Wait for all tasks to complete
+                    await Task.WhenAll(subTasks.ToArray()); // No timeout: db-commandtimeout will do
                     repo.CommitTransaction();
 
                     // Return the topic event
                     return newTopicEvent;
+                }
+                catch (AggregateException aggrEx)
+                {
+                    repo.RollbackTransaction();
+
+                    if (payloadId.HasValue)
+                    {
+                        try
+                        {
+                            await repo.DeletePayload(payloadId.Value);
+                        }
+                        catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
+                    }
+
+                    var firstInnerEx = aggrEx.InnerExceptions.FirstOrDefault();
+                    if (firstInnerEx != null)
+                        throw firstInnerEx; // Do we want this?
+                    else
+                        throw;
                 }
                 catch (Exception)
                 {

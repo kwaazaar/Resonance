@@ -22,11 +22,12 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpGet()]
-        public IActionResult GetTopics(string partOfName)
+        [ProducesResponseType(typeof(IEnumerable<Topic>), 200)]
+        public async Task<IActionResult> GetTopics(string partOfName)
         {
             try
             {
-                return Ok(_publisher.GetTopics(partOfName));
+                return Ok(await _publisher.GetTopics(partOfName));
             }
             catch (Exception ex)
             {
@@ -36,11 +37,12 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpGet("{name}")]
-        public IActionResult GetTopic(string name)
+        [ProducesResponseType(typeof(Topic), 200)]
+        public async Task<IActionResult> GetTopic(string name)
         {
             try
             {
-                var topic = _publisher.GetTopicByName(name);
+                var topic = await _publisher.GetTopicByName(name);
                 if (topic != null)
                     return Ok(topic);
                 else
@@ -54,13 +56,14 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpPost]
-        public IActionResult Post([FromBody]Topic topic)
+        [ProducesResponseType(typeof(Topic), 200)]
+        public async Task<IActionResult> Post([FromBody]Topic topic)
         {
             if (topic != null && TryValidateModel(topic))
             {
                 try
                 {
-                    return Ok(_publisher.AddOrUpdateTopic(topic));
+                    return Ok(await _publisher.AddOrUpdateTopic(topic));
                 }
                 catch (ArgumentException argEx)
                 {
@@ -77,19 +80,20 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpPut("{name}")]
-        public IActionResult Put(string name, [FromBody]Topic topic)
+        [ProducesResponseType(typeof(Topic), 200)]
+        public async Task<IActionResult> Put(string name, [FromBody]Topic topic)
         {
             if (topic != null && TryValidateModel(topic))
             {
                 try
                 {
-                    var existingTopic = _publisher.GetTopicByName(name);
+                    var existingTopic = await _publisher.GetTopicByName(name);
                     if (existingTopic == null)
                         return NotFound($"No topic found with name {name}");
                     if (existingTopic.Id != topic.Id)
                         return BadRequest("Id of topic cannot be modified");
 
-                    return Ok(_publisher.AddOrUpdateTopic(topic));
+                    return Ok(await _publisher.AddOrUpdateTopic(topic));
                 }
                 catch (ArgumentException argEx)
                 {
@@ -106,19 +110,19 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpDelete("{name}")]
-        public IActionResult Delete(string name, bool? includingSubscriptions)
+        public async Task<IActionResult> Delete(string name, bool? includingSubscriptions)
         {
             if (String.IsNullOrWhiteSpace(name))
                 return BadRequest("Topic name not provided");
 
             try
             {
-                var existingTopic = _publisher.GetTopicByName(name);
+                var existingTopic = await _publisher.GetTopicByName(name);
                 if (existingTopic == null)
                     return NotFound($"No topic found with name {name}");
                 else
                 {
-                    _publisher.DeleteTopic(existingTopic.Id.Value, includingSubscriptions.GetValueOrDefault(true));
+                    await _publisher.DeleteTopic(existingTopic.Id.Value, includingSubscriptions.GetValueOrDefault(true));
                     return Ok();
                 }
             }

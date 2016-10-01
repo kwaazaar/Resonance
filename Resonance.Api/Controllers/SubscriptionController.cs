@@ -22,11 +22,12 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpGet]
-        public IActionResult Get()
+        [ProducesResponseType(typeof(IEnumerable<Subscription>), 200)]
+        public async Task<IActionResult> Get()
         {
             try
             {
-                return Ok(_consumer.GetSubscriptions());
+                return Ok(await _consumer.GetSubscriptions());
             }
             catch (Exception ex)
             {
@@ -36,11 +37,12 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpGet("{name}")]
-        public IActionResult Get(string name)
+        [ProducesResponseType(typeof(Subscription), 200)]
+        public async Task<IActionResult> Get(string name)
         {
             try
             {
-                var sub = _consumer.GetSubscriptionByName(name);
+                var sub = await _consumer.GetSubscriptionByName(name);
                 if (sub != null)
                     return Ok(sub);
                 else
@@ -54,13 +56,14 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpPost]
-        public IActionResult Post([FromBody]Subscription sub)
+        [ProducesResponseType(typeof(Subscription), 200)]
+        public async Task<IActionResult> Post([FromBody]Subscription sub)
         {
             if (sub != null && TryValidateModel(sub))
             {
                 try
                 {
-                    return Ok(_consumer.AddOrUpdateSubscription(sub));
+                    return Ok(await _consumer.AddOrUpdateSubscription(sub));
                 }
                 catch (ArgumentException argEx)
                 {
@@ -77,19 +80,20 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpPut("{name}")]
-        public IActionResult Put(string name, [FromBody]Subscription sub)
+        [ProducesResponseType(typeof(Subscription), 200)]
+        public async Task<IActionResult> Put(string name, [FromBody]Subscription sub)
         {
             if (sub != null && TryValidateModel(sub))
             {
                 try
                 {
-                    var existingSub = _consumer.GetSubscriptionByName(name);
+                    var existingSub = await _consumer.GetSubscriptionByName(name);
                     if (existingSub == null)
                         return NotFound($"No subscription found with name {name}");
                     if (existingSub.Id != sub.Id)
                         return BadRequest("Id of subscription cannot be modified");
 
-                    return Ok(_consumer.AddOrUpdateSubscription(sub));
+                    return Ok(await _consumer.AddOrUpdateSubscription(sub));
                 }
                 catch (ArgumentException argEx)
                 {
@@ -106,19 +110,19 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpDelete("{name}")]
-        public IActionResult Delete(string name)
+        public async Task<IActionResult> Delete(string name)
         {
             if (String.IsNullOrWhiteSpace(name))
                 return BadRequest("Subscription name not provided");
 
             try
             {
-                var existingSub = _consumer.GetSubscriptionByName(name);
+                var existingSub = await _consumer.GetSubscriptionByName(name);
                 if (existingSub == null)
                     return NotFound($"No subscription found with name {name}");
                 else
                 {
-                    _consumer.DeleteSubscription(existingSub.Id.Value);
+                    await _consumer.DeleteSubscription(existingSub.Id.Value);
                     return Ok();
                 }
             }

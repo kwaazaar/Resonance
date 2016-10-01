@@ -25,7 +25,7 @@ namespace Resonance.Tests.Publishing
         {
             // Arrange
             var topicName = "Publishing.PublishTests.PublishComplete";
-            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName }).Result;
 
             var publicationDateUtc = DateTime.UtcNow.AddMinutes(1); // Overriding default (which is UtcNow)
             var expirationDateUtc = DateTime.UtcNow.AddMinutes(5);
@@ -43,7 +43,7 @@ namespace Resonance.Tests.Publishing
                 expirationDateUtc: expirationDateUtc,
                 functionalKey: functionalKey,
                 headers: headers,
-                payload: payload);
+                payload: payload).Result;
 
             // Assert
             Assert.NotNull(topicEvent.Id);
@@ -63,10 +63,10 @@ namespace Resonance.Tests.Publishing
         {
             // Arrange
             var topicName = "Publishing.PublishTests.PublishMinimal";
-            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName }).Result;
 
             // Act
-            var topicEvent = _publisher.Publish(topicName);
+            var topicEvent = _publisher.Publish(topicName).Result;
             Thread.Sleep(TimeSpan.FromMilliseconds(200)); // To make sure that DateTime.UtcNow returns a later datetime than during the Publish-call
 
             // Assert

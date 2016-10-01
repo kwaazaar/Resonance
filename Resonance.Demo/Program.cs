@@ -53,9 +53,9 @@ namespace Resonance.Demo
             var consumer = serviceProvider.GetRequiredService<IEventConsumer>();
 
             // Make sure the topic exists
-            var topic1 = publisher.GetTopicByName("Demo Topic 1") ?? publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic 1" });
-            var topic2 = publisher.GetTopicByName("Demo Topic 2") ?? publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic 2" });
-            var subscription1 = consumer.GetSubscriptionByName("Demo Subscription 1");
+            var topic1 = publisher.GetTopicByName("Demo Topic 1").Result ??  publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic 1" }).Result;
+            var topic2 = publisher.GetTopicByName("Demo Topic 2").Result ??  publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic 2" }).Result;
+            var subscription1 = consumer.GetSubscriptionByName("Demo Subscription 1").Result;
             if (subscription1 == null)
                 subscription1 = consumer.AddOrUpdateSubscription(new Subscription
                 {
@@ -75,8 +75,8 @@ namespace Resonance.Demo
                         },
                         new TopicSubscription { TopicId = topic2.Id.Value, Enabled = true },
                     }
-                });
-            var subscription2 = consumer.GetSubscriptionByName("Demo Subscription 2");
+                }).Result;
+            var subscription2 = consumer.GetSubscriptionByName("Demo Subscription 2").Result;
             if (subscription2 == null)
                 subscription2 = consumer.AddOrUpdateSubscription(new Subscription
                 {
@@ -88,33 +88,35 @@ namespace Resonance.Demo
                         new TopicSubscription { TopicId = topic1.Id.Value, Enabled = true },
                         new TopicSubscription { TopicId = topic2.Id.Value, Enabled = false }, // Not enabled
                     }
-                });
+                }).Result;
 
-            var sw = new Stopwatch();
-            sw.Start();
-            int maxLoop = 10;
-            for (int i = 1; i <= maxLoop; i++)
-            {
-                var iAsString = i.ToString();
-                for (int fk = 1; fk <= 1000; fk++) // 1000 different functional keys, 4 TopicEvents per fk
-                {
-                    var fkAsString = fk.ToString();
-                    publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload100, headers: new Dictionary<string, string> { { "EventName", "Bla" } });
-                    publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload2000); // Not delivered to sub1: EventName-header is missing
-                    publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload2000); // Not delivered to sub2: topic2-subscription is not enabled
-                    publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload100); // Not delivered to sub2: topic2-subscription is not enabled
-                }
-                Console.WriteLine($"Runs done: {i} of {maxLoop}");
-            }
-            sw.Stop();
-            Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
+            //var sw = new Stopwatch();
+            //sw.Start();
+            //int maxLoop = 10;
+            //for (int i = 1; i <= maxLoop; i++)
+            //{
+            //    var iAsString = i.ToString();
+            //    for (int fk = 1; fk <= 1000; fk++) // 1000 different functional keys, 4 TopicEvents per fk
+            //    {
+            //        var fkAsString = fk.ToString();
+            //        Task.WaitAll(
+            //            publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload100, headers: new Dictionary<string, string> { { "EventName", "Bla" } }),
+            //            publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload2000), // Not delivered to sub1: EventName-header is missing
+            //            publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload2000), // Not delivered to sub2: topic2-subscription is not enabled
+            //            publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload100) // Not delivered to sub2: topic2-subscription is not enabled
+            //        );
+            //    }
+            //    Console.WriteLine($"Runs done: {i} of {maxLoop}");
+            //}
+            //sw.Stop();
+            //Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
 
             //var ce = consumer.ConsumeNext(subscription1.Name).FirstOrDefault();
             //if (ce != null)
             //    consumer.MarkConsumed(ce.Id, ce.DeliveryKey);
 
             var worker = new EventConsumptionWorker(consumer,
-                "Demo Subscription 2", (ceW) =>
+                "Demo Subscription 1", (ceW) =>
                 {
                     //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     return DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded;
@@ -150,18 +152,18 @@ namespace Resonance.Demo
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
 
             // To use MSSQLServer:
-            //var connectionString = config.GetConnectionString("Resonance.MsSql");
-            //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
-            //{
-            //    return new MsSqlEventingRepoFactory(connectionString);
-            //});
-
-            // To use MySQL:
-            var connectionString = config.GetConnectionString("Resonance.MySql");
+            var connectionString = config.GetConnectionString("Resonance.MsSql");
             serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
             {
-                return new MySqlEventingRepoFactory(connectionString);
+                return new MsSqlEventingRepoFactory(connectionString);
             });
+
+            // To use MySQL:
+            //var connectionString = config.GetConnectionString("Resonance.MySql");
+            //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
+            //{
+            //    return new MySqlEventingRepoFactory(connectionString);
+            //});
 
             // Configure EventPublisher
             serviceCollection.AddTransient<IEventPublisher, EventPublisher>();

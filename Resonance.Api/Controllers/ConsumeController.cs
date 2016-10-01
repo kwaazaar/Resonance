@@ -21,15 +21,16 @@ namespace Resonance.Api.Controllers
         }
 
         [HttpGet("{name}")]
-        public IActionResult ConsumeNext(string name, int? visibilityTimeout, int? maxCount)
+        [ProducesResponseType(typeof(IEnumerable<ConsumableEvent>), 200)]
+        public async Task<IActionResult> ConsumeNext(string name, int? visibilityTimeout, int? maxCount)
         {
             try
             {
-                var ce = _consumer.ConsumeNext(name, visibilityTimeout.GetValueOrDefault(120), maxCount.GetValueOrDefault(1)).FirstOrDefault();
-                if (ce == null)
+                var ces = await _consumer.ConsumeNext(name, visibilityTimeout.GetValueOrDefault(120), maxCount.GetValueOrDefault(1));
+                if (ces.Count() == 0)
                     return NotFound();
                 else
-                    return Ok(ce);
+                    return Ok(ces);
             }
             catch (ArgumentException argEx)
             {
