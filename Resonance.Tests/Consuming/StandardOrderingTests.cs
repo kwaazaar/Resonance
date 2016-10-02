@@ -34,7 +34,9 @@ namespace Resonance.Tests.Consuming
             }).Result;
 
             _publisher.Publish(topicName, payload: "1").Wait();
+            Thread.Sleep(100); // To make sure publicationdateutc is not equal for each item
             _publisher.Publish(topicName, payload: "2").Wait();
+            Thread.Sleep(100);
             _publisher.Publish(topicName, payload: "3").Wait();
 
             var visibilityTimeout = 2;
