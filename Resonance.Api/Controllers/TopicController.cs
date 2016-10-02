@@ -27,7 +27,7 @@ namespace Resonance.Api.Controllers
         {
             try
             {
-                return Ok(await _publisher.GetTopics(partOfName));
+                return Ok(await _publisher.GetTopicsAsync(partOfName));
             }
             catch (Exception ex)
             {
@@ -42,7 +42,7 @@ namespace Resonance.Api.Controllers
         {
             try
             {
-                var topic = await _publisher.GetTopicByName(name);
+                var topic = await _publisher.GetTopicByNameAsync(name);
                 if (topic != null)
                     return Ok(topic);
                 else
@@ -63,7 +63,7 @@ namespace Resonance.Api.Controllers
             {
                 try
                 {
-                    return Ok(await _publisher.AddOrUpdateTopic(topic));
+                    return Ok(await _publisher.AddOrUpdateTopicAsync(topic));
                 }
                 catch (ArgumentException argEx)
                 {
@@ -87,13 +87,13 @@ namespace Resonance.Api.Controllers
             {
                 try
                 {
-                    var existingTopic = await _publisher.GetTopicByName(name);
+                    var existingTopic = await _publisher.GetTopicByNameAsync(name);
                     if (existingTopic == null)
                         return NotFound($"No topic found with name {name}");
                     if (existingTopic.Id != topic.Id)
                         return BadRequest("Id of topic cannot be modified");
 
-                    return Ok(await _publisher.AddOrUpdateTopic(topic));
+                    return Ok(await _publisher.AddOrUpdateTopicAsync(topic));
                 }
                 catch (ArgumentException argEx)
                 {
@@ -117,12 +117,12 @@ namespace Resonance.Api.Controllers
 
             try
             {
-                var existingTopic = await _publisher.GetTopicByName(name);
+                var existingTopic = await _publisher.GetTopicByNameAsync(name);
                 if (existingTopic == null)
                     return NotFound($"No topic found with name {name}");
                 else
                 {
-                    await _publisher.DeleteTopic(existingTopic.Id.Value, includingSubscriptions.GetValueOrDefault(true));
+                    await _publisher.DeleteTopicAsync(existingTopic.Id.Value, includingSubscriptions.GetValueOrDefault(true));
                     return Ok();
                 }
             }

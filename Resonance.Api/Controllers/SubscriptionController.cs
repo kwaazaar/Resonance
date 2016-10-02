@@ -27,7 +27,7 @@ namespace Resonance.Api.Controllers
         {
             try
             {
-                return Ok(await _consumer.GetSubscriptions());
+                return Ok(await _consumer.GetSubscriptionsAsync());
             }
             catch (Exception ex)
             {
@@ -42,7 +42,7 @@ namespace Resonance.Api.Controllers
         {
             try
             {
-                var sub = await _consumer.GetSubscriptionByName(name);
+                var sub = await _consumer.GetSubscriptionByNameAsync(name);
                 if (sub != null)
                     return Ok(sub);
                 else
@@ -63,7 +63,7 @@ namespace Resonance.Api.Controllers
             {
                 try
                 {
-                    return Ok(await _consumer.AddOrUpdateSubscription(sub));
+                    return Ok(await _consumer.AddOrUpdateSubscriptionAsync(sub));
                 }
                 catch (ArgumentException argEx)
                 {
@@ -87,13 +87,13 @@ namespace Resonance.Api.Controllers
             {
                 try
                 {
-                    var existingSub = await _consumer.GetSubscriptionByName(name);
+                    var existingSub = await _consumer.GetSubscriptionByNameAsync(name);
                     if (existingSub == null)
                         return NotFound($"No subscription found with name {name}");
                     if (existingSub.Id != sub.Id)
                         return BadRequest("Id of subscription cannot be modified");
 
-                    return Ok(await _consumer.AddOrUpdateSubscription(sub));
+                    return Ok(await _consumer.AddOrUpdateSubscriptionAsync(sub));
                 }
                 catch (ArgumentException argEx)
                 {
@@ -117,12 +117,12 @@ namespace Resonance.Api.Controllers
 
             try
             {
-                var existingSub = await _consumer.GetSubscriptionByName(name);
+                var existingSub = await _consumer.GetSubscriptionByNameAsync(name);
                 if (existingSub == null)
                     return NotFound($"No subscription found with name {name}");
                 else
                 {
-                    await _consumer.DeleteSubscription(existingSub.Id.Value);
+                    await _consumer.DeleteSubscriptionAsync(existingSub.Id.Value);
                     return Ok();
                 }
             }

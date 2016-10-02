@@ -282,7 +282,7 @@ namespace Resonance
         {
             try
             {
-                var consEvent = await _eventConsumer.ConsumeNext(_subscriptionName, _visibilityTimeout, maxWorkItems);
+                var consEvent = await _eventConsumer.ConsumeNextAsync(_subscriptionName, _visibilityTimeout, maxWorkItems);
                 return consEvent;
             }
             catch (Exception ex)
@@ -332,7 +332,7 @@ namespace Resonance
 
                 try
                 {
-                    _eventConsumer.MarkConsumed(ce.Id, ce.DeliveryKey);
+                    _eventConsumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey);
                     markedComplete = true;
                     LogTrace($"Event consumption succeeded for event with id {ce.Id} and functional key {ce.FunctionalKey}.");
                 }
@@ -354,7 +354,7 @@ namespace Resonance
 
                 try
                 {
-                    _eventConsumer.MarkFailed(ce.Id, ce.DeliveryKey, Reason.Other(result.Reason));
+                    _eventConsumer.MarkFailedAsync(ce.Id, ce.DeliveryKey, Reason.Other(result.Reason));
                 }
                 catch (Exception) { } // Swallow, want is geen ramp als deze toch opnieuw wordt aangeboden (dan wordt hij alsnog corrupt gemeld)
             }

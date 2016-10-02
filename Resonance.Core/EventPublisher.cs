@@ -17,37 +17,75 @@ namespace Resonance
             _repoFactory = repoFactory;
         }
 
-        public async Task<Topic> AddOrUpdateTopic(Topic topic)
+        #region Sync
+        public Topic AddOrUpdateTopic(Topic topic)
+        {
+            return AddOrUpdateTopicAsync(topic).GetAwaiter().GetResult();
+        }
+
+        public void DeleteTopic(long id, bool inclSubscriptions)
+        {
+            DeleteTopicAsync(id, inclSubscriptions).GetAwaiter().GetResult();
+        }
+
+        public Topic GetTopic(long id)
+        {
+            return GetTopicAsync(id).GetAwaiter().GetResult();
+        }
+
+        public Topic GetTopicByName(string name)
+        {
+            return GetTopicByNameAsync(name).GetAwaiter().GetResult();
+        }
+
+        public IEnumerable<Topic> GetTopics(string partOfName = null)
+        {
+            return GetTopicsAsync(partOfName).GetAwaiter().GetResult();
+        }
+
+        public TopicEvent Publish(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, string payload = null)
+        {
+            return PublishAsync(topicName, publicationDateUtc, expirationDateUtc, functionalKey, headers, payload).GetAwaiter().GetResult();
+        }
+
+        public TopicEvent Publish<T>(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, T payload = null) where T : class
+        {
+            return PublishAsync<T>(topicName, publicationDateUtc, expirationDateUtc, functionalKey, headers, payload).GetAwaiter().GetResult();
+        }
+        #endregion
+
+        #region Async
+        public async Task<Topic> AddOrUpdateTopicAsync(Topic topic)
         {
             using (var repo = _repoFactory.CreateRepo())
                 return await repo.AddOrUpdateTopic(topic);
         }
 
-        public async Task DeleteTopic(Int64 id, bool inclSubscriptions)
+        public async Task DeleteTopicAsync(Int64 id, bool inclSubscriptions)
         {
             using (var repo = _repoFactory.CreateRepo())
                 await repo.DeleteTopic(id, inclSubscriptions);
         }
 
-        public async Task<Topic> GetTopic(Int64 id)
+        public async Task<Topic> GetTopicAsync(Int64 id)
         {
             using (var repo = _repoFactory.CreateRepo())
                 return await repo.GetTopic(id);
         }
 
-        public async Task<Topic> GetTopicByName(string name)
+        public async Task<Topic> GetTopicByNameAsync(string name)
         {
             using (var repo = _repoFactory.CreateRepo())
                 return await repo.GetTopicByName(name);
         }
 
-        public async Task<IEnumerable<Topic>> GetTopics(string partOfName = null)
+        public async Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null)
         {
             using (var repo = _repoFactory.CreateRepo())
                 return await repo.GetTopics(partOfName);
         }
 
-        public async Task<TopicEvent> Publish(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, string payload = null)
+        public async Task<TopicEvent> PublishAsync(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, string payload = null)
         {
             using (var repo = _repoFactory.CreateRepo())
             {
@@ -161,14 +199,15 @@ namespace Resonance
             }
         }
 
-        public async Task<TopicEvent> Publish<T>(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, T payload = null) where T : class
+        public async Task<TopicEvent> PublishAsync<T>(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, T payload = null) where T : class
         {
             string payloadAsString = null;
             if (payload != null)
                 payloadAsString = await Task.Factory.StartNew(() => JsonConvert.SerializeObject(payload)); // No specific parameters: the consumer must understand the json as well
 
-            return await Publish(topicName, publicationDateUtc, expirationDateUtc, functionalKey, headers, payloadAsString);
+            return await PublishAsync(topicName, publicationDateUtc, expirationDateUtc, functionalKey, headers, payloadAsString);
         }
+        #endregion
 
         private bool CheckFilters(List<TopicSubscriptionFilter> filters, Dictionary<string, string> headers)
         {

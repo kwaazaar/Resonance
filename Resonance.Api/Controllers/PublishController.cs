@@ -42,7 +42,7 @@ namespace Resonance.Api.Controllers
                     payload = await new StreamReader(Request.Body).ReadToEndAsync();
 
                 // Now publish
-                var te = await _publisher.Publish(topicName: name, publicationDateUtc: publicationDateUtc, expirationDateUtc: expirationDateUtc, functionalKey: functionalKey, headers: headers, payload: payload);
+                var te = await _publisher.PublishAsync(topicName: name, publicationDateUtc: publicationDateUtc, expirationDateUtc: expirationDateUtc, functionalKey: functionalKey, headers: headers, payload: payload);
                 return Ok(te);
             }
             catch (ArgumentException argEx)

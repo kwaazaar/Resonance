@@ -29,7 +29,7 @@ namespace Resonance.Api.Controllers
 
             try
             {
-                await _consumer.MarkConsumed(id, deliveryKey);
+                await _consumer.MarkConsumedAsync(id, deliveryKey);
                 return Ok();
             }
             catch (ArgumentException argEx)
@@ -52,7 +52,7 @@ namespace Resonance.Api.Controllers
 
             try
             {
-                await _consumer.MarkFailed(id, deliveryKey, Reason.Other(reason ?? string.Empty));
+                await _consumer.MarkFailedAsync(id, deliveryKey, Reason.Other(reason ?? string.Empty));
                 return Ok();
             }
             catch (ArgumentException argEx)

@@ -17,47 +17,96 @@ namespace Resonance
             _repoFactory = repoFactory;
         }
 
-        public async Task<Subscription> AddOrUpdateSubscription(Subscription subscription)
+        #region Sync
+
+        public IEnumerable<ConsumableEvent> ConsumeNext(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
+        {
+            return ConsumeNextAsync(subscriptionName, visibilityTimeout, maxCount).GetAwaiter().GetResult();
+        }
+
+        public IEnumerable<ConsumableEvent<T>> ConsumeNext<T>(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
+        {
+            return ConsumeNextAsync<T>(subscriptionName, visibilityTimeout, maxCount).GetAwaiter().GetResult();
+        }
+
+        public void MarkConsumed(long id, string deliveryKey)
+        {
+            MarkConsumedAsync(id, deliveryKey).GetAwaiter().GetResult();
+        }
+
+        public void MarkFailed(long id, string deliveryKey, Reason reason)
+        {
+            MarkFailedAsync(id, deliveryKey, reason).GetAwaiter().GetResult();
+        }
+
+        public IEnumerable<Subscription> GetSubscriptions(long? topicId = default(long?))
+        {
+            return GetSubscriptionsAsync(topicId).GetAwaiter().GetResult();
+        }
+
+        public Subscription GetSubscription(long id)
+        {
+            return GetSubscriptionAsync(id).GetAwaiter().GetResult();
+        }
+
+        public Subscription GetSubscriptionByName(string name)
+        {
+            return GetSubscriptionByNameAsync(name).GetAwaiter().GetResult();
+        }
+
+        public Subscription AddOrUpdateSubscription(Subscription subscription)
+        {
+            return AddOrUpdateSubscriptionAsync(subscription).GetAwaiter().GetResult();
+        }
+
+        public void DeleteSubscription(long id)
+        {
+            DeleteSubscriptionAsync(id).GetAwaiter().GetResult();
+        }
+        #endregion
+
+        #region Async
+        public async Task<Subscription> AddOrUpdateSubscriptionAsync(Subscription subscription)
         {
             using (var repo = _repoFactory.CreateRepo())
                 return await repo.AddOrUpdateSubscription(subscription);
         }
 
-        public async Task DeleteSubscription(Int64 id)
+        public async Task DeleteSubscriptionAsync(Int64 id)
         {
             using (var repo = _repoFactory.CreateRepo())
                 await repo.DeleteSubscription(id);
         }
 
-        public async Task<Subscription> GetSubscription(Int64 id)
+        public async Task<Subscription> GetSubscriptionAsync(Int64 id)
         {
             using (var repo = _repoFactory.CreateRepo())
                 return await repo.GetSubscription(id);
         }
 
-        public async Task<Subscription> GetSubscriptionByName(string name)
+        public async Task<Subscription> GetSubscriptionByNameAsync(string name)
         {
             using (var repo = _repoFactory.CreateRepo())
                 return await repo.GetSubscriptionByName(name);
         }
 
-        public async Task<IEnumerable<Subscription>> GetSubscriptions(Int64? topicId = null)
+        public async Task<IEnumerable<Subscription>> GetSubscriptionsAsync(Int64? topicId = null)
         {
             using (var repo = _repoFactory.CreateRepo())
                 return await repo.GetSubscriptions(topicId);
         }
 
-        public async Task<IEnumerable<ConsumableEvent>> ConsumeNext(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
+        public async Task<IEnumerable<ConsumableEvent>> ConsumeNextAsync(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
         {
             using (var repo = _repoFactory.CreateRepo())
                 return await repo.ConsumeNext(subscriptionName, visibilityTimeout, maxCount);
         }
 
-        public async Task<IEnumerable<ConsumableEvent<T>>> ConsumeNext<T>(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
+        public async Task<IEnumerable<ConsumableEvent<T>>> ConsumeNextAsync<T>(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
         {
             var ces = new List<ConsumableEvent<T>>();
 
-            foreach (var ce in await ConsumeNext(subscriptionName, visibilityTimeout, maxCount))
+            foreach (var ce in await ConsumeNextAsync(subscriptionName, visibilityTimeout, maxCount))
             {
                 // Deserialize the payload
                 T payloadAsObject = await Task.Factory.StartNew(() => JsonConvert.DeserializeObject<T>(ce.Payload));
@@ -75,16 +124,17 @@ namespace Resonance
             return ces;
         }
 
-        public async Task MarkConsumed(Int64 id, string deliveryKey)
+        public async Task MarkConsumedAsync(Int64 id, string deliveryKey)
         {
             using (var repo = _repoFactory.CreateRepo())
                 await repo.MarkConsumed(id, deliveryKey);   
         }
 
-        public async Task MarkFailed(Int64 id, string deliveryKey, Reason reason)
+        public async Task MarkFailedAsync(Int64 id, string deliveryKey, Reason reason)
         {
             using (var repo = _repoFactory.CreateRepo())
                 await repo.MarkFailed(id, deliveryKey, reason);
         }
+        #endregion
     }
 }

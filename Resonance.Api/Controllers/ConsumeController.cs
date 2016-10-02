@@ -26,7 +26,7 @@ namespace Resonance.Api.Controllers
         {
             try
             {
-                var ces = await _consumer.ConsumeNext(name, visibilityTimeout.GetValueOrDefault(120), maxCount.GetValueOrDefault(1));
+                var ces = await _consumer.ConsumeNextAsync(name, visibilityTimeout.GetValueOrDefault(120), maxCount.GetValueOrDefault(1));
                 if (ces.Count() == 0)
                     return NotFound();
                 else
