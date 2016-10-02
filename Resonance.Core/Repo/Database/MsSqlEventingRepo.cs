@@ -22,7 +22,7 @@ namespace Resonance.Repo.Database
         /// <summary>
         /// Creates a new MsSqlEventingRepo.
         /// </summary>
-        /// <param name="conn">IDbConnection to use. If not yet opened, it will be opened here.</param>
+        /// <param name="conn">IDbConnection to use.</param>
         public MsSqlEventingRepo(SqlConnection conn)
             : base(conn)
         {

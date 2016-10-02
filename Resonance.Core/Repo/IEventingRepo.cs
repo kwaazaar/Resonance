@@ -14,9 +14,9 @@ namespace Resonance.Repo
         /// <summary>
         /// Starts a new transaction
         /// </summary>
-        void BeginTransaction();
-        void RollbackTransaction();
-        void CommitTransaction();
+        Task BeginTransaction();
+        Task RollbackTransaction();
+        Task CommitTransaction();
 
         // Topic & subscription management
         Task<IEnumerable<Topic>> GetTopics(string partOfName = null);

@@ -36,8 +36,6 @@ namespace Resonance.Repo.Database
         public DbEventingRepo(IDbConnection conn)
         {
             _conn = conn;
-            if (_conn.State == ConnectionState.Closed)
-                _conn.Open();
         }
 
         public void Dispose()
@@ -56,21 +54,57 @@ namespace Resonance.Repo.Database
             {
                 if (_conn != null)
                 {
-                    if (_conn.State == ConnectionState.Open)
-                        _conn.Close();
+                    if (_conn.State != ConnectionState.Closed)
+                    {
+                        try
+                        {
+                            _conn.Close();
+                        }
+                        catch (Exception) { } // Swallow, can't help it anyway
+                    }
                     _conn.Dispose();
                 }
             }
         }
 
+        #region Connection Management
+        /// <summary>
+        /// Ensures the provided connection is available and open.
+        /// </summary>
+        /// <returns></returns>
+        protected virtual async Task EnsureConnectionReady()
+        {
+            if (_conn == null)
+                throw new InvalidOperationException("No connection available");
+
+            var dbConn = _conn as DbConnection; // If _conn appears to be a (derived) DbConnection, we cast it, since it provides some async methods
+            if (_conn.State == ConnectionState.Broken)
+            {
+                // When broken, just close and reopen again, might do the job
+                _conn.Close();
+                if (dbConn != null)
+                    await dbConn.OpenAsync();
+                else
+                    _conn.Open();
+            }
+            else if (_conn.State == ConnectionState.Closed)
+            {
+                if (dbConn != null)
+                    await dbConn.OpenAsync();
+                else
+                    _conn.Open();
+            }
+        }
+        #endregion
 
         #region Transactions
         /// <summary>
         /// Starts a new transaction.
         /// NB: Transactions can be nested.
         /// </summary>
-        public virtual void BeginTransaction()
+        public async virtual Task BeginTransaction()
         {
+            await EnsureConnectionReady();
             lock (_tranLock)
             {
                 if (_runningTransaction == null)
@@ -86,11 +120,12 @@ namespace Resonance.Repo.Database
         /// Rolls back the the transaction and disposes it.
         /// Make sure there are no parallel threads/tasks still using the transaction!
         /// </summary>
-        public virtual void RollbackTransaction()
+        public virtual async Task RollbackTransaction()
         {
             if (_runningTransaction == null) // Check before waiting for lock to prevent unnessecary locks
                 throw new ArgumentException($"No running transaction found");
 
+            await EnsureConnectionReady();
             lock (_tranLock)
             {
                 if (_runningTransaction == null)
@@ -98,7 +133,7 @@ namespace Resonance.Repo.Database
 
                 if (_tranState != TranState.Rollbacked) // Nothing to do if already rolled back
                 {
-                    if (_runningTransaction.Connection != null) // Would be weird, since it's only cleared after a rollback or commit
+                    if (_runningTransaction.Connection != null) // Would be weird, since it's only cleared after a rollback or commit (on SqlServer)
                         _runningTransaction.Rollback(); // Rollback immediately
 
                     _tranState = TranState.Rollbacked;
@@ -117,11 +152,12 @@ namespace Resonance.Repo.Database
         /// Commits the transaction and disposes it.
         /// Make sure there are no parallel threads/tasks still using the transaction!
         /// </summary>
-        public virtual void CommitTransaction()
+        public virtual async Task CommitTransaction()
         {
             if (_runningTransaction == null) // Check before waiting for lock to prevent unnessecary locks
                 throw new ArgumentException($"No running transaction found");
 
+            await EnsureConnectionReady();
             lock (_tranLock)
             {
                 if (_runningTransaction == null)
@@ -150,34 +186,10 @@ namespace Resonance.Repo.Database
         /// <param name="param"></param>
         /// <param name="commandTimeout"></param>
         /// <returns></returns>
-        protected virtual int TranExecute(string sql, object param = null, int? commandTimeout = null)
-        {
-            return _conn.Execute(sql, param: param, transaction: _runningTransaction, commandTimeout: commandTimeout);
-        }
-
-        /// <summary>
-        /// Transacted execution; if a transaction was started, the execute will take place on/in it
-        /// </summary>
-        /// <param name="sql"></param>
-        /// <param name="param"></param>
-        /// <param name="commandTimeout"></param>
-        /// <returns></returns>
         protected async virtual Task<int> TranExecuteAsync(string sql, object param = null, int? commandTimeout = null)
         {
+            await EnsureConnectionReady();
             return await _conn.ExecuteAsync(sql, param: param, transaction: _runningTransaction, commandTimeout: commandTimeout);
-        }
-
-        /// <summary>
-        /// Transacted query; if a transaction was started, the query will take place on/in it
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="sql"></param>
-        /// <param name="param"></param>
-        /// <param name="commandTimeout"></param>
-        /// <returns></returns>
-        protected virtual IEnumerable<T> TranQuery<T>(string sql, object param = null, int? commandTimeout = null)
-        {
-            return _conn.Query<T>(sql, param: param, transaction: _runningTransaction, commandTimeout: commandTimeout);
         }
 
         /// <summary>
@@ -190,6 +202,7 @@ namespace Resonance.Repo.Database
         /// <returns></returns>
         protected async virtual Task<IEnumerable<T>> TranQueryAsync<T>(string sql, object param = null, int? commandTimeout = null)
         {
+            await EnsureConnectionReady();
             return await _conn.QueryAsync<T>(sql, param: param, transaction: _runningTransaction, commandTimeout: commandTimeout);
         }
         #endregion
@@ -222,7 +235,7 @@ namespace Resonance.Repo.Database
 
             if (existingSubscription != null) // update
             {
-                BeginTransaction();
+                await BeginTransaction();
                 try
                 {
                     var parameters = new Dictionary<string, object>
@@ -240,11 +253,11 @@ namespace Resonance.Repo.Database
                     await RemoveTopicSubscriptions(subscription.Id.Value);
                     await AddTopicSubscriptions(subscription.Id.Value, subscription.TopicSubscriptions);
 
-                    CommitTransaction();
+                    await CommitTransaction();
                 }
                 catch (Exception)
                 {
-                    RollbackTransaction();
+                    await RollbackTransaction();
                     throw;
                 }
 
@@ -254,7 +267,7 @@ namespace Resonance.Repo.Database
             {
                 Int64 subscriptionId = Int64.MinValue;
 
-                BeginTransaction();
+                await BeginTransaction();
                 try
                 {
                     var parameters = new Dictionary<string, object>
@@ -270,11 +283,11 @@ namespace Resonance.Repo.Database
                         parameters);
                     subscriptionId = subscriptionIds.Single();
                     await AddTopicSubscriptions(subscriptionId, subscription.TopicSubscriptions);
-                    CommitTransaction();
+                    await CommitTransaction();
                 }
                 catch (Exception)
                 {
-                    RollbackTransaction();
+                    await RollbackTransaction();
                     throw;
                 }
 
@@ -284,7 +297,7 @@ namespace Resonance.Repo.Database
 
         private async Task AddTopicSubscriptions(Int64 subscriptionId, List<TopicSubscription> topicSubscriptions)
         {
-            BeginTransaction();
+            await BeginTransaction();
             try
             {
                 foreach (var topicSubscription in topicSubscriptions)
@@ -315,18 +328,18 @@ namespace Resonance.Repo.Database
                         }
                     }
                 }
-                CommitTransaction();
+                await CommitTransaction();
             }
             catch (Exception)
             {
-                RollbackTransaction();
+                await RollbackTransaction();
                 throw;
             }
         }
 
         private async Task RemoveTopicSubscriptions(Int64 subscriptionId)
         {
-            BeginTransaction();
+            await BeginTransaction();
             try
             {
                 var parameters = new Dictionary<string, object> { { "@subscriptionId", subscriptionId } };
@@ -342,11 +355,11 @@ namespace Resonance.Repo.Database
                     " where ts.SubscriptionId = @subscriptionId";
                 await TranExecuteAsync(query, parameters);
 
-                CommitTransaction();
+                await CommitTransaction();
             }
             catch (Exception)
             {
-                RollbackTransaction();
+                await RollbackTransaction();
                 throw;
             }
         }
@@ -385,7 +398,7 @@ namespace Resonance.Repo.Database
 
         public async Task DeleteSubscription(Int64 id)
         {
-            BeginTransaction();
+            await BeginTransaction();
             try
             {
                 //TranExecute("delete from SubscriptionEvent where SubscriptionId = @subscriptionId",
@@ -399,18 +412,18 @@ namespace Resonance.Repo.Database
                     {
                         { "@id", id },
                     });
-                CommitTransaction();
+                await CommitTransaction();
             }
             catch (Exception)
             {
-                RollbackTransaction();
+                await RollbackTransaction();
                 throw;
             }
         }
 
         public async Task DeleteTopic(Int64 id, bool inclSubscriptions)
         {
-            BeginTransaction();
+            await BeginTransaction();
             try
             {
                 if (inclSubscriptions)
@@ -444,11 +457,11 @@ namespace Resonance.Repo.Database
                         { "@id", id },
                     });
 
-                CommitTransaction();
+                await CommitTransaction();
             }
             catch (Exception)
             {
-                RollbackTransaction();
+                await RollbackTransaction();
                 throw;
             }
         }
@@ -726,7 +739,7 @@ namespace Resonance.Repo.Database
                 success = false;
                 allowRetry = false;
 
-                BeginTransaction();
+                await BeginTransaction();
                 try
                 {
                     // 1. Remove from SubscriptionEvent
@@ -755,19 +768,19 @@ namespace Resonance.Repo.Database
                             System.Diagnostics.Debug.WriteLine($"Warning: combination of SubscriptionId ({se.SubscriptionId}), FunctionalKey ({se.FunctionalKey}) and PublicationDateUtc ({se.PublicationDateUtc}) is found to be not unique for SubscriptionEvent with Id {se.Id}. Functional ordering cannot be guaranteed.");
                     }
 
-                    CommitTransaction();
+                    await CommitTransaction();
                     success = true;
                 }
                 catch (DbException dbEx)
                 {
-                    RollbackTransaction();
+                    await RollbackTransaction();
                     allowRetry = CanRetry(dbEx, attempts);
                     if (!allowRetry)
                         throw;
                 }
                 catch (Exception)
                 {
-                    RollbackTransaction();
+                    await RollbackTransaction();
                     throw;
                 }
             } while (!success && allowRetry);
@@ -782,7 +795,7 @@ namespace Resonance.Repo.Database
                && se.InvisibleUntilUtc > DateTime.UtcNow) // ... If not currently locked
                 throw new ArgumentException($"Subscription-event with id {id} had expired and it has already been locked again.");
 
-            BeginTransaction();
+            await BeginTransaction();
             try
             {
                 // 1. Remove from SubscriptionEvent
@@ -801,11 +814,11 @@ namespace Resonance.Repo.Database
                 if (rowsUpdated == 0)
                     throw new InvalidOperationException($"Failed to add FailedSubscriptionEvent for SubscriptionEvent with id {id} and reason {reason}.");
 
-                CommitTransaction();
+                await CommitTransaction();
             }
             catch (Exception)
             {
-                RollbackTransaction();
+                await RollbackTransaction();
                 throw;
             }
         }

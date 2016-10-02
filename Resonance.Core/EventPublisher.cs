@@ -98,7 +98,7 @@ namespace Resonance
 
                 var subscriptions = await repo.GetSubscriptions(topicId: topic.Id);
 
-                repo.BeginTransaction();
+                await repo.BeginTransaction();
                 try
                 {
                     // Store topic event
@@ -158,14 +158,14 @@ namespace Resonance
 
                     // Wait for all tasks to complete
                     await Task.WhenAll(subTasks.ToArray()); // No timeout: db-commandtimeout will do
-                    repo.CommitTransaction();
+                    await repo.CommitTransaction();
 
                     // Return the topic event
                     return newTopicEvent;
                 }
                 catch (AggregateException aggrEx)
                 {
-                    repo.RollbackTransaction();
+                    await repo.RollbackTransaction();
 
                     if (payloadId.HasValue)
                     {
@@ -184,7 +184,7 @@ namespace Resonance
                 }
                 catch (Exception)
                 {
-                    repo.RollbackTransaction();
+                    await repo.RollbackTransaction();
 
                     if (payloadId.HasValue)
                     {
