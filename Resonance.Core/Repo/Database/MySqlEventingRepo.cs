@@ -44,7 +44,7 @@ namespace Resonance.Repo.Database
                 { "@subscriptionId", subscriptionEvent.SubscriptionId },
                 { "@functionalKey", subscriptionEvent.FunctionalKey },
                 { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
-            });
+            }).ConfigureAwait(false);
         }
 
         protected override async Task<IEnumerable<ConsumableEvent>> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
@@ -52,13 +52,13 @@ namespace Resonance.Repo.Database
             // TODO: Optimize when not ordered: use old code
 
             // 1. Lock and get ids
-            var lockedIds = await LockNextSubscriptionEvents(subscription.Id.Value, subscription.Ordered, visibilityTimeout, maxCount);
+            var lockedIds = await LockNextSubscriptionEvents(subscription.Id.Value, subscription.Ordered, visibilityTimeout, maxCount).ConfigureAwait(false);
 
             // 2. Get se details
             var ces = new List<ConsumableEvent>();
             foreach (var sId in lockedIds)
             {
-                ces.Add(await GetConsumableEvent(sId));
+                ces.Add(await GetConsumableEvent(sId).ConfigureAwait(false));
             }
 
             return ces;
@@ -73,11 +73,11 @@ namespace Resonance.Repo.Database
         {
             var query = $"select se.Id, se.DeliveryKey, se.FunctionalKey, se.InvisibleUntilUtc, se.PayloadId" + // Get the minimal amount of data
                 " from SubscriptionEvent se where se.Id = @sId";
-            var ces = await TranQueryAsync<ConsumableEvent>(query, new { sId = sId });
+            var ces = await TranQueryAsync<ConsumableEvent>(query, new { sId = sId }).ConfigureAwait(false);
             var ce = ces.SingleOrDefault();
             if (ce != null && ce.PayloadId.HasValue)
             {
-                ce.Payload = await GetPayload(ce.PayloadId.Value);
+                ce.Payload = await GetPayload(ce.PayloadId.Value).ConfigureAwait(false);
                 ce.PayloadId = null; // No reason to keep it
             }
             return ce;
@@ -125,7 +125,7 @@ namespace Resonance.Repo.Database
                         { "@utcNow", DateTime.UtcNow },
                         { "@deliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },
-                        });
+                        }).ConfigureAwait(false);
                     var sId = sIds.SingleOrDefault();
                     if (sId.HasValue && sId.Value > 0) // MySql returns the 0 used to initialize this variable with.
                         lockedIds.Add(sId.Value);
@@ -181,7 +181,7 @@ namespace Resonance.Repo.Database
                         { "@utcNow", DateTime.UtcNow },
                         { "@deliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },
-                        });
+                        }).ConfigureAwait(false);
                     var sId = sIds.SingleOrDefault();
                     if (sId.HasValue && sId.Value > 0) // MySql returns the 0 used to initialize this variable with.
                         lockedIds.Add(sId.Value);

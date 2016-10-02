@@ -55,7 +55,7 @@ namespace Resonance.Repo.Database
                 { "@subscriptionId", subscriptionEvent.SubscriptionId },
                 { "@functionalKey", subscriptionEvent.FunctionalKey },
                 { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
-            });
+            }).ConfigureAwait(false);
         }
 
         protected override async Task<IEnumerable<ConsumableEvent>> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
@@ -95,7 +95,7 @@ namespace Resonance.Repo.Database
                             { "@subscriptionId", subscription.Id.Value },
                             { "@utcNow", DateTime.UtcNow },
                             { "@invisibleUntilUtc", invisibleUntilUtc },
-                        }));
+                        }).ConfigureAwait(false));
             }
             else // Functional ordering
             {
@@ -142,7 +142,7 @@ namespace Resonance.Repo.Database
                                             { "@utcNow", DateTime.UtcNow },
                                             { "@deliveryKey", deliveryKey },
                                             { "@invisibleUntilUtc", invisibleUntilUtc },
-                                        });
+                                        }).ConfigureAwait(false);
                     if (cesInLoop.Count() > 0)
                         ces.AddRange(cesInLoop);
                     else
@@ -154,7 +154,7 @@ namespace Resonance.Repo.Database
             {
                 if (ce.PayloadId.HasValue)
                 {
-                    ce.Payload = await GetPayload(ce.PayloadId.Value);
+                    ce.Payload = await GetPayload(ce.PayloadId.Value).ConfigureAwait(false);
                     ce.PayloadId = null; // No reason to keep it
                 }
             }
