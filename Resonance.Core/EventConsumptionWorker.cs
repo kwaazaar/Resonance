@@ -26,7 +26,7 @@ namespace Resonance
         private readonly IEventConsumer _eventConsumer;
         private readonly ILogger<EventConsumptionWorker> _logger;
         private readonly string _subscriptionName;
-        private readonly Func<ConsumableEvent, ConsumeResult> _consumeAction;
+        private readonly Func<ConsumableEvent, Task<ConsumeResult>> _consumeAction;
         private readonly int _visibilityTimeout;
 
         /// <summary>
@@ -37,9 +37,9 @@ namespace Resonance
         /// <param name="maxBackOffDelayInMs">Maximum backoff delay in milliseconds. Backoff-delay will increment exponentially up until this value.</param>
         /// <param name="maxThreads"></param>
         /// <param name="visibilityTimeout">Number of seconds the business event must be locked</param>
-        /// <param name="consumeAction">Action that must be invoked for each event. Must be thread-safe when parallelExecution is enabled!</param>
+        /// <param name="consumeAction">Action that must be invoked for each event. Make sure it is thread-safe when parallelExecution is enabled!</param>
         public EventConsumptionWorker(IEventConsumer eventConsumer, string subscriptionName,
-            Func<ConsumableEvent, ConsumeResult> consumeAction, int visibilityTimeout = 60,
+            Func<ConsumableEvent, Task<ConsumeResult>> consumeAction, int visibilityTimeout = 60,
             ILogger<EventConsumptionWorker> logger = null,
             int minBackOffDelayInMs = 1, int maxBackOffDelayInMs = 60000, int maxThreads = 1)
         {
@@ -112,7 +112,7 @@ namespace Resonance
         /// Executes a workitem and calls Complete on success (no exception and true returned by Execute) or Failed otherwise.
         /// </summary>
         /// <param name="workItem"></param>
-        private void ExecuteWork(ConsumableEvent workItem)
+        private async Task ExecuteWork(ConsumableEvent workItem)
         {
             bool success = false;
             Exception execEx = null;
@@ -121,7 +121,7 @@ namespace Resonance
             w.Start();
             try
             {
-                success = this.Execute(workItem);
+                success = await this.Execute(workItem).ConfigureAwait(false);
                 w.Stop();
             }
             catch (Exception ex)
@@ -207,9 +207,9 @@ namespace Resonance
                     this._attempts = 0;
 
                     if (this._maxThreads > 1)
-                        workitems.AsParallel().ForAll(new Action<ConsumableEvent>(this.ExecuteWork));
+                        workitems.AsParallel().ForAll(async (w) => await this.ExecuteWork(w).ConfigureAwait(false));//  (new Action<ConsumableEvent>(this.ExecuteWork));
                     else
-                        workitems.ToList().ForEach(new Action<ConsumableEvent>(this.ExecuteWork)); // Executed on single (current) thread, but theoretically the TryGetWork could have returned more than one workitem
+                        workitems.ToList().ForEach(async (w) => await this.ExecuteWork(w).ConfigureAwait(false)); // Executed on single (current) thread, but theoretically the TryGetWork could have returned more than one workitem
 
                     this.BackOff(); // Ook hier backoff, zodat obv minBackOffDelayInMs vermeden wordt dat deze verwerking alle CPU opeist.
                 }
@@ -296,12 +296,12 @@ namespace Resonance
         /// Invoked to actually execute a single workitem
         /// </summary>
         /// <param name="workItem"></param>
-        protected virtual bool Execute(ConsumableEvent workItem)
+        protected virtual async Task<bool> Execute(ConsumableEvent workItem)
         {
             // Only process if still invisible (serial processing of a list of workitems may cause workitems to expire before being processed)
             if (workItem.InvisibleUntilUtc > DateTime.UtcNow)
             {
-                return ExecuteConcrete(workItem);
+                return await ExecuteConcrete(workItem);
             }
             else
             {
@@ -310,7 +310,7 @@ namespace Resonance
             }
         }
 
-        private bool ExecuteConcrete(ConsumableEvent ce)
+        private async Task<bool> ExecuteConcrete(ConsumableEvent ce)
         {
             ConsumeResult result = null;
             bool mustRollback = false;
@@ -318,7 +318,7 @@ namespace Resonance
             try
             {
                 LogTrace($"Processing event with id {ce.Id} and functional key {ce.FunctionalKey}.");
-                result = _consumeAction(ce);
+                result = await _consumeAction(ce).ConfigureAwait(false);
             }
             catch (Exception procEx)
             {
@@ -332,7 +332,7 @@ namespace Resonance
 
                 try
                 {
-                    _eventConsumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey);
+                    await _eventConsumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey).ConfigureAwait(false);
                     markedComplete = true;
                     LogTrace($"Event consumption succeeded for event with id {ce.Id} and functional key {ce.FunctionalKey}.");
                 }
@@ -354,7 +354,7 @@ namespace Resonance
 
                 try
                 {
-                    _eventConsumer.MarkFailedAsync(ce.Id, ce.DeliveryKey, Reason.Other(result.Reason));
+                    await _eventConsumer.MarkFailedAsync(ce.Id, ce.DeliveryKey, Reason.Other(result.Reason)).ConfigureAwait(false);
                 }
                 catch (Exception) { } // Swallow, want is geen ramp als deze toch opnieuw wordt aangeboden (dan wordt hij alsnog corrupt gemeld)
             }
