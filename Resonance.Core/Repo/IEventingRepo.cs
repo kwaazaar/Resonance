@@ -11,9 +11,7 @@ namespace Resonance.Repo
     public interface IEventingRepo : IDisposable
     {
         // Transaction Management
-        /// <summary>
-        /// Starts a new transaction
-        /// </summary>
+        bool ParallelQueriesSupport { get; }
         Task BeginTransaction();
         Task RollbackTransaction();
         Task CommitTransaction();

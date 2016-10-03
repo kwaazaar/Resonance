@@ -20,15 +20,21 @@ namespace Resonance.Repo.Database
     public class MsSqlEventingRepo : DbEventingRepo, IEventingRepo
     {
         /// <summary>
+        /// ConnectionStringBuilder for easy access to properties of the connectionstring used.
+        /// </summary>
+        private readonly SqlConnectionStringBuilder _connStringBuilder;
+
+        /// <summary>
         /// Creates a new MsSqlEventingRepo.
         /// </summary>
         /// <param name="conn">IDbConnection to use.</param>
         public MsSqlEventingRepo(SqlConnection conn)
             : base(conn)
         {
+            _connStringBuilder = new SqlConnectionStringBuilder(conn.ConnectionString);
         }
 
-        public override bool CanRetry(DbException dbEx, int attempts)
+        protected override bool CanRetry(DbException dbEx, int attempts)
         {
             var sqlEx = dbEx as SqlException;
             if (sqlEx != null && sqlEx.Number == 1205 && attempts < 3) // After 3 attempts give up deadlocks
@@ -36,6 +42,8 @@ namespace Resonance.Repo.Database
             else
                 return base.CanRetry(dbEx, attempts);
         }
+
+        public override bool ParallelQueriesSupport { get { return _connStringBuilder.MultipleActiveResultSets; } } // 'MARS' must be enabled in the connectionstring
 
         public override string GetLastAutoIncrementValue
         {

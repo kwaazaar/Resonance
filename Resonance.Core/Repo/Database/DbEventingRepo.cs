@@ -95,6 +95,12 @@ namespace Resonance.Repo.Database
                     _conn.Open();
             }
         }
+
+        /// <summary>
+        /// Indicates whether the repo supports running parallel queries on a single connection. Default=false.
+        /// </summary>
+        public virtual bool ParallelQueriesSupport { get { return false; } }
+
         #endregion
 
         #region Transactions
@@ -215,7 +221,7 @@ namespace Resonance.Repo.Database
         /// <param name="dbEx">The DbException</param>
         /// <param name="attempts">The nr of attempts tried so far</param>
         /// <returns></returns>
-        public virtual bool CanRetry(DbException dbEx, int attempts)
+        protected virtual bool CanRetry(DbException dbEx, int attempts)
         {
             return false;
         }

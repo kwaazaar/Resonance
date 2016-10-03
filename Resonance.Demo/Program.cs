@@ -90,24 +90,24 @@ namespace Resonance.Demo
                     }
                 });
 
-            //var sw = new Stopwatch();
-            //sw.Start();
-            //int maxLoop = 10;
-            //for (int i = 1; i <= maxLoop; i++)
-            //{
-            //    var iAsString = i.ToString();
-            //    for (int fk = 1; fk <= 1000; fk++) // 1000 different functional keys, 4 TopicEvents per fk
-            //    {
-            //        var fkAsString = fk.ToString();
-            //        publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload100, headers: new Dictionary<string, string> { { "EventName", "Bla" } });
-            //        publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload2000); // Not delivered to sub1: EventName-header is missing
-            //        publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload2000); // Not delivered to sub2: topic2-subscription is not enabled
-            //        publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload100); // Not delivered to sub2: topic2-subscription is not enabled
-            //    }
-            //    Console.WriteLine($"Runs done: {i} of {maxLoop}");
-            //}
-            //sw.Stop();
-            //Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
+            var sw = new Stopwatch();
+            sw.Start();
+            int maxLoop = 10;
+            for (int i = 1; i <= maxLoop; i++)
+            {
+                var iAsString = i.ToString();
+                for (int fk = 1; fk <= 1000; fk++) // 1000 different functional keys, 4 TopicEvents per fk
+                {
+                    var fkAsString = fk.ToString();
+                    publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload100, headers: new Dictionary<string, string> { { "EventName", "Bla" } });
+                    publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload2000); // Not delivered to sub1: EventName-header is missing
+                    publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload2000); // Not delivered to sub2: topic2-subscription is not enabled
+                    publisher.Publish(topic2.Name, functionalKey: fkAsString, payload: payload100); // Not delivered to sub2: topic2-subscription is not enabled
+                }
+                Console.WriteLine($"Runs done: {i} of {maxLoop}");
+            }
+            sw.Stop();
+            Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
 
             //var ce = consumer.ConsumeNext(subscription1.Name).FirstOrDefault();
             //if (ce != null)
@@ -150,18 +150,18 @@ namespace Resonance.Demo
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
 
             // To use MSSQLServer:
-            var connectionString = config.GetConnectionString("Resonance.MsSql");
-            serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
-            {
-                return new MsSqlEventingRepoFactory(connectionString);
-            });
-
-            // To use MySQL:
-            //var connectionString = config.GetConnectionString("Resonance.MySql");
+            //var connectionString = config.GetConnectionString("Resonance.MsSql");
             //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
             //{
-            //    return new MySqlEventingRepoFactory(connectionString);
+            //    return new MsSqlEventingRepoFactory(connectionString);
             //});
+
+            // To use MySQL:
+            var connectionString = config.GetConnectionString("Resonance.MySql");
+            serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
+            {
+                return new MySqlEventingRepoFactory(connectionString);
+            });
 
             // Configure EventPublisher
             serviceCollection.AddTransient<IEventPublisher, EventPublisher>();

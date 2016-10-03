@@ -11,6 +11,7 @@ using Resonance.Models;
 using Resonance.Repo.InternalModels;
 using Newtonsoft.Json;
 using MySql.Data.MySqlClient;
+using System.Data.Common;
 
 namespace Resonance.Repo.Database
 {
@@ -31,6 +32,15 @@ namespace Resonance.Repo.Database
         public override string GetLastAutoIncrementValue
         {
             get { return "LAST_INSERT_ID()"; }
+        }
+
+        protected override bool CanRetry(DbException dbEx, int attempts)
+        {
+            var mysqlEx = dbEx as MySqlException;
+            if (mysqlEx != null && mysqlEx.Number == 1213 && attempts < 3) // After 3 attempts give up deadlocks
+                return true;
+            else
+                return base.CanRetry(dbEx, attempts);
         }
 
         public override async Task<int> UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)

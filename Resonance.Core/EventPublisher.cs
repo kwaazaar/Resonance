@@ -120,44 +120,50 @@ namespace Resonance
                         .Distinct(); // Nessecary when one subscription has more than once topicsubscription for the same topic (probably with different filters)
 
                     // Create tasks for each subscription
-                    var subTasks = subscriptionsMatching.Select((subscription) =>
+                    var subTasks = new List<Task<Int64>>();
+                    foreach (var subscription in subscriptionsMatching)
+                    {
+                        // By default a SubscriptionEvent takes expirationdate of TopicEvent
+                        var subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
+
+                        // If subscription has its own TTL, it will be applied, but may never exceed the TopicEvent expiration
+                        if (subscription.TimeToLive.HasValue)
                         {
-                            // By default a SubscriptionEvent takes expirationdate of TopicEvent
-                            var subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
+                            subExpirationDateUtc = newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.TimeToLive.Value);
+                            if (newTopicEvent.ExpirationDateUtc.HasValue && (newTopicEvent.ExpirationDateUtc.Value < subExpirationDateUtc))
+                                subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
+                        }
 
-                            // If subscription has its own TTL, it will be applied, but may never exceed the TopicEvent expiration
-                            if (subscription.TimeToLive.HasValue)
-                            {
-                                subExpirationDateUtc = newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.TimeToLive.Value);
-                                if (newTopicEvent.ExpirationDateUtc.HasValue && (newTopicEvent.ExpirationDateUtc.Value < subExpirationDateUtc))
-                                    subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
-                            }
+                        // Delivery can be initially delayed, but it cannot exceed the expirationdate (would be useless)
+                        var deliveryDelayedUntilUtc = subscription.DeliveryDelay.HasValue ? newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value) : default(DateTime?);
+                        //if (deliveryDelayedUntilUtc.HasValue && subExpirationDateUtc.HasValue
+                        //    && deliveryDelayedUntilUtc.Value > subExpirationDateUtc.Value)
+                        //    break; // Skip this one, it would have been expired immedi
 
-                            // Delivery can be initially delayed, but it cannot exceed the expirationdate (would be useless)
-                            var deliveryDelayedUntilUtc = subscription.DeliveryDelay.HasValue ? newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value) : default(DateTime?);
-                            //if (deliveryDelayedUntilUtc.HasValue && subExpirationDateUtc.HasValue
-                            //    && deliveryDelayedUntilUtc.Value > subExpirationDateUtc.Value)
-                            //    break; // Skip this one, it would have been expired immedi
+                        var newSubscriptionEvent = new SubscriptionEvent
+                        {
+                            SubscriptionId = subscription.Id.Value,
+                            TopicEventId = newTopicEvent.Id.Value,
+                            PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
+                            FunctionalKey = newTopicEvent.FunctionalKey,
+                            PayloadId = newTopicEvent.PayloadId,
+                            Payload = null, // Only used when consuming
+                            ExpirationDateUtc = subExpirationDateUtc,
+                            DeliveryDelayedUntilUtc = deliveryDelayedUntilUtc,
+                            DeliveryCount = 0,
+                            DeliveryKey = null,
+                            InvisibleUntilUtc = null,
+                        };
 
-                            var newSubscriptionEvent = new SubscriptionEvent
-                            {
-                                SubscriptionId = subscription.Id.Value,
-                                TopicEventId = newTopicEvent.Id.Value,
-                                PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
-                                FunctionalKey = newTopicEvent.FunctionalKey,
-                                PayloadId = newTopicEvent.PayloadId,
-                                Payload = null, // Only used when consuming
-                                ExpirationDateUtc = subExpirationDateUtc,
-                                DeliveryDelayedUntilUtc = deliveryDelayedUntilUtc,
-                                DeliveryCount = 0,
-                                DeliveryKey = null,
-                                InvisibleUntilUtc = null,
-                            };
-                            return repo.AddSubscriptionEvent(newSubscriptionEvent);
-                        });
+                        if (repo.ParallelQueriesSupport)
+                            subTasks.Add(repo.AddSubscriptionEvent(newSubscriptionEvent));
+                        else
+                            await repo.AddSubscriptionEvent(newSubscriptionEvent).ConfigureAwait(false);
+                    };
 
-                    // Wait for all tasks to complete
-                    await Task.WhenAll(subTasks.ToArray()); // No timeout: db-commandtimeout will do
+                    if (subTasks.Count > 0) // Wait for all tasks (if any) to complete
+                        await Task.WhenAll(subTasks.ToArray()); // No timeout: db-commandtimeout will do
+
                     await repo.CommitTransaction();
 
                     // Return the topic event
