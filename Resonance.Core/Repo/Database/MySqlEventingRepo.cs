@@ -11,6 +11,7 @@ using Resonance.Models;
 using Resonance.Repo.InternalModels;
 using Newtonsoft.Json;
 using MySql.Data.MySqlClient;
+using System.Data.Common;
 
 namespace Resonance.Repo.Database
 {
@@ -22,7 +23,7 @@ namespace Resonance.Repo.Database
         /// <summary>
         /// Creates a new MsSqlEventingRepo.
         /// </summary>
-        /// <param name="conn">IDbConnection to use. If not yet opened, it will be opened here.</param>
+        /// <param name="conn">IDbConnection to use.</param>
         public MySqlEventingRepo(MySqlConnection conn)
             : base(conn)
         {
@@ -33,32 +34,41 @@ namespace Resonance.Repo.Database
             get { return "LAST_INSERT_ID()"; }
         }
 
-        public override int UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
+        protected override bool CanRetry(DbException dbEx, int attempts)
+        {
+            var mysqlEx = dbEx as MySqlException;
+            if (mysqlEx != null && mysqlEx.Number == 1213 && attempts < 3) // After 3 attempts give up deadlocks
+                return true;
+            else
+                return base.CanRetry(dbEx, attempts);
+        }
+
+        public override async Task<int> UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
             var query = "INSERT INTO LastConsumedSubscriptionEvent (SubscriptionId, FunctionalKey, PublicationDateUtc)" +
                 " VALUES(@subscriptionId, @functionalKey, @publicationDateUtc)" +
                 " ON DUPLICATE KEY UPDATE PublicationDateUtc = @publicationDateUtc";
 
-            return TranExecute(query, new Dictionary<string, object>
+            return await TranExecuteAsync(query, new Dictionary<string, object>
             {
                 { "@subscriptionId", subscriptionEvent.SubscriptionId },
                 { "@functionalKey", subscriptionEvent.FunctionalKey },
                 { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
-            });
+            }).ConfigureAwait(false);
         }
 
-        protected override IEnumerable<ConsumableEvent> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
+        protected override async Task<IEnumerable<ConsumableEvent>> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
         {
             // TODO: Optimize when not ordered: use old code
 
             // 1. Lock and get ids
-            var lockedIds = LockNextSubscriptionEvents(subscription.Id.Value, subscription.Ordered, visibilityTimeout, maxCount);
+            var lockedIds = await LockNextSubscriptionEvents(subscription.Id.Value, subscription.Ordered, visibilityTimeout, maxCount).ConfigureAwait(false);
 
             // 2. Get se details
             var ces = new List<ConsumableEvent>();
             foreach (var sId in lockedIds)
             {
-                ces.Add(GetConsumableEvent(sId));
+                ces.Add(await GetConsumableEvent(sId).ConfigureAwait(false));
             }
 
             return ces;
@@ -69,20 +79,21 @@ namespace Resonance.Repo.Database
         /// </summary>
         /// <param name="sId">SubscriptionEventId</param>
         /// <returns></returns>
-        private ConsumableEvent GetConsumableEvent(Int64 sId)
+        private async Task<ConsumableEvent> GetConsumableEvent(Int64 sId)
         {
             var query = $"select se.Id, se.DeliveryKey, se.FunctionalKey, se.InvisibleUntilUtc, se.PayloadId" + // Get the minimal amount of data
                 " from SubscriptionEvent se where se.Id = @sId";
-            var ce = TranQuery<ConsumableEvent>(query, new { sId = sId }).SingleOrDefault();
+            var ces = await TranQueryAsync<ConsumableEvent>(query, new { sId = sId }).ConfigureAwait(false);
+            var ce = ces.SingleOrDefault();
             if (ce != null && ce.PayloadId.HasValue)
             {
-                ce.Payload = GetPayload(ce.PayloadId.Value);
+                ce.Payload = await GetPayload(ce.PayloadId.Value).ConfigureAwait(false);
                 ce.PayloadId = null; // No reason to keep it
             }
             return ce;
         }
 
-        private IEnumerable<Int64> LockNextSubscriptionEvents(Int64 subscriptionId, bool ordered, int visibilityTimeout, int maxCount)
+        private async Task<IEnumerable<Int64>> LockNextSubscriptionEvents(Int64 subscriptionId, bool ordered, int visibilityTimeout, int maxCount)
         {
             var maxCountToUse = ordered ? 1 : maxCount; // Fix to one, when using functional ordering
 
@@ -117,14 +128,15 @@ namespace Resonance.Repo.Database
                         ");" +
                         "select @updatedSeId;";
 
-                    var sId = TranQuery<Int64?>(query,
+                    var sIds = await TranQueryAsync<Int64?>(query,
                         new Dictionary<string, object>
                         {
                         { "@subscriptionId", subscriptionId },
                         { "@utcNow", DateTime.UtcNow },
                         { "@deliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },
-                        }).SingleOrDefault();
+                        }).ConfigureAwait(false);
+                    var sId = sIds.SingleOrDefault();
                     if (sId.HasValue && sId.Value > 0) // MySql returns the 0 used to initialize this variable with.
                         lockedIds.Add(sId.Value);
                     else
@@ -172,14 +184,15 @@ namespace Resonance.Repo.Database
                         ");" +
                         "select @updatedSeId;";
 
-                    var sId = TranQuery<Int64?>(query,
+                    var sIds = await TranQueryAsync<Int64?>(query,
                         new Dictionary<string, object>
                         {
                         { "@subscriptionId", subscriptionId },
                         { "@utcNow", DateTime.UtcNow },
                         { "@deliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },
-                        }).SingleOrDefault();
+                        }).ConfigureAwait(false);
+                    var sId = sIds.SingleOrDefault();
                     if (sId.HasValue && sId.Value > 0) // MySql returns the 0 used to initialize this variable with.
                         lockedIds.Add(sId.Value);
                     else

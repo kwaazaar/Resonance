@@ -53,8 +53,8 @@ namespace Resonance.Demo
             var consumer = serviceProvider.GetRequiredService<IEventConsumer>();
 
             // Make sure the topic exists
-            var topic1 = publisher.GetTopicByName("Demo Topic 1") ?? publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic 1" });
-            var topic2 = publisher.GetTopicByName("Demo Topic 2") ?? publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic 2" });
+            var topic1 = publisher.GetTopicByName("Demo Topic 1") ??  publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic 1" });
+            var topic2 = publisher.GetTopicByName("Demo Topic 2") ??  publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic 2" });
             var subscription1 = consumer.GetSubscriptionByName("Demo Subscription 1");
             if (subscription1 == null)
                 subscription1 = consumer.AddOrUpdateSubscription(new Subscription
@@ -114,10 +114,10 @@ namespace Resonance.Demo
             //    consumer.MarkConsumed(ce.Id, ce.DeliveryKey);
 
             var worker = new EventConsumptionWorker(consumer,
-                "Demo Subscription 2", (ceW) =>
+                "Demo Subscription 1", (ceW) =>
                 {
                     //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
-                    return DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded;
+                    return Task.FromResult<ConsumeResult>(DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded);
                 }, maxThreads: 10, minBackOffDelayInMs: 0,
                 logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>());
             worker.Start();

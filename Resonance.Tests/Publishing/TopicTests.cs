@@ -28,7 +28,7 @@ namespace Resonance.Tests.Publishing
             var topicNotes = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
 
             // Act
-            var returnedTopic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName, Notes = topicNotes });
+            var returnedTopic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName, Notes = topicNotes }).Result;
 
             // Assert
             Assert.Equal(topicName, returnedTopic.Name);
@@ -45,9 +45,9 @@ namespace Resonance.Tests.Publishing
             var topicNotes = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
 
             // Act
-            var addedTopic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName, Notes = topicNotes });
+            var addedTopic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName, Notes = topicNotes }).Result;
             var topicToBeUpdated = new Topic { Id = addedTopic.Id, Name = addedTopic.Name + "_updated", Notes = "updated_" + addedTopic.Notes };
-            var updatedTopic = _publisher.AddOrUpdateTopic(topicToBeUpdated);
+            var updatedTopic = _publisher.AddOrUpdateTopicAsync(topicToBeUpdated).Result;
 
             // Assert
             Assert.Equal(updatedTopic.Id.Value, addedTopic.Id.Value); // Use id from addedTopic, to make sure the id was not modified by the EventPublisher itself
@@ -63,15 +63,15 @@ namespace Resonance.Tests.Publishing
             var topicNotes = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
 
             // Act
-            var addedTopic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName, Notes = topicNotes });
-            _publisher.DeleteTopic(addedTopic.Id.Value, true);
+            var addedTopic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName, Notes = topicNotes }).Result;
+            _publisher.DeleteTopicAsync(addedTopic.Id.Value, true).Wait();
 
             // Assert
-            Assert.Null(_publisher.GetTopic(addedTopic.Id.Value));
+            Assert.Null(_publisher.GetTopicAsync(addedTopic.Id.Value).Result);
 
             // Act
-            var addedTopicWithSubscriptions = _publisher.AddOrUpdateTopic(new Topic { Name = topicName + "_WithSubs", Notes = topicNotes });
-            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
+            var addedTopicWithSubscriptions = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName + "_WithSubs", Notes = topicNotes }).Result;
+            var sub1 = _consumer.AddOrUpdateSubscriptionAsync(new Subscription
             {
                 Name = addedTopicWithSubscriptions.Name + "_Sub1",
                 TopicSubscriptions = new List<TopicSubscription>
@@ -85,18 +85,18 @@ namespace Resonance.Tests.Publishing
                         },
                     },
                 },
-            });
-            _publisher.Publish(addedTopicWithSubscriptions.Name, payload: "test"); // Make sure there are also TopicEvents and SubscriptionEvents
+            }).Result;
+            _publisher.PublishAsync(addedTopicWithSubscriptions.Name, payload: "test").Wait(); // Make sure there are also TopicEvents and SubscriptionEvents
 
             // Assert/act
-            Assert.ThrowsAny<Exception>(() => _publisher.DeleteTopic(addedTopicWithSubscriptions.Id.Value, false));
-            Assert.NotNull(_publisher.GetTopic(addedTopicWithSubscriptions.Id.Value));
+            Assert.ThrowsAny<Exception>(() => _publisher.DeleteTopicAsync(addedTopicWithSubscriptions.Id.Value, false).Wait());
+            Assert.NotNull(_publisher.GetTopicAsync(addedTopicWithSubscriptions.Id.Value).Result);
 
             // Act
-            _publisher.DeleteTopic(addedTopicWithSubscriptions.Id.Value, true);
+            _publisher.DeleteTopicAsync(addedTopicWithSubscriptions.Id.Value, true).Wait();
             
             // Assert
-            Assert.Null(_publisher.GetTopic(addedTopicWithSubscriptions.Id.Value));
+            Assert.Null(_publisher.GetTopicAsync(addedTopicWithSubscriptions.Id.Value).Result);
         }
 
         [Fact]
@@ -104,11 +104,11 @@ namespace Resonance.Tests.Publishing
         {
             // Arrange
             var topicName = "Publishing.TopicTests.GetTopicById";
-            _publisher.AddOrUpdateTopic(new Topic { Name = Guid.NewGuid().ToString() }); // Add another to make sure it actually finds it
-            var topicId = _publisher.AddOrUpdateTopic(new Topic { Name = topicName }).Id.Value;
+            _publisher.AddOrUpdateTopicAsync(new Topic { Name = Guid.NewGuid().ToString() }).Wait(); // Add another to make sure it actually finds it
+            var topicId = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result.Id.Value;
 
             // Act
-            var topic = _publisher.GetTopic(topicId);
+            var topic = _publisher.GetTopicAsync(topicId).Result;
 
             // Assert
             Assert.NotNull(topic);
@@ -120,12 +120,12 @@ namespace Resonance.Tests.Publishing
         {
             // Arrange
             var topicName = "Publishing.TopicTests.GetTopicByName";
-            _publisher.AddOrUpdateTopic(new Topic { Name = topicName + "!" }); // Add look-a-likes
-            _publisher.AddOrUpdateTopic(new Topic { Name = "!" + topicName });
-            var topicToBeFound = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName + "!" }).Wait(); // Add look-a-likes
+            _publisher.AddOrUpdateTopicAsync(new Topic { Name = "!" + topicName }).Wait();
+            var topicToBeFound = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
 
             // Act
-            var topic = _publisher.GetTopicByName(topicName);
+            var topic = _publisher.GetTopicByNameAsync(topicName).Result;
 
             // Assert
             Assert.NotNull(topic);
@@ -139,13 +139,13 @@ namespace Resonance.Tests.Publishing
         {
             // Arrange
             var topicName = "Publishing.TopicTests.GetTopics";
-            _publisher.AddOrUpdateTopic(new Topic { Name = Guid.NewGuid().ToString() });
-            _publisher.AddOrUpdateTopic(new Topic { Name = topicName + "1" });
-            _publisher.AddOrUpdateTopic(new Topic { Name = topicName + "2" });
-            _publisher.AddOrUpdateTopic(new Topic { Name = topicName + "3" });
+            _publisher.AddOrUpdateTopicAsync(new Topic { Name = Guid.NewGuid().ToString() }).Wait();
+            _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName + "1" }).Wait();
+            _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName + "2" }).Wait();
+            _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName + "3" }).Wait();
 
             // Act
-            var topics = _publisher.GetTopics();
+            var topics = _publisher.GetTopicsAsync().Result;
 
             // Assert
             Assert.NotNull(topics);
@@ -155,7 +155,7 @@ namespace Resonance.Tests.Publishing
             Assert.True(topics.Any((t) => t.Name == topicName + "3"));
 
             // Act
-            topics = _publisher.GetTopics(topicName);
+            topics = _publisher.GetTopicsAsync(topicName).Result;
             Assert.NotNull(topics);
             Assert.True(topics.Count() == 3);
             Assert.True(topics.Any((t) => t.Name == topicName + "1"));

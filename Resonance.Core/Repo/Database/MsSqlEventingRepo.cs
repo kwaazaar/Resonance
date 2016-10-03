@@ -20,15 +20,21 @@ namespace Resonance.Repo.Database
     public class MsSqlEventingRepo : DbEventingRepo, IEventingRepo
     {
         /// <summary>
+        /// ConnectionStringBuilder for easy access to properties of the connectionstring used.
+        /// </summary>
+        private readonly SqlConnectionStringBuilder _connStringBuilder;
+
+        /// <summary>
         /// Creates a new MsSqlEventingRepo.
         /// </summary>
-        /// <param name="conn">IDbConnection to use. If not yet opened, it will be opened here.</param>
+        /// <param name="conn">IDbConnection to use.</param>
         public MsSqlEventingRepo(SqlConnection conn)
             : base(conn)
         {
+            _connStringBuilder = new SqlConnectionStringBuilder(conn.ConnectionString);
         }
 
-        public override bool CanRetry(DbException dbEx, int attempts)
+        protected override bool CanRetry(DbException dbEx, int attempts)
         {
             var sqlEx = dbEx as SqlException;
             if (sqlEx != null && sqlEx.Number == 1205 && attempts < 3) // After 3 attempts give up deadlocks
@@ -37,12 +43,14 @@ namespace Resonance.Repo.Database
                 return base.CanRetry(dbEx, attempts);
         }
 
+        public override bool ParallelQueriesSupport { get { return _connStringBuilder.MultipleActiveResultSets; } } // 'MARS' must be enabled in the connectionstring
+
         public override string GetLastAutoIncrementValue
         {
             get { return "SCOPE_IDENTITY()"; }
         }
 
-        public override int UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
+        public override async Task<int> UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
             var query = "MERGE LastConsumedSubscriptionEvent AS target" +
                             " USING(SELECT @subscriptionId, @functionalKey) as source(SubscriptionId, FunctionalKey)" +
@@ -50,19 +58,19 @@ namespace Resonance.Repo.Database
                             " WHEN MATCHED THEN UPDATE SET PublicationDateUtc = @publicationDateUtc" +
                             " WHEN NOT MATCHED THEN INSERT(SubscriptionId, FunctionalKey, PublicationDateUtc) VALUES(source.SubscriptionId, source.FunctionalKey, @publicationDateUtc);";
 
-            return TranExecute(query, new Dictionary<string, object>
+            return await TranExecuteAsync(query, new Dictionary<string, object>
             {
                 { "@subscriptionId", subscriptionEvent.SubscriptionId },
                 { "@functionalKey", subscriptionEvent.FunctionalKey },
                 { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
-            });
+            }).ConfigureAwait(false);
         }
 
-        protected override IEnumerable<ConsumableEvent> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
+        protected override async Task<IEnumerable<ConsumableEvent>> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
         {
             int maxCountToUse = maxCount;
 
-            List<ConsumableEvent> ces = null;
+            var ces = new List<ConsumableEvent>();
 
             if (!subscription.Ordered)
             {
@@ -89,18 +97,16 @@ namespace Resonance.Repo.Database
                     + " from SubscriptionEvent se"
                     + " join @l_PBEIds pbe on pbe.Id = se.Id";
 
-                ces = TranQuery<ConsumableEvent>(query,
+                ces.AddRange(await TranQueryAsync<ConsumableEvent>(query,
                         new Dictionary<string, object>
                         {
                             { "@subscriptionId", subscription.Id.Value },
                             { "@utcNow", DateTime.UtcNow },
                             { "@invisibleUntilUtc", invisibleUntilUtc },
-                        }).ToList();
+                        }).ConfigureAwait(false));
             }
             else // Functional ordering
             {
-                ces = new List<ConsumableEvent>();
-
                 for (int i = 0; i < maxCountToUse; i++) // Ordered altijd per 1 raadplegen
                 {
                     var deliveryKey = Guid.NewGuid().ToString();
@@ -137,15 +143,15 @@ namespace Resonance.Repo.Database
                         + " from SubscriptionEvent se"
                         + " join @l_PBEIds pbe on pbe.Id = se.Id";
 
-                    var cesInLoop = TranQuery<ConsumableEvent>(query,
+                    var cesInLoop = await TranQueryAsync<ConsumableEvent>(query,
                                         new Dictionary<string, object>
                                         {
                                             { "@subscriptionId", subscription.Id.Value },
                                             { "@utcNow", DateTime.UtcNow },
                                             { "@deliveryKey", deliveryKey },
                                             { "@invisibleUntilUtc", invisibleUntilUtc },
-                                        }).ToList();
-                    if (cesInLoop.Count > 0)
+                                        }).ConfigureAwait(false);
+                    if (cesInLoop.Count() > 0)
                         ces.AddRange(cesInLoop);
                     else
                         break; // Nothing found anymore, escape from the for-loop
@@ -156,7 +162,7 @@ namespace Resonance.Repo.Database
             {
                 if (ce.PayloadId.HasValue)
                 {
-                    ce.Payload = GetPayload(ce.PayloadId.Value);
+                    ce.Payload = await GetPayload(ce.PayloadId.Value).ConfigureAwait(false);
                     ce.PayloadId = null; // No reason to keep it
                 }
             }

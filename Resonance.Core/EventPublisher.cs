@@ -17,50 +17,88 @@ namespace Resonance
             _repoFactory = repoFactory;
         }
 
+        #region Sync
         public Topic AddOrUpdateTopic(Topic topic)
         {
-            using (var repo = _repoFactory.CreateRepo())
-                return repo.AddOrUpdateTopic(topic);
+            return AddOrUpdateTopicAsync(topic).GetAwaiter().GetResult();
         }
 
-        public void DeleteTopic(Int64 id, bool inclSubscriptions)
+        public void DeleteTopic(long id, bool inclSubscriptions)
         {
-            using (var repo = _repoFactory.CreateRepo())
-                repo.DeleteTopic(id, inclSubscriptions);
+            DeleteTopicAsync(id, inclSubscriptions).GetAwaiter().GetResult();
         }
 
-        public Topic GetTopic(Int64 id)
+        public Topic GetTopic(long id)
         {
-            using (var repo = _repoFactory.CreateRepo())
-                return repo.GetTopic(id);
+            return GetTopicAsync(id).GetAwaiter().GetResult();
         }
 
         public Topic GetTopicByName(string name)
         {
-            using (var repo = _repoFactory.CreateRepo())
-                return repo.GetTopicByName(name);
+            return GetTopicByNameAsync(name).GetAwaiter().GetResult();
         }
 
         public IEnumerable<Topic> GetTopics(string partOfName = null)
         {
-            using (var repo = _repoFactory.CreateRepo())
-                return repo.GetTopics(partOfName).ToList();
+            return GetTopicsAsync(partOfName).GetAwaiter().GetResult();
         }
 
         public TopicEvent Publish(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, string payload = null)
         {
+            return PublishAsync(topicName, publicationDateUtc, expirationDateUtc, functionalKey, headers, payload).GetAwaiter().GetResult();
+        }
+
+        public TopicEvent Publish<T>(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, T payload = null) where T : class
+        {
+            return PublishAsync<T>(topicName, publicationDateUtc, expirationDateUtc, functionalKey, headers, payload).GetAwaiter().GetResult();
+        }
+        #endregion
+
+        #region Async
+        public async Task<Topic> AddOrUpdateTopicAsync(Topic topic)
+        {
+            using (var repo = _repoFactory.CreateRepo())
+                return await repo.AddOrUpdateTopic(topic);
+        }
+
+        public async Task DeleteTopicAsync(Int64 id, bool inclSubscriptions)
+        {
+            using (var repo = _repoFactory.CreateRepo())
+                await repo.DeleteTopic(id, inclSubscriptions);
+        }
+
+        public async Task<Topic> GetTopicAsync(Int64 id)
+        {
+            using (var repo = _repoFactory.CreateRepo())
+                return await repo.GetTopic(id);
+        }
+
+        public async Task<Topic> GetTopicByNameAsync(string name)
+        {
+            using (var repo = _repoFactory.CreateRepo())
+                return await repo.GetTopicByName(name);
+        }
+
+        public async Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null)
+        {
+            using (var repo = _repoFactory.CreateRepo())
+                return await repo.GetTopics(partOfName);
+        }
+
+        public async Task<TopicEvent> PublishAsync(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, string payload = null)
+        {
             using (var repo = _repoFactory.CreateRepo())
             {
-                var topic = repo.GetTopicByName(topicName);
+                var topic = await repo.GetTopicByName(topicName);
                 if (topic == null)
                     throw new ArgumentException($"Topic with name {topicName} not found", "topicName");
 
                 // Store payload (outside transaction, no need to lock right now already)
-                var payloadId = (payload != null) ? repo.StorePayload(payload) : default(Int64?);
+                var payloadId = (payload != null) ? await repo.StorePayload(payload) : default(Int64?);
 
-                var subscriptions = repo.GetSubscriptions(topicId: topic.Id).ToList();
+                var subscriptions = await repo.GetSubscriptions(topicId: topic.Id);
 
-                repo.BeginTransaction();
+                await repo.BeginTransaction();
                 try
                 {
                     // Store topic event
@@ -73,66 +111,92 @@ namespace Resonance
                         Headers = headers,
                         PayloadId = payloadId,
                     };
-                    var topicEventId = repo.AddTopicEvent(newTopicEvent);
+                    var topicEventId = await repo.AddTopicEvent(newTopicEvent);
                     newTopicEvent.Id = topicEventId;
 
-                    foreach (var subscription in subscriptions)
+                    // Determine for which subscriptions the topic must be published
+                    var subscriptionsMatching = subscriptions
+                        .Where((s) => s.TopicSubscriptions.Any((ts) => ((ts.TopicId == topic.Id.Value) && ts.Enabled && (!ts.Filtered || CheckFilters(ts.Filters, headers)))))
+                        .Distinct(); // Nessecary when one subscription has more than once topicsubscription for the same topic (probably with different filters)
+
+                    // Create tasks for each subscription
+                    var subTasks = new List<Task<Int64>>();
+                    foreach (var subscription in subscriptionsMatching)
                     {
-                        // Create SubscriptionEvents for topicsubscriptions for the specified topic that are enabled
-                        foreach (var topicSubscription in subscription.TopicSubscriptions
-                            .Where((ts) => ts.TopicId == topic.Id.Value) // Correct topic
-                            .Where((ts) => ts.Enabled) // Enabled
-                            .Where((ts) => !ts.Filtered || CheckFilters(ts.Filters, headers))) // Filters match
+                        // By default a SubscriptionEvent takes expirationdate of TopicEvent
+                        var subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
+
+                        // If subscription has its own TTL, it will be applied, but may never exceed the TopicEvent expiration
+                        if (subscription.TimeToLive.HasValue)
                         {
-                            // By default a SubscriptionEvent takes expirationdate of TopicEvent
-                            var subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
-
-                            // If subscription has its own TTL, it will be applied, but may never exceed the TopicEvent expiration
-                            if (subscription.TimeToLive.HasValue)
-                            {
-                                subExpirationDateUtc = newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.TimeToLive.Value);
-                                if (newTopicEvent.ExpirationDateUtc.HasValue && (newTopicEvent.ExpirationDateUtc.Value < subExpirationDateUtc))
-                                    subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
-                            }
-
-                            // Delivery can be initially delayed, but it cannot exceed the expirationdate (would be useless)
-                            var deliveryDelayedUntilUtc = subscription.DeliveryDelay.HasValue ? newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value) : default(DateTime?);
-                            //if (deliveryDelayedUntilUtc.HasValue && subExpirationDateUtc.HasValue
-                            //    && deliveryDelayedUntilUtc.Value > subExpirationDateUtc.Value)
-                            //    break; // Skip this one, it would have been expired immedi
-
-                            var newSubscriptionEvent = new SubscriptionEvent
-                            {
-                                SubscriptionId = subscription.Id.Value,
-                                TopicEventId = newTopicEvent.Id.Value,
-                                PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
-                                FunctionalKey = newTopicEvent.FunctionalKey,
-                                PayloadId = newTopicEvent.PayloadId,
-                                Payload = null, // Only used when consuming
-                                ExpirationDateUtc = subExpirationDateUtc,
-                                DeliveryDelayedUntilUtc = deliveryDelayedUntilUtc,
-                                DeliveryCount = 0,
-                                DeliveryKey = null,
-                                InvisibleUntilUtc = null,
-                            };
-                            repo.AddSubscriptionEvent(newSubscriptionEvent);
+                            subExpirationDateUtc = newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.TimeToLive.Value);
+                            if (newTopicEvent.ExpirationDateUtc.HasValue && (newTopicEvent.ExpirationDateUtc.Value < subExpirationDateUtc))
+                                subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
                         }
-                    }
 
-                    repo.CommitTransaction();
+                        // Delivery can be initially delayed, but it cannot exceed the expirationdate (would be useless)
+                        var deliveryDelayedUntilUtc = subscription.DeliveryDelay.HasValue ? newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value) : default(DateTime?);
+                        //if (deliveryDelayedUntilUtc.HasValue && subExpirationDateUtc.HasValue
+                        //    && deliveryDelayedUntilUtc.Value > subExpirationDateUtc.Value)
+                        //    break; // Skip this one, it would have been expired immedi
+
+                        var newSubscriptionEvent = new SubscriptionEvent
+                        {
+                            SubscriptionId = subscription.Id.Value,
+                            TopicEventId = newTopicEvent.Id.Value,
+                            PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
+                            FunctionalKey = newTopicEvent.FunctionalKey,
+                            PayloadId = newTopicEvent.PayloadId,
+                            Payload = null, // Only used when consuming
+                            ExpirationDateUtc = subExpirationDateUtc,
+                            DeliveryDelayedUntilUtc = deliveryDelayedUntilUtc,
+                            DeliveryCount = 0,
+                            DeliveryKey = null,
+                            InvisibleUntilUtc = null,
+                        };
+
+                        if (repo.ParallelQueriesSupport)
+                            subTasks.Add(repo.AddSubscriptionEvent(newSubscriptionEvent));
+                        else
+                            await repo.AddSubscriptionEvent(newSubscriptionEvent).ConfigureAwait(false);
+                    };
+
+                    if (subTasks.Count > 0) // Wait for all tasks (if any) to complete
+                        await Task.WhenAll(subTasks.ToArray()); // No timeout: db-commandtimeout will do
+
+                    await repo.CommitTransaction();
 
                     // Return the topic event
                     return newTopicEvent;
                 }
-                catch (Exception)
+                catch (AggregateException aggrEx)
                 {
-                    repo.RollbackTransaction();
+                    await repo.RollbackTransaction();
 
                     if (payloadId.HasValue)
                     {
                         try
                         {
-                            repo.DeletePayload(payloadId.Value);
+                            await repo.DeletePayload(payloadId.Value);
+                        }
+                        catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
+                    }
+
+                    var firstInnerEx = aggrEx.InnerExceptions.FirstOrDefault();
+                    if (firstInnerEx != null)
+                        throw firstInnerEx; // Do we want this?
+                    else
+                        throw;
+                }
+                catch (Exception)
+                {
+                    await repo.RollbackTransaction();
+
+                    if (payloadId.HasValue)
+                    {
+                        try
+                        {
+                            await repo.DeletePayload(payloadId.Value);
                         }
                         catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
                     }
@@ -141,14 +205,15 @@ namespace Resonance
             }
         }
 
-        public TopicEvent Publish<T>(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, T payload = null) where T : class
+        public async Task<TopicEvent> PublishAsync<T>(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, T payload = null) where T : class
         {
             string payloadAsString = null;
             if (payload != null)
-                payloadAsString = JsonConvert.SerializeObject(payload); // No specific parameters: the consumer must understand the json as well
+                payloadAsString = await Task.Factory.StartNew(() => JsonConvert.SerializeObject(payload)); // No specific parameters: the consumer must understand the json as well
 
-            return Publish(topicName, publicationDateUtc, expirationDateUtc, functionalKey, headers, payloadAsString);
+            return await PublishAsync(topicName, publicationDateUtc, expirationDateUtc, functionalKey, headers, payloadAsString);
         }
+        #endregion
 
         private bool CheckFilters(List<TopicSubscriptionFilter> filters, Dictionary<string, string> headers)
         {
