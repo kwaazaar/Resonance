@@ -235,13 +235,13 @@ namespace Resonance
 
         private bool CheckFilters(TopicSubscriptionFilter filter, Dictionary<string, string> headers)
         {
-            if (!headers.Any((h) => h.Key.Equals(filter.Header, StringComparison.OrdinalIgnoreCase)))
+            if (!headers.Any((h) => h.Key.Equals(filter.Header, StringComparison.OrdinalIgnoreCase))) // Header must be provided, otherwise mismatch anyway (even with MatchExpression '*')
                 return false;
 
             if (filter.MatchExpression == "*") return true;
 
             var headerValue = headers.First((h) => h.Key.Equals(filter.Header, StringComparison.OrdinalIgnoreCase)).Value;
-            var endsWith = filter.MatchExpression.EndsWith("*");
+            var endsWith = filter.MatchExpression.StartsWith("*");
             var startsWith = filter.MatchExpression.EndsWith("*");
 
             if (endsWith && startsWith)
@@ -253,12 +253,12 @@ namespace Resonance
             else if (endsWith)
             {
                 return ((filter.MatchExpression.Length >= 2)
-                    && headerValue.StartsWith(filter.MatchExpression.Substring(0, filter.MatchExpression.Length - 1), StringComparison.OrdinalIgnoreCase));
+                    && headerValue.EndsWith(filter.MatchExpression.Substring(1, filter.MatchExpression.Length - 1), StringComparison.OrdinalIgnoreCase));
             }
             else if (startsWith)
             {
                 return ((filter.MatchExpression.Length >= 2)
-                    && headerValue.EndsWith(filter.MatchExpression.Substring(1, filter.MatchExpression.Length - 1), StringComparison.OrdinalIgnoreCase));
+                    && headerValue.StartsWith(filter.MatchExpression.Substring(0, filter.MatchExpression.Length - 1), StringComparison.OrdinalIgnoreCase));
             }
             else
             {
