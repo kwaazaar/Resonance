@@ -2,7 +2,7 @@
   "title": "Resonance",
   "copyright": "Copyright 2016 - Robert te Kaat",
   "description": "Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc.",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "authors": [ "Robert te Kaat" ],
 
   "buildOptions": {
@@ -34,10 +34,10 @@
   },
 
   "packOptions": {
-    "summary": "Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc.",
+    "summary": "Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc. To get a quick idea, check the repo on GitHub for documentation and code samples: https://github.com/kwaazaar/Resonance",
     "tags": [ "pub", "sub", "esb", "queue", "topic", "subscription", "microservice", "messaging", "event", "publish", "subscribe", "mssql", "mysql", "netcore" ],
     "owners": [ "Robert te Kaat" ],
-    "releaseNotes": "To get a quick idea, check the repo on GitHub for documentation and code samples: https://github.com/kwaazaar/Resonance",
+    "releaseNotes": "Now all async methods are supported, fixes for deadlocks on MySql, small performance improvement on MsSql and fixed header filters.",
     "iconUrl": "https://msg.blob.core.windows.net/resonance/Resonance-Icon-64x64.png",
     "projectUrl": "https://github.com/kwaazaar/Resonance",
     "licenseUrl": "https://opensource.org/licenses/MIT",
