@@ -246,9 +246,8 @@ namespace Resonance
 
             if (endsWith && startsWith)
             {
-#warning TODO: fix endwith+startswith filter
                 return ((filter.MatchExpression.Length >= 3)
-                    && filter.MatchExpression.Substring(1).Substring(0, filter.MatchExpression.Length - 2).Equals(headerValue, StringComparison.OrdinalIgnoreCase));
+                    && headerValue.ToLowerInvariant().Contains(filter.MatchExpression.Substring(1).Substring(0, filter.MatchExpression.Length - 2).ToLowerInvariant()));
             }
             else if (endsWith)
             {

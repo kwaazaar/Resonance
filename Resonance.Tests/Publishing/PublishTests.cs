@@ -153,7 +153,7 @@ namespace Resonance.Tests.Publishing
                         Filtered = true,
                         Filters = new List<TopicSubscriptionFilter>
                         {
-                            new TopicSubscriptionFilter { Header="Headr1", MatchExpression="HdrValue", }
+                            new TopicSubscriptionFilter { Header="Headr1", MatchExpression="HdrVALUE", }
                         },
                     },
                 },
@@ -166,7 +166,7 @@ namespace Resonance.Tests.Publishing
             // Assert
             var se1 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
             Assert.NotNull(se1);
-            Assert.Equal(te1.FunctionalKey, se1.FunctionalKey);
+            Assert.Equal(te1.FunctionalKey, se1.FunctionalKey); // Must match, filters are always case insensitive
             var se2 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
             Assert.Null(se2); // Does not have "Headr1"-header
             _consumer.MarkConsumed(se1.Id, se1.DeliveryKey);
@@ -205,7 +205,7 @@ namespace Resonance.Tests.Publishing
                         Filtered = true,
                         Filters = new List<TopicSubscriptionFilter>
                         {
-                            new TopicSubscriptionFilter { Header="Headr1", MatchExpression="Hdr*", }
+                            new TopicSubscriptionFilter { Header="Headr1", MatchExpression="HdR*", }
                         },
                     },
                 },
@@ -224,6 +224,89 @@ namespace Resonance.Tests.Publishing
             Assert.Null(se2);
             var se3 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
             Assert.Null(se3);
+        }
+
+        [Fact]
+        public void PublishSingleSubscriberEndsWithFilter()
+        {
+            // Arrange
+            var topicName = "PublishSingleSubscriberEndsWithFilter";
+            var topic1 = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = Guid.NewGuid().ToString(),
+                TopicSubscriptions = new List<TopicSubscription>
+                {
+                    new TopicSubscription
+                    {
+                        TopicId = topic1.Id.Value, Enabled = true,
+                        Filtered = true,
+                        Filters = new List<TopicSubscriptionFilter>
+                        {
+                            new TopicSubscriptionFilter { Header="Headr1", MatchExpression="*VALUEa", }
+                        },
+                    },
+                },
+            });
+
+            // Act
+            var te1 = _publisher.Publish(topicName, functionalKey: "1", headers: new Dictionary<string, string> { { "Headr1", "HdrValueA" } }); // We (ab)use functionalkey for correlation
+            var te2 = _publisher.Publish(topicName, functionalKey: "2", headers: new Dictionary<string, string> { { "Headr1", "HdrValueB" } });
+            var te3 = _publisher.Publish(topicName, functionalKey: "3", headers: new Dictionary<string, string> { });
+
+            // Assert
+            var se1 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.NotNull(se1); // Value ends with "ValueA" (case insensitive)
+            Assert.Equal(te1.FunctionalKey, se1.FunctionalKey);
+            var se2 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.Null(se2);
+            var se3 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.Null(se3);
+        }
+
+        [Fact]
+        public void PublishSingleSubscriberStartsWithEndsWithFilter()
+        {
+            // Arrange
+            var topicName = "PublishSingleSubscriberSWEWFilter";
+            var topic1 = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = Guid.NewGuid().ToString(),
+                TopicSubscriptions = new List<TopicSubscription>
+                {
+                    new TopicSubscription
+                    {
+                        TopicId = topic1.Id.Value, Enabled = true,
+                        Filtered = true,
+                        Filters = new List<TopicSubscriptionFilter>
+                        {
+                            new TopicSubscriptionFilter { Header="Headr1", MatchExpression="*VaLuE*", }
+                        },
+                    },
+                },
+            });
+
+            // Act
+            var te1 = _publisher.Publish(topicName, functionalKey: "1", headers: new Dictionary<string, string> { { "Headr1", "XValueY" } }); // 1, 3 and 4 must match
+            var te2 = _publisher.Publish(topicName, functionalKey: "2", headers: new Dictionary<string, string> { { "Headr2", "MValueN" } });
+            var te3 = _publisher.Publish(topicName, functionalKey: "3", headers: new Dictionary<string, string> { { "Headr1", "PValue" } });
+            var te4 = _publisher.Publish(topicName, functionalKey: "4", headers: new Dictionary<string, string> { { "Headr1", "ValueQ" } });
+            var te5 = _publisher.Publish(topicName, functionalKey: "5", headers: new Dictionary<string, string> { { "Headr1", "NoMatch" } });
+            var te6 = _publisher.Publish(topicName, functionalKey: "6", headers: new Dictionary<string, string> { });
+
+            // Assert
+            var se1 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.NotNull(se1);
+            Assert.Equal(te1.FunctionalKey, se1.FunctionalKey);
+            var se3 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.NotNull(se3);
+            Assert.Equal(te3.FunctionalKey, se3.FunctionalKey);
+            var se4 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.NotNull(se4);
+            Assert.Equal(te4.FunctionalKey, se4.FunctionalKey);
+            var seNext = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.Null(seNext);
         }
     }
 }
