@@ -85,14 +85,14 @@ namespace Resonance
         /// <remarks>Override GetBackOffDelay to implement custom logic to determine the delay duration.</remarks>
         protected void BackOff()
         {
-            var timeout = this.GetBackOffDelay(this._attempts, this._minDelayInMs, this._maxDelayInMs);
-            if (timeout.TotalMilliseconds > 0)
+            var backoffDelay = this.GetBackOffDelay(this._attempts, this._minDelayInMs, this._maxDelayInMs);
+            if (backoffDelay.TotalMilliseconds > 0)
             {
-                LogTrace("Backing off for {0}", timeout);
+                LogTrace("Backing off for {backoffDelay}", backoffDelay);
 
                 try
                 {
-                    Task.WaitAll(new Task[] { Task.Delay(timeout) }, _cancellationToken.Token);
+                    Task.WaitAll(new Task[] { Task.Delay(backoffDelay) }, _cancellationToken.Token);
                 }
                 catch (OperationCanceledException) { }
             }
@@ -198,7 +198,7 @@ namespace Resonance
                     this._attempts++;
                     if (this._attempts == 1) // First time no events were found
                     {
-                        LogTrace("No consumable events found. Polling-timeout will increase from {0} till {1} milliseconds.", _minDelayInMs, _maxDelayInMs);
+                        LogTrace("No consumable events found. Polling-timeout will increase from {minDelayInMs} till {maxDelayInMs} milliseconds.", _minDelayInMs, _maxDelayInMs);
                     }
                     this.BackOff();
                 }
@@ -287,7 +287,7 @@ namespace Resonance
             }
             catch (Exception ex)
             {
-                LogError("Failed to get consumable event: {0}", ex);
+                LogError("Failed to get consumable event: {exception}", ex);
                 return null;
             }
         }
@@ -305,7 +305,7 @@ namespace Resonance
             }
             else
             {
-                LogWarning("ConsumableEvent with id {0} has expired: InvisibleUntilUtc ({1}) < UtcNow ({2}).",
+                LogWarning("ConsumableEvent with id {Id} has expired: InvisibleUntilUtc ({InvisibleUntilUtc}) < UtcNow ({UtcNow}).",
                     workItem.Id, workItem.InvisibleUntilUtc, DateTime.UtcNow);
                 return false;
             }
@@ -318,7 +318,7 @@ namespace Resonance
 
             try
             {
-                LogTrace("Processing event with id {0} and functional key {1}.",
+                LogTrace("Processing event with id {Id} and functional key {FunctionalKey}.",
                     ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a");
                 result = await _consumeAction(ce).ConfigureAwait(false);
             }
@@ -336,12 +336,12 @@ namespace Resonance
                 {
                     await _eventConsumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey).ConfigureAwait(false);
                     markedComplete = true;
-                    LogTrace("Event consumption succeeded for event with id {0} and functional key {1}.",
+                    LogTrace("Event consumption succeeded for event with id {Id} and functional key {FunctionalKey}.",
                         ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a");
                 }
                 catch (Exception ex)
                 {
-                    LogError("Failed to mark event consumed with id {0} and functional key {1}, cause event to be processes again! Details: {2}.",
+                    LogError("Failed to mark event consumed with id {Id} and functional key {FunctionalKey}, cause event to be processes again! Details: {Exception}.",
                         ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", ex);
                     // mustRollback hoeft eigenlijk niet geset te worden, want markedComplete zal niet meer true zijn
                     mustRollback = true;
@@ -354,7 +354,7 @@ namespace Resonance
             {
                 mustRollback = true;
                 // Let op: een exception anders dan BusinessEventWorkerException, wordt als corrupt beschouwd!
-                LogError("Exception occurred while processing event with id {0} and functional key {1}: {2}.",
+                LogError("Exception occurred while processing event with id {Id} and functional key {FunctionalKey}: {Reason}.",
                     ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", result.Reason);
 
                 try
@@ -367,7 +367,7 @@ namespace Resonance
             {
                 mustRollback = true;
                 var suspendedUntilUtc = this.Suspend(result.SuspendDuration.GetValueOrDefault(TimeSpan.FromSeconds(60)));
-                LogError("Event consumption failed for event with id {0} and functional key {1}. Processing suspended until {2} (UTC). Reason: {3}.",
+                LogError("Event consumption failed for event with id {Id} and functional key {FunctionalKey}. Processing suspended until {SuspendedUntilUtc} (UTC). Reason: {Reason}.",
                     ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", suspendedUntilUtc, result.Reason);
             }
             // MustRetry does nothing: default behaviour when not marked consumed/failed
@@ -396,7 +396,7 @@ namespace Resonance
         /// <param name="pollingEx"></param>
         protected virtual void PollingException(Exception pollingEx)
         {
-            LogError("Polling exception occurred: {0}", pollingEx);
+            LogError("Polling exception occurred: {Exception}", pollingEx);
         }
 
         #region Logging helpers
