@@ -12,6 +12,7 @@ using Resonance.Models;
 using Resonance.Repo.Database;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using Microsoft.Extensions.PlatformAbstractions;
 
 namespace Resonance.Demo
 {
@@ -132,8 +133,7 @@ namespace Resonance.Demo
         private static void ConfigureServices(IServiceCollection serviceCollection)
         {
             var builder = new ConfigurationBuilder()
-                //.SetBasePath(PlatformServices.Default.Application.ApplicationBasePath)
-                .SetBasePath(AppContext.BaseDirectory)
+                .SetBasePath(PlatformServices.Default.Application.ApplicationBasePath)
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
             //builder.AddEnvironmentVariables();
             var config = builder.Build();
