@@ -9,8 +9,8 @@ namespace Resonance
     public interface IEventPublisher
     {
         #region Sync
-        TopicEvent Publish(string topicName, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, Dictionary<string, string> headers = null, string payload = null);
-        TopicEvent Publish<T>(string topicName, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, Dictionary<string, string> headers = null, T payload = null) where T : class;
+        TopicEvent Publish(string topicName, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, int priority = 0, Dictionary<string, string> headers = null, string payload = null);
+        TopicEvent Publish<T>(string topicName, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, int priority = 0, Dictionary<string, string> headers = null, T payload = null) where T : class;
 
         IEnumerable<Topic> GetTopics(string partOfName = null);
         Topic GetTopic(Int64 id);
@@ -20,8 +20,8 @@ namespace Resonance
         #endregion
 
         #region Async
-        Task<TopicEvent> PublishAsync(string topicName, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, Dictionary<string, string> headers = null, string payload = null);
-        Task<TopicEvent> PublishAsync<T>(string topicName, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, Dictionary<string, string> headers=null, T payload = null) where T : class;
+        Task<TopicEvent> PublishAsync(string topicName, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, int priority = 0, Dictionary<string, string> headers = null, string payload = null);
+        Task<TopicEvent> PublishAsync<T>(string topicName, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, int priority = 0, Dictionary<string, string> headers=null, T payload = null) where T : class;
 
         Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null);
         Task<Topic> GetTopicAsync(Int64 id);

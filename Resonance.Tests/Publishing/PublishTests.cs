@@ -30,6 +30,7 @@ namespace Resonance.Tests.Publishing
             var publicationDateUtc = DateTime.UtcNow.AddMinutes(1); // Overriding default (which is UtcNow)
             var expirationDateUtc = DateTime.UtcNow.AddMinutes(5);
             var functionalKey = "F1";
+            var priority = 10;
             var headers = new Dictionary<string, string>
             {
                 { "EventName", "Order.Purchased" },
@@ -38,12 +39,13 @@ namespace Resonance.Tests.Publishing
             var payload = "Hello";
 
             // Act
-            var topicEvent = _publisher.PublishAsync(topicName,
+            var topicEvent = _publisher.Publish(topicName,
                 publicationDateUtc: publicationDateUtc,
                 expirationDateUtc: expirationDateUtc,
                 functionalKey: functionalKey,
+                priority: priority,
                 headers: headers,
-                payload: payload).Result;
+                payload: payload);
 
             // Assert
             Assert.NotNull(topicEvent.Id);
@@ -51,6 +53,7 @@ namespace Resonance.Tests.Publishing
             Assert.Equal(publicationDateUtc, topicEvent.PublicationDateUtc);
             Assert.Equal(expirationDateUtc, topicEvent.ExpirationDateUtc);
             Assert.Equal(functionalKey, topicEvent.FunctionalKey);
+            Assert.Equal(priority, topicEvent.Priority);
             Assert.NotNull(topicEvent.Headers);
             Assert.Equal(headers.Count, topicEvent.Headers.Count);
             Assert.True(headers.All(h => topicEvent.Headers.Any(teH => teH.Key == h.Key)));
@@ -77,6 +80,7 @@ namespace Resonance.Tests.Publishing
             Assert.True(topicEvent.PublicationDateUtc > DateTime.UtcNow.AddMinutes(-1)); // Less than a minute old
             Assert.Null(topicEvent.ExpirationDateUtc);
             Assert.Null(topicEvent.FunctionalKey);
+            Assert.Equal(0, topicEvent.Priority);
             Assert.Null(topicEvent.Headers);
             Assert.Null(topicEvent.PayloadId);
         }

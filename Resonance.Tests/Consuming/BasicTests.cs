@@ -33,7 +33,7 @@ namespace Resonance.Tests.Consuming
                 TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
             }).Result;
 
-            _publisher.PublishAsync(topicName).Wait();
+            _publisher.Publish(topicName);
 
             var visibilityTimeout = 2;
             var ce1 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
