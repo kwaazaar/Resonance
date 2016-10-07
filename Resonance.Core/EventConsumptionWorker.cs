@@ -21,7 +21,7 @@ namespace Resonance
         private object _suspendTimeoutLock = new object();
         private readonly int _minDelayInMs;
         private readonly int _maxDelayInMs;
-        private readonly int _maxThreads;
+        private readonly int _batchSize;
 
         private readonly IEventConsumer _eventConsumer;
         private readonly ILogger<EventConsumptionWorker> _logger;
@@ -35,20 +35,20 @@ namespace Resonance
         /// <param name="subscriptionName"></param>
         /// <param name="minBackOffDelayInMs">Minimum backoff delay in milliseconds. If 0, then processing will use up to 100% CPU!</param>
         /// <param name="maxBackOffDelayInMs">Maximum backoff delay in milliseconds. Backoff-delay will increment exponentially up until this value.</param>
-        /// <param name="maxThreads"></param>
+        /// <param name="batchSize">Number of events to process in parallel (> 1 can result in slower processing when ordered delivery is used)</param>
         /// <param name="visibilityTimeout">Number of seconds the business event must be locked</param>
         /// <param name="consumeAction">Action that must be invoked for each event. Make sure it is thread-safe when parallelExecution is enabled!</param>
         public EventConsumptionWorker(IEventConsumer eventConsumer, string subscriptionName,
             Func<ConsumableEvent, Task<ConsumeResult>> consumeAction, int visibilityTimeout = 60,
             ILogger<EventConsumptionWorker> logger = null,
-            int minBackOffDelayInMs = 1, int maxBackOffDelayInMs = 60000, int maxThreads = 1)
+            int minBackOffDelayInMs = 1, int maxBackOffDelayInMs = 60000, int batchSize = 1)
         {
             if (maxBackOffDelayInMs < minBackOffDelayInMs) throw new ArgumentOutOfRangeException("maxBackOffDelayInSeconds", "maxBackOffDelayInSeconds must be greater than minBackOffDelay");
 
             this._minDelayInMs = minBackOffDelayInMs;
             this._maxDelayInMs = maxBackOffDelayInMs;
             this._cancellationToken = new CancellationTokenSource();
-            this._maxThreads = maxThreads;
+            this._batchSize = batchSize;
 
             this._eventConsumer = eventConsumer;
             this._logger = logger;
@@ -192,11 +192,11 @@ namespace Resonance
         {
             try
             {
-                var workitems = await this.TryGetWork(this._maxThreads);
+                var workitems = await this.TryGetWork(this._batchSize);
                 if (workitems == null || (!workitems.Any<ConsumableEvent>())) // No result or empty list
                 {
                     this._attempts++;
-                    if (this._attempts == 1) // Eerste keer dat geen workitems gevonden
+                    if (this._attempts == 1) // First time no events were found
                     {
                         LogTrace("No consumable events found. Polling-timeout will increase from {0} till {1} milliseconds.", _minDelayInMs, _maxDelayInMs);
                     }
@@ -206,12 +206,12 @@ namespace Resonance
                 {
                     this._attempts = 0;
 
-                    if (this._maxThreads > 1)
-                        workitems.AsParallel().ForAll(async (w) => await this.ExecuteWork(w).ConfigureAwait(false));//  (new Action<ConsumableEvent>(this.ExecuteWork));
+                    if (this._batchSize > 1)
+                        workitems.AsParallel().ForAll(async (w) => await this.ExecuteWork(w).ConfigureAwait(false));
                     else
                         workitems.ToList().ForEach(async (w) => await this.ExecuteWork(w).ConfigureAwait(false)); // Executed on single (current) thread, but theoretically the TryGetWork could have returned more than one workitem
 
-                    this.BackOff(); // Ook hier backoff, zodat obv minBackOffDelayInMs vermeden wordt dat deze verwerking alle CPU opeist.
+                    this.BackOff(); // Using backoff here as well to pause for minBackoffDelay between batches
                 }
             }
             catch (AggregateException aggregateException)

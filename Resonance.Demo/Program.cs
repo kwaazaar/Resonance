@@ -119,7 +119,7 @@ namespace Resonance.Demo
                 {
                     //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     return Task.FromResult<ConsumeResult>(DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded);
-                }, maxThreads: 10, minBackOffDelayInMs: 0,
+                }, batchSize: 10, minBackOffDelayInMs: 0,
                 logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>());
             worker.Start();
             Console.WriteLine("Press a key to stop the worker...");
