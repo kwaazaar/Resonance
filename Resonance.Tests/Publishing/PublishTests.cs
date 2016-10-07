@@ -26,6 +26,11 @@ namespace Resonance.Tests.Publishing
             // Arrange
             var topicName = "Publishing.PublishTests.PublishComplete";
             var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
+            var sub = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = Guid.NewGuid().ToString(),
+                TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true, } }
+            });
 
             var publicationDateUtc = DateTime.UtcNow.AddMinutes(1); // Overriding default (which is UtcNow)
             var expirationDateUtc = DateTime.UtcNow.AddMinutes(5);
@@ -59,6 +64,16 @@ namespace Resonance.Tests.Publishing
             Assert.True(headers.All(h => topicEvent.Headers.Any(teH => teH.Key == h.Key)));
             Assert.True(headers.All(h => h.Value == topicEvent.Headers[h.Key]));
             Assert.NotNull(topicEvent.PayloadId); // Cannot check payload here
+
+            // Act
+            var consumableEvent = _consumer.ConsumeNext(sub.Name).SingleOrDefault();
+
+            // Assert
+            Assert.NotNull(consumableEvent);
+            Assert.NotNull(consumableEvent.Id);
+            Assert.Equal(functionalKey, consumableEvent.FunctionalKey);
+            Assert.Equal(payload, consumableEvent.Payload);
+            // Other properties do not exist on an consumable event
         }
 
         [Fact]
@@ -67,6 +82,11 @@ namespace Resonance.Tests.Publishing
             // Arrange
             var topicName = "Publishing.PublishTests.PublishMinimal";
             var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
+            var sub = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = Guid.NewGuid().ToString(),
+                TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true, } }
+            });
 
             // Act
             var topicEvent = _publisher.PublishAsync(topicName).Result;
@@ -83,6 +103,16 @@ namespace Resonance.Tests.Publishing
             Assert.Equal(0, topicEvent.Priority);
             Assert.Null(topicEvent.Headers);
             Assert.Null(topicEvent.PayloadId);
+
+            // Act
+            var consumableEvent = _consumer.ConsumeNext(sub.Name).SingleOrDefault();
+
+            // Assert
+            Assert.NotNull(consumableEvent);
+            Assert.NotNull(consumableEvent.Id);
+            Assert.Null(consumableEvent.FunctionalKey);
+            Assert.Null(consumableEvent.Payload);
+            // Other properties do not exist on an consumable event
         }
 
         [Fact]

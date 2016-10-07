@@ -29,7 +29,9 @@ namespace Resonance.Tests.Consuming
             var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
             var sub1 = _consumer.AddOrUpdateSubscriptionAsync(new Subscription
             {
-                Name = subName, Ordered = true, MaxDeliveries = 2,
+                Name = subName,
+                Ordered = true,
+                MaxDeliveries = 2,
                 TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
             }).Result;
 
@@ -71,6 +73,46 @@ namespace Resonance.Tests.Consuming
             var p5 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
             Assert.Equal("4", p4.Payload); // p4 should be redeliverd (it was only delivered once)
             Assert.Equal("5", p5.Payload); // p3 has reached maxDeliveries, so p5 should now be delivered
+        }
+
+
+        [Fact]
+        public void SerialDelivery_WithPriority()
+        {
+            // Arrange
+            var topicName = "SerialDelivery_WithPriority";
+            var subName = topicName + "_Sub1"; // Substring to prevent too long sub-names
+            var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
+            var sub1 = _consumer.AddOrUpdateSubscriptionAsync(new Subscription
+            {
+                Name = subName,
+                Ordered = true,
+                TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
+            }).Result;
+
+            var publishedDateUtcBaseLine = DateTime.UtcNow.AddSeconds(-60); // Explicitly setting publicationdates to make sure none are the same!
+            _publisher.PublishAsync(topicName, payload: "1", functionalKey: "f1", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(1)).Wait();
+            _publisher.PublishAsync(topicName, payload: "2", functionalKey: "f1", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(2), priority: 10).Wait();
+            _publisher.PublishAsync(topicName, payload: "3", functionalKey: "f2", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(3)).Wait();
+            _publisher.PublishAsync(topicName, payload: "4", functionalKey: "f1", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(4)).Wait();
+            _publisher.PublishAsync(topicName, payload: "5", functionalKey: "f2", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(5)).Wait();
+
+            var visibilityTimeout = 5;
+            var p2 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault(); // p1 stands for payload "1"
+            var p3 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            var pNext = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            Assert.Equal("2", p2.Payload); // Higher prio, so comes first
+            Assert.Equal("3", p3.Payload);
+            Assert.Null(pNext); // No other should be delivered yet
+
+            _consumer.MarkConsumed(p2.Id, p2.DeliveryKey);
+            _consumer.MarkConsumed(p3.Id, p3.DeliveryKey);
+            var p4 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            var p5 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            pNext = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            Assert.Equal("4", p4.Payload); // p1 should NOT BE delivered: its too old, the higher prio of p2 delivered it first, but also caused p1 to be skipped
+            Assert.Equal("5", p5.Payload);
+            Assert.Null(pNext); // Nothing more to deliver
         }
     }
 }

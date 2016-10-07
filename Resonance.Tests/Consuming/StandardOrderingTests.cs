@@ -87,5 +87,40 @@ namespace Resonance.Tests.Consuming
             Assert.Equal("1", ce2.Payload);
             Assert.Equal("3", ce3.Payload);
         }
+
+        [Fact]
+        public void PublicationDate_WithPriority()
+        {
+            // Arrange
+            var topicName = "PublicationDate_WithPriority";
+            var subName = topicName + "_Sub1";
+            var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
+            var sub1 = _consumer.AddOrUpdateSubscriptionAsync(new Subscription
+            {
+                Name = subName, // When ordered not set, delivery should still be ordered on publicationdateutc
+                TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
+            }).Result;
+
+            _publisher.Publish(topicName, payload: "1");
+            Thread.Sleep(100); // To make sure publicationdateutc is not equal for each item
+            _publisher.Publish(topicName, payload: "2", priority: 1); // Higher
+            Thread.Sleep(100);
+            _publisher.Publish(topicName, payload: "3");
+
+            var visibilityTimeout = 2;
+            var ce1 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            var ce2 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            var ce3 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            Assert.Equal("2", ce1.Payload);
+            Assert.Equal("1", ce2.Payload);
+            Assert.Equal("3", ce3.Payload);
+            _consumer.MarkConsumedAsync(ce1.Id, ce1.DeliveryKey).Wait(); // Once the high prio is gone, the other come again
+
+            Thread.Sleep(TimeSpan.FromSeconds(visibilityTimeout + 1)); // Wait until visibilitytimeout of all items (+1) has expired
+            ce1 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            ce3 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            Assert.Equal("1", ce1.Payload);
+            Assert.Equal("3", ce3.Payload);
+        }
     }
 }
