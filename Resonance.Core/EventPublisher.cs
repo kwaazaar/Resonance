@@ -58,47 +58,47 @@ namespace Resonance
         public async Task<Topic> AddOrUpdateTopicAsync(Topic topic)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return await repo.AddOrUpdateTopic(topic);
+                return await repo.AddOrUpdateTopic(topic).ConfigureAwait(false);
         }
 
         public async Task DeleteTopicAsync(Int64 id, bool inclSubscriptions)
         {
             using (var repo = _repoFactory.CreateRepo())
-                await repo.DeleteTopic(id, inclSubscriptions);
+                await repo.DeleteTopic(id, inclSubscriptions).ConfigureAwait(false);
         }
 
         public async Task<Topic> GetTopicAsync(Int64 id)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return await repo.GetTopic(id);
+                return await repo.GetTopic(id).ConfigureAwait(false);
         }
 
         public async Task<Topic> GetTopicByNameAsync(string name)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return await repo.GetTopicByName(name);
+                return await repo.GetTopicByName(name).ConfigureAwait(false);
         }
 
         public async Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return await repo.GetTopics(partOfName);
+                return await repo.GetTopics(partOfName).ConfigureAwait(false);
         }
 
         public async Task<TopicEvent> PublishAsync(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, Dictionary<string, string> headers = null, string payload = null)
         {
             using (var repo = _repoFactory.CreateRepo())
             {
-                var topic = await repo.GetTopicByName(topicName);
+                var topic = await repo.GetTopicByName(topicName).ConfigureAwait(false);
                 if (topic == null)
                     throw new ArgumentException($"Topic with name {topicName} not found", "topicName");
 
                 // Store payload (outside transaction, no need to lock right now already)
-                var payloadId = (payload != null) ? await repo.StorePayload(payload) : default(Int64?);
+                var payloadId = (payload != null) ? await repo.StorePayload(payload).ConfigureAwait(false) : default(Int64?);
 
-                var subscriptions = await repo.GetSubscriptions(topicId: topic.Id);
+                var subscriptions = await repo.GetSubscriptions(topicId: topic.Id).ConfigureAwait(false);
 
-                await repo.BeginTransaction();
+                await repo.BeginTransaction().ConfigureAwait(false);
                 try
                 {
                     // Store topic event
@@ -111,7 +111,7 @@ namespace Resonance
                         Headers = headers,
                         PayloadId = payloadId,
                     };
-                    var topicEventId = await repo.AddTopicEvent(newTopicEvent);
+                    var topicEventId = await repo.AddTopicEvent(newTopicEvent).ConfigureAwait(false);
                     newTopicEvent.Id = topicEventId;
 
                     // Determine for which subscriptions the topic must be published
@@ -162,22 +162,22 @@ namespace Resonance
                     };
 
                     if (subTasks.Count > 0) // Wait for all tasks (if any) to complete
-                        await Task.WhenAll(subTasks.ToArray()); // No timeout: db-commandtimeout will do
+                        await Task.WhenAll(subTasks.ToArray()).ConfigureAwait(false); // No timeout: db-commandtimeout will do
 
-                    await repo.CommitTransaction();
+                    await repo.CommitTransaction().ConfigureAwait(false);
 
                     // Return the topic event
                     return newTopicEvent;
                 }
                 catch (AggregateException aggrEx)
                 {
-                    await repo.RollbackTransaction();
+                    await repo.RollbackTransaction().ConfigureAwait(false);
 
                     if (payloadId.HasValue)
                     {
                         try
                         {
-                            await repo.DeletePayload(payloadId.Value);
+                            await repo.DeletePayload(payloadId.Value).ConfigureAwait(false);
                         }
                         catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
                     }
@@ -190,13 +190,13 @@ namespace Resonance
                 }
                 catch (Exception)
                 {
-                    await repo.RollbackTransaction();
+                    await repo.RollbackTransaction().ConfigureAwait(false);
 
                     if (payloadId.HasValue)
                     {
                         try
                         {
-                            await repo.DeletePayload(payloadId.Value);
+                            await repo.DeletePayload(payloadId.Value).ConfigureAwait(false);
                         }
                         catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
                     }
@@ -209,9 +209,9 @@ namespace Resonance
         {
             string payloadAsString = null;
             if (payload != null)
-                payloadAsString = await Task.Factory.StartNew(() => JsonConvert.SerializeObject(payload)); // No specific parameters: the consumer must understand the json as well
+                payloadAsString = JsonConvert.SerializeObject(payload); // No specific parameters: the consumer must understand the json as well
 
-            return await PublishAsync(topicName, publicationDateUtc, expirationDateUtc, functionalKey, headers, payloadAsString);
+            return await PublishAsync(topicName, publicationDateUtc, expirationDateUtc, functionalKey, headers, payloadAsString).ConfigureAwait(false);
         }
         #endregion
 
