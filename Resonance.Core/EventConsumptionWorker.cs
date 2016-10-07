@@ -88,7 +88,7 @@ namespace Resonance
             var timeout = this.GetBackOffDelay(this._attempts, this._minDelayInMs, this._maxDelayInMs);
             if (timeout.TotalMilliseconds > 0)
             {
-                LogTrace($"Backing off for {timeout}.");
+                LogTrace("Backing off for {0}", timeout);
 
                 try
                 {
@@ -198,7 +198,7 @@ namespace Resonance
                     this._attempts++;
                     if (this._attempts == 1) // Eerste keer dat geen workitems gevonden
                     {
-                        LogTrace($"No consumable events found. Polling-timeout will increase from {_minDelayInMs} till {_maxDelayInMs} milliseconds.");
+                        LogTrace("No consumable events found. Polling-timeout will increase from {0} till {1} milliseconds.", _minDelayInMs, _maxDelayInMs);
                     }
                     this.BackOff();
                 }
@@ -287,7 +287,7 @@ namespace Resonance
             }
             catch (Exception ex)
             {
-                LogError($"Failed to get consumable event: {ex}");
+                LogError("Failed to get consumable event: {0}", ex);
                 return null;
             }
         }
@@ -305,7 +305,8 @@ namespace Resonance
             }
             else
             {
-                LogWarning($"ConsumableEvent with id {workItem.Id} has expired: InvisibleUntilUtc ({workItem.InvisibleUntilUtc}) < UtcNow ({DateTime.UtcNow}).");
+                LogWarning("ConsumableEvent with id {0} has expired: InvisibleUntilUtc ({1}) < UtcNow ({2}).",
+                    workItem.Id, workItem.InvisibleUntilUtc, DateTime.UtcNow);
                 return false;
             }
         }
@@ -317,7 +318,8 @@ namespace Resonance
 
             try
             {
-                LogTrace($"Processing event with id {ce.Id} and functional key {ce.FunctionalKey}.");
+                LogTrace("Processing event with id {0} and functional key {1}.",
+                    ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a");
                 result = await _consumeAction(ce).ConfigureAwait(false);
             }
             catch (Exception procEx)
@@ -334,11 +336,13 @@ namespace Resonance
                 {
                     await _eventConsumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey).ConfigureAwait(false);
                     markedComplete = true;
-                    LogTrace($"Event consumption succeeded for event with id {ce.Id} and functional key {ce.FunctionalKey}.");
+                    LogTrace("Event consumption succeeded for event with id {0} and functional key {1}.",
+                        ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a");
                 }
                 catch (Exception ex)
                 {
-                    LogError($"Failed to mark event consumed with id {ce.Id} and functional key {ce.FunctionalKey}, cause event to be processes again! Details: {ex}.");
+                    LogError("Failed to mark event consumed with id {0} and functional key {1}, cause event to be processes again! Details: {2}.",
+                        ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", ex);
                     // mustRollback hoeft eigenlijk niet geset te worden, want markedComplete zal niet meer true zijn
                     mustRollback = true;
                 }
@@ -350,7 +354,8 @@ namespace Resonance
             {
                 mustRollback = true;
                 // Let op: een exception anders dan BusinessEventWorkerException, wordt als corrupt beschouwd!
-                LogError($"Exception occurred while processing event with id {ce.Id} and functional key {ce.FunctionalKey}: {result.Reason}.");
+                LogError("Exception occurred while processing event with id {0} and functional key {1}: {2}.",
+                    ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", result.Reason);
 
                 try
                 {
@@ -362,7 +367,8 @@ namespace Resonance
             {
                 mustRollback = true;
                 var suspendedUntilUtc = this.Suspend(result.SuspendDuration.GetValueOrDefault(TimeSpan.FromSeconds(60)));
-                LogError($"Event consumption failed for event with id {ce.Id} and functional key {ce.FunctionalKey}. Processing suspended until {suspendedUntilUtc} (UTC). Reason: {result.Reason}.");
+                LogError("Event consumption failed for event with id {0} and functional key {1}. Processing suspended until {2} (UTC). Reason: {3}.",
+                    ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", suspendedUntilUtc, result.Reason);
             }
             // MustRetry does nothing: default behaviour when not marked consumed/failed
 
@@ -390,32 +396,32 @@ namespace Resonance
         /// <param name="pollingEx"></param>
         protected virtual void PollingException(Exception pollingEx)
         {
-            LogError($"Polling exception occurred: {pollingEx}");
+            LogError("Polling exception occurred: {0}", pollingEx);
         }
 
         #region Logging helpers
-        private void LogTrace(string text)
+        private void LogTrace(string text, params object[] args)
         {
             if (_logger != null)
-                _logger.LogTrace(text);
+                _logger.LogTrace(text, args);
         }
 
-        private void LogInformation(string text)
+        private void LogInformation(string text, params object[] args)
         {
             if (_logger != null)
-                _logger.LogInformation(text);
+                _logger.LogInformation(text, args);
         }
 
-        private void LogError(string text)
+        private void LogError(string text, params object[] args)
         {
             if (_logger != null)
-                _logger.LogError(text);
+                _logger.LogError(text, args);
         }
 
-        private void LogWarning(string text)
+        private void LogWarning(string text, params object[] args)
         {
             if (_logger != null)
-                _logger.LogWarning(text);
+                _logger.LogWarning(text, args);
         }
         #endregion
     }
