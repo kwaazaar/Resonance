@@ -27,6 +27,16 @@ namespace Resonance.Repo.Database
         public MySqlEventingRepo(MySqlConnection conn)
             : base(conn)
         {
+            // Check if AllowUserVariables is enabled
+            var connStringBuilder = new MySqlConnectionStringBuilder(conn.ConnectionString);
+            if (!connStringBuilder.AllowUserVariables)
+            {
+                // Modify the connectionstring of the passed connection
+                connStringBuilder.AllowUserVariables = true;
+                if (_conn.State != ConnectionState.Closed)
+                    _conn.Close();
+                _conn.ConnectionString = connStringBuilder.ConnectionString;
+            }
         }
 
         public override string GetLastAutoIncrementValue
