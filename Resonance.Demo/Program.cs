@@ -114,13 +114,17 @@ namespace Resonance.Demo
             //if (ce != null)
             //    consumer.MarkConsumed(ce.Id, ce.DeliveryKey);
 
-            var worker = new EventConsumptionWorker(consumer,
-                "Demo Subscription 1", (ceW) =>
+            var worker = new EventConsumptionWorker(
+                eventConsumer: consumer,
+                subscriptionName: "Demo Subscription 1",
+                consumeAction: (ceW) =>
                 {
                     //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     return Task.FromResult<ConsumeResult>(DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded);
-                }, batchSize: 10, minBackOffDelayInMs: 0,
-                logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>());
+                },
+                logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>()
+                );
+
             worker.Start();
             Console.WriteLine("Press a key to stop the worker...");
             Console.ReadKey();
@@ -138,13 +142,12 @@ namespace Resonance.Demo
             //builder.AddEnvironmentVariables();
             var config = builder.Build();
 
-
             // Add IConfiguration dependency (reason: allows access to config from any injected component)
             serviceCollection.AddSingleton<IConfiguration>(config);
 
             ILoggerFactory loggerFactory = new LoggerFactory()
-                .AddConsole(LogLevel.Trace);
-            //.AddDebug(LogLevel.Trace);
+                .AddConsole(LogLevel.Information)
+                .AddDebug(LogLevel.Trace);
             serviceCollection.AddSingleton<ILoggerFactory>(loggerFactory);
 
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)

@@ -24,7 +24,7 @@ namespace Resonance
         private readonly int _batchSize;
 
         private readonly IEventConsumer _eventConsumer;
-        private readonly ILogger<EventConsumptionWorker> _logger;
+        private readonly ILogger _logger;
         private readonly string _subscriptionName;
         private readonly Func<ConsumableEvent, Task<ConsumeResult>> _consumeAction;
         private readonly int _visibilityTimeout;
@@ -40,7 +40,7 @@ namespace Resonance
         /// <param name="consumeAction">Action that must be invoked for each event. Make sure it is thread-safe when parallelExecution is enabled!</param>
         public EventConsumptionWorker(IEventConsumer eventConsumer, string subscriptionName,
             Func<ConsumableEvent, Task<ConsumeResult>> consumeAction, int visibilityTimeout = 60,
-            ILogger<EventConsumptionWorker> logger = null,
+            ILogger logger = null,
             int minBackOffDelayInMs = 1, int maxBackOffDelayInMs = 60000, int batchSize = 1)
         {
             if (maxBackOffDelayInMs < minBackOffDelayInMs) throw new ArgumentOutOfRangeException("maxBackOffDelayInSeconds", "maxBackOffDelayInSeconds must be greater than minBackOffDelay");
