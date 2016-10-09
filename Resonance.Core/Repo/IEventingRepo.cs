@@ -12,34 +12,33 @@ namespace Resonance.Repo
     {
         // Transaction Management
         bool ParallelQueriesSupport { get; }
-        Task BeginTransaction();
-        Task RollbackTransaction();
-        Task CommitTransaction();
+        Task BeginTransactionAsync();
+        Task RollbackTransactionAsync();
+        Task CommitTransactionAsync();
 
         // Topic & subscription management
-        Task<IEnumerable<Topic>> GetTopics(string partOfName = null);
-        Task<Topic> GetTopic(Int64 id);
-        Task<Topic> GetTopicByName(string name);
-        Task<Topic> AddOrUpdateTopic(Topic topic);
-        Task DeleteTopic(Int64 id, bool inclSubscriptions);
-        Task<IEnumerable<Subscription>> GetSubscriptions(Int64? topicId = null);
-        Task<Subscription> GetSubscription(Int64 id);
-        Task<Subscription> GetSubscriptionByName(string name);
-        Task<Subscription> AddOrUpdateSubscription(Subscription subscription);
-        Task DeleteSubscription(Int64 id);
+        Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null);
+        Task<Topic> GetTopicAsync(Int64 id);
+        Task<Topic> GetTopicByNameAsync(string name);
+        Task<Topic> AddOrUpdateTopicAsync(Topic topic);
+        Task DeleteTopicAsync(Int64 id, bool inclSubscriptions);
+        Task<IEnumerable<Subscription>> GetSubscriptionsAsync(Int64? topicId = null);
+        Task<Subscription> GetSubscriptionAsync(Int64 id);
+        Task<Subscription> GetSubscriptionByNameAsync(string name);
+        Task<Subscription> AddOrUpdateSubscriptionAsync(Subscription subscription);
+        Task DeleteSubscriptionAsync(Int64 id);
 
         // Publication
-        Task<Int64> StorePayload(string payload);
-        Task<string> GetPayload(Int64 id);
-        Task<int> DeletePayload(Int64 id);
-        Task<Int64> AddTopicEvent(TopicEvent topicEvent);
-        Task<Int64> AddSubscriptionEvent(SubscriptionEvent subscriptionEvent);
+        Task<Int64> StorePayloadAsync(string payload);
+        Task<string> GetPayloadAsync(Int64 id);
+        Task<int> DeletePayloadAsync(Int64 id);
+        Task<Int64> AddTopicEventAsync(TopicEvent topicEvent);
+        Task<Int64> AddSubscriptionEventAsync(SubscriptionEvent subscriptionEvent);
+        Task<TopicEvent> PublishTopicEventAsync(TopicEvent newTopicEvent, IEnumerable<Subscription> subscriptionsMatching);
 
         // Consumption
-        //IEnumerable<SubscriptionEventIdentifier> FindConsumableEventsForSubscription(Subscription subscription, int maxCount);
-        //bool TryLockConsumableEvent(SubscriptionEventIdentifier sId, string deliveryKey, DateTime invisibleUntilUtc);
-        Task<IEnumerable<ConsumableEvent>> ConsumeNext(string subscriptionName, int visibilityTimeout, int maxCount = 1);
-        Task MarkConsumed(Int64 id, string deliveryKey);
-        Task MarkFailed(Int64 id, string deliveryKey, Reason reason);
+        Task<IEnumerable<ConsumableEvent>> ConsumeNextAsync(string subscriptionName, int visibilityTimeout, int maxCount = 1);
+        Task MarkConsumedAsync(Int64 id, string deliveryKey);
+        Task MarkFailedAsync(Int64 id, string deliveryKey, Reason reason);
     }
 }

@@ -58,150 +58,79 @@ namespace Resonance
         public async Task<Topic> AddOrUpdateTopicAsync(Topic topic)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return await repo.AddOrUpdateTopic(topic).ConfigureAwait(false);
+                return await repo.AddOrUpdateTopicAsync(topic).ConfigureAwait(false);
         }
 
         public async Task DeleteTopicAsync(Int64 id, bool inclSubscriptions)
         {
             using (var repo = _repoFactory.CreateRepo())
-                await repo.DeleteTopic(id, inclSubscriptions).ConfigureAwait(false);
+                await repo.DeleteTopicAsync(id, inclSubscriptions).ConfigureAwait(false);
         }
 
         public async Task<Topic> GetTopicAsync(Int64 id)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return await repo.GetTopic(id).ConfigureAwait(false);
+                return await repo.GetTopicAsync(id).ConfigureAwait(false);
         }
 
         public async Task<Topic> GetTopicByNameAsync(string name)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return await repo.GetTopicByName(name).ConfigureAwait(false);
+                return await repo.GetTopicByNameAsync(name).ConfigureAwait(false);
         }
 
         public async Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return await repo.GetTopics(partOfName).ConfigureAwait(false);
+                return await repo.GetTopicsAsync(partOfName).ConfigureAwait(false);
         }
 
         public async Task<TopicEvent> PublishAsync(string topicName, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 0, Dictionary<string, string> headers = null, string payload = null)
         {
             using (var repo = _repoFactory.CreateRepo())
             {
-                var topic = await repo.GetTopicByName(topicName).ConfigureAwait(false);
+                var topic = await repo.GetTopicByNameAsync(topicName).ConfigureAwait(false);
                 if (topic == null)
                     throw new ArgumentException($"Topic with name {topicName} not found", "topicName");
 
                 // Store payload (outside transaction, no need to lock right now already)
-                var payloadId = (payload != null) ? await repo.StorePayload(payload).ConfigureAwait(false) : default(Int64?);
+                var payloadId = (payload != null) ? await repo.StorePayloadAsync(payload).ConfigureAwait(false) : default(Int64?);
 
-                var subscriptions = await repo.GetSubscriptions(topicId: topic.Id).ConfigureAwait(false);
+                var subscriptions = await repo.GetSubscriptionsAsync(topicId: topic.Id).ConfigureAwait(false);
 
-                await repo.BeginTransaction().ConfigureAwait(false);
+                // Store topic event
+                var newTopicEvent = new TopicEvent
+                {
+                    TopicId = topic.Id.Value,
+                    PublicationDateUtc = publicationDateUtc.GetValueOrDefault(DateTime.UtcNow),
+                    FunctionalKey = functionalKey,
+                    Priority = priority,
+                    ExpirationDateUtc = expirationDateUtc,
+                    Headers = headers,
+                    PayloadId = payloadId,
+                };
+
+                // Determine for which subscriptions the topic must be published
+                var subscriptionsMatching = subscriptions
+                    .Where((s) => s.TopicSubscriptions.Any((ts) => ((ts.TopicId == topic.Id.Value) && ts.Enabled && (!ts.Filtered || CheckFilters(ts.Filters, headers)))))
+                    .Distinct(); // Nessecary when one subscription has more than once topicsubscription for the same topic (probably with different filters)
+
                 try
                 {
-                    // Store topic event
-                    var newTopicEvent = new TopicEvent
-                    {
-                        TopicId = topic.Id.Value,
-                        PublicationDateUtc = publicationDateUtc.GetValueOrDefault(DateTime.UtcNow),
-                        FunctionalKey = functionalKey,
-                        Priority = priority,
-                        ExpirationDateUtc = expirationDateUtc,
-                        Headers = headers,
-                        PayloadId = payloadId,
-                    };
-                    var topicEventId = await repo.AddTopicEvent(newTopicEvent).ConfigureAwait(false);
-                    newTopicEvent.Id = topicEventId;
-
-                    // Determine for which subscriptions the topic must be published
-                    var subscriptionsMatching = subscriptions
-                        .Where((s) => s.TopicSubscriptions.Any((ts) => ((ts.TopicId == topic.Id.Value) && ts.Enabled && (!ts.Filtered || CheckFilters(ts.Filters, headers)))))
-                        .Distinct(); // Nessecary when one subscription has more than once topicsubscription for the same topic (probably with different filters)
-
-                    // Create tasks for each subscription
-                    var subTasks = new List<Task<Int64>>();
-                    foreach (var subscription in subscriptionsMatching)
-                    {
-                        // By default a SubscriptionEvent takes expirationdate of TopicEvent
-                        var subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
-
-                        // If subscription has its own TTL, it will be applied, but may never exceed the TopicEvent expiration
-                        if (subscription.TimeToLive.HasValue)
-                        {
-                            subExpirationDateUtc = newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.TimeToLive.Value);
-                            if (newTopicEvent.ExpirationDateUtc.HasValue && (newTopicEvent.ExpirationDateUtc.Value < subExpirationDateUtc))
-                                subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
-                        }
-
-                        // Delivery can be initially delayed, but it cannot exceed the expirationdate (would be useless)
-                        var deliveryDelayedUntilUtc = subscription.DeliveryDelay.HasValue ? newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value) : default(DateTime?);
-                        //if (deliveryDelayedUntilUtc.HasValue && subExpirationDateUtc.HasValue
-                        //    && deliveryDelayedUntilUtc.Value > subExpirationDateUtc.Value)
-                        //    break; // Skip this one, it would have been expired immedi
-
-                        var newSubscriptionEvent = new SubscriptionEvent
-                        {
-                            SubscriptionId = subscription.Id.Value,
-                            TopicEventId = newTopicEvent.Id.Value,
-                            PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
-                            FunctionalKey = newTopicEvent.FunctionalKey,
-                            Priority = newTopicEvent.Priority,
-                            PayloadId = newTopicEvent.PayloadId,
-                            Payload = null, // Only used when consuming
-                            ExpirationDateUtc = subExpirationDateUtc,
-                            DeliveryDelayedUntilUtc = deliveryDelayedUntilUtc,
-                            DeliveryCount = 0,
-                            DeliveryKey = null,
-                            InvisibleUntilUtc = null,
-                        };
-
-                        if (repo.ParallelQueriesSupport)
-                            subTasks.Add(repo.AddSubscriptionEvent(newSubscriptionEvent));
-                        else
-                            await repo.AddSubscriptionEvent(newSubscriptionEvent).ConfigureAwait(false);
-                    };
-
-                    if (subTasks.Count > 0) // Wait for all tasks (if any) to complete
-                        await Task.WhenAll(subTasks.ToArray()).ConfigureAwait(false); // No timeout: db-commandtimeout will do
-
-                    await repo.CommitTransaction().ConfigureAwait(false);
-
-                    // Return the topic event
-                    return newTopicEvent;
-                }
-                catch (AggregateException aggrEx)
-                {
-                    await repo.RollbackTransaction().ConfigureAwait(false);
-
-                    if (payloadId.HasValue)
-                    {
-                        try
-                        {
-                            await repo.DeletePayload(payloadId.Value).ConfigureAwait(false);
-                        }
-                        catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
-                    }
-
-                    var firstInnerEx = aggrEx.InnerExceptions.FirstOrDefault();
-                    if (firstInnerEx != null)
-                        throw firstInnerEx; // Do we want this?
-                    else
-                        throw;
+                    var topicEvent = await repo.PublishTopicEventAsync(newTopicEvent, subscriptionsMatching).ConfigureAwait(false);
+                    return topicEvent;
                 }
                 catch (Exception)
                 {
-                    await repo.RollbackTransaction().ConfigureAwait(false);
-
                     if (payloadId.HasValue)
                     {
                         try
                         {
-                            await repo.DeletePayload(payloadId.Value).ConfigureAwait(false);
+                            await repo.DeletePayloadAsync(payloadId.Value).ConfigureAwait(false);
                         }
                         catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
                     }
+
                     throw;
                 }
             }

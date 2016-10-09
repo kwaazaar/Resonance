@@ -162,7 +162,7 @@ namespace Resonance.Repo.Database
             {
                 if (ce.PayloadId.HasValue)
                 {
-                    ce.Payload = await GetPayload(ce.PayloadId.Value).ConfigureAwait(false);
+                    ce.Payload = await GetPayloadAsync(ce.PayloadId.Value).ConfigureAwait(false);
                     ce.PayloadId = null; // No reason to keep it
                 }
             }
