@@ -99,7 +99,7 @@ namespace Resonance
                 var subscriptions = await repo.GetSubscriptionsAsync(topicId: topic.Id).ConfigureAwait(false);
 
                 var eventNameToUse = eventName;
-                if (eventNameToUse == null)
+                if (eventNameToUse == null && headers != null)
                 {
                     var eventNameHeader = headers.FirstOrDefault(h => h.Key.Equals("EventName", StringComparison.OrdinalIgnoreCase));
                     if (eventNameHeader.Key != null)
