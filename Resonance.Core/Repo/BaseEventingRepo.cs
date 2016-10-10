@@ -41,6 +41,7 @@ namespace Resonance.Repo
                     {
                         SubscriptionId = subscription.Id.Value,
                         TopicEventId = newTopicEvent.Id.Value,
+                        EventName = newTopicEvent.EventName,
                         PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
                         FunctionalKey = newTopicEvent.FunctionalKey,
                         Priority = newTopicEvent.Priority,

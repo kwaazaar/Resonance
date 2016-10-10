@@ -11,6 +11,7 @@ namespace Resonance.Models
         public Int64 SubscriptionId { get; set; }
         public bool Ordered { get; set; }
         public Int64 TopicEventId { get; set; }
+        public string EventName { get; set; }
         public DateTime PublicationDateUtc { get; set; }
         public string FunctionalKey { get; set; }
         public int Priority { get; set; }

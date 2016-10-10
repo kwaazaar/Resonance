@@ -91,7 +91,7 @@ namespace Resonance.Repo.Database
         /// <returns></returns>
         private async Task<ConsumableEvent> GetConsumableEvent(Int64 sId)
         {
-            var query = $"select se.Id, se.DeliveryKey, se.FunctionalKey, se.InvisibleUntilUtc, se.PayloadId" + // Get the minimal amount of data
+            var query = $"select se.Id, se.DeliveryKey, se.EventName, se.FunctionalKey, se.InvisibleUntilUtc, se.PayloadId" + // Get the minimal amount of data
                 " from SubscriptionEvent se where se.Id = @sId";
             var ces = await TranQueryAsync<ConsumableEvent>(query, new { sId = sId }).ConfigureAwait(false);
             var ce = ces.SingleOrDefault();

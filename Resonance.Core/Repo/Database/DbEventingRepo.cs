@@ -621,6 +621,7 @@ namespace Resonance.Repo.Database
             var parameters = new Dictionary<string, object>
                 {
                     { "@topicId", topicEvent.TopicId },
+                    { "@eventName", topicEvent.EventName },
                     { "@functionalKey", topicEvent.FunctionalKey },
                     { "@publicationDateUtc", topicEvent.PublicationDateUtc },
                     { "@expirationDateUtc", topicEvent.ExpirationDateUtc },
@@ -628,7 +629,7 @@ namespace Resonance.Repo.Database
                     { "@priority", topicEvent.Priority },
                     { "@payloadId", topicEvent.PayloadId },
                 };
-            var ids = await TranQueryAsync<Int64>("insert into TopicEvent (TopicId, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, Headers, Priority, PayloadId) values (@topicId, @functionalKey, @publicationDateUtc, @expirationDateUtc, @headers, @priority, @payloadId)" +
+            var ids = await TranQueryAsync<Int64>("insert into TopicEvent (TopicId, EventName, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, Headers, Priority, PayloadId) values (@topicId, @eventName, @functionalKey, @publicationDateUtc, @expirationDateUtc, @headers, @priority, @payloadId)" +
                 $";select {GetLastAutoIncrementValue} as 'Id'",
                 parameters).ConfigureAwait(false);
 
@@ -644,6 +645,7 @@ namespace Resonance.Repo.Database
                 {
                     { "@subscriptionId", subscriptionEvent.SubscriptionId },
                     { "@topicEventId", subscriptionEvent.TopicEventId },
+                    { "@eventName", subscriptionEvent.EventName },
                     { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
                     { "@priority", subscriptionEvent.Priority },
@@ -655,8 +657,8 @@ namespace Resonance.Repo.Database
                     { "@deliveryKey", default(string) },
                     { "@invisibleUntilUtc", default(DateTime?) },
                 };
-            var ids = await TranQueryAsync<Int64>("insert into SubscriptionEvent (SubscriptionId, TopicEventId, PublicationDateUtc, FunctionalKey, Priority, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryDateUtc, DeliveryKey, InvisibleUntilUtc)"
-                + " values (@subscriptionId, @topicEventId, @publicationDateUtc, @functionalKey, @priority, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryDateUtc, @deliveryKey, @invisibleUntilUtc)"
+            var ids = await TranQueryAsync<Int64>("insert into SubscriptionEvent (SubscriptionId, TopicEventId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryDateUtc, DeliveryKey, InvisibleUntilUtc)"
+                + " values (@subscriptionId, @topicEventId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryDateUtc, @deliveryKey, @invisibleUntilUtc)"
                 + $";select {GetLastAutoIncrementValue} as 'Id'",
                 parameters).ConfigureAwait(false);
 
@@ -677,12 +679,13 @@ namespace Resonance.Repo.Database
 
         private async Task<int> AddConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
-            return await TranExecuteAsync("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, ConsumedDateUtc)" +
-                " values (@id, @subscriptionId, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @consumedDateUtc)",
+            return await TranExecuteAsync("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, ConsumedDateUtc)" +
+                " values (@id, @subscriptionId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @consumedDateUtc)",
                 new Dictionary<string, object>
                 {
                 { "@id", subscriptionEvent.Id },
                 { "@subscriptionId", subscriptionEvent.SubscriptionId },
+                { "@eventName", subscriptionEvent.EventName },
                 { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                 { "@functionalKey", subscriptionEvent.FunctionalKey },
                 { "@priority", subscriptionEvent.Priority },
@@ -696,12 +699,13 @@ namespace Resonance.Repo.Database
 
         private async Task<int> AddFailedSubscriptionEvent(SubscriptionEvent subscriptionEvent, Reason reason)
         {
-            return await TranExecuteAsync("insert into FailedSubscriptionEvent (Id, SubscriptionId, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, FailedDateUtc, Reason, ReasonOther)" +
-                " values (@id, @subscriptionId, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @failedDateUtc, @reason, @reasonOther)",
+            return await TranExecuteAsync("insert into FailedSubscriptionEvent (Id, SubscriptionId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, FailedDateUtc, Reason, ReasonOther)" +
+                " values (@id, @subscriptionId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @failedDateUtc, @reason, @reasonOther)",
                 new Dictionary<string, object>
                 {
                     { "@id", subscriptionEvent.Id },
                     { "@subscriptionId", subscriptionEvent.SubscriptionId },
+                    { "@eventName", subscriptionEvent.EventName },
                     { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
                     { "@functionalKey", subscriptionEvent.FunctionalKey },
                     { "@priority", subscriptionEvent.Priority },

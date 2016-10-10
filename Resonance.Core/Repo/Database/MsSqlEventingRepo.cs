@@ -93,7 +93,7 @@ namespace Resonance.Repo.Database
                     + "    DeliveryKey = NEWID()," // Let SQL server generate the deliverykey
                     + "    DeliveryDateUtc = @utcNow"
                     + " OUTPUT inserted.Id INTO @l_PBEIds"
-                    + " select se.Id, se.DeliveryKey, se.FunctionalKey, se.InvisibleUntilUtc, se.PayloadId"
+                    + " select se.Id, se.DeliveryKey, se.EventName, se.FunctionalKey, se.InvisibleUntilUtc, se.PayloadId"
                     + " from SubscriptionEvent se"
                     + " join @l_PBEIds pbe on pbe.Id = se.Id";
 
@@ -139,7 +139,7 @@ namespace Resonance.Repo.Database
                         + "    DeliveryKey = @deliveryKey,"
                         + "    DeliveryDateUtc = @utcNow"
                         + " OUTPUT inserted.Id INTO @l_PBEIds"
-                        + " select se.Id, se.DeliveryKey, se.FunctionalKey, se.InvisibleUntilUtc, se.PayloadId"
+                        + " select se.Id, se.DeliveryKey, se.EventName, se.FunctionalKey, se.InvisibleUntilUtc, se.PayloadId"
                         + " from SubscriptionEvent se"
                         + " join @l_PBEIds pbe on pbe.Id = se.Id";
 

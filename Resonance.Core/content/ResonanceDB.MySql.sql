@@ -27,6 +27,7 @@ DROP TABLE IF EXISTS `consumedsubscriptionevent`;
 CREATE TABLE `consumedsubscriptionevent` (
   `Id` BIGINT(20) UNSIGNED NOT NULL,
   `SubscriptionId` BIGINT(20) UNSIGNED NOT NULL,
+  `EventName` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `Priority` int(11) NOT NULL,
@@ -63,6 +64,7 @@ DROP TABLE IF EXISTS `failedsubscriptionevent`;
 CREATE TABLE `failedsubscriptionevent` (
   `Id` BIGINT(20) UNSIGNED NOT NULL,
   `SubscriptionId` BIGINT(20) UNSIGNED NOT NULL,
+  `EventName` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `Priority` int(11) NOT NULL,
@@ -122,6 +124,7 @@ CREATE TABLE `subscriptionevent` (
   `Id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
   `SubscriptionId` BIGINT(20) UNSIGNED NOT NULL,
   `TopicEventId` BIGINT(20) UNSIGNED NOT NULL,
+  `EventName` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `Priority` int(11) NOT NULL,
@@ -168,6 +171,7 @@ DROP TABLE IF EXISTS `topicevent`;
 CREATE TABLE `topicevent` (
   `Id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
   `TopicId` BIGINT(20) UNSIGNED NOT NULL,
+  `EventName` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `ExpirationDateUtc` datetime(6) DEFAULT NULL,
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,

@@ -34,6 +34,7 @@ namespace Resonance.Tests.Publishing
 
             var publicationDateUtc = DateTime.UtcNow.AddMinutes(1); // Overriding default (which is UtcNow)
             var expirationDateUtc = DateTime.UtcNow.AddMinutes(5);
+            var eventName = "Name of the Event";
             var functionalKey = "F1";
             var priority = 10;
             var headers = new Dictionary<string, string>
@@ -45,6 +46,7 @@ namespace Resonance.Tests.Publishing
 
             // Act
             var topicEvent = _publisher.Publish(topicName,
+                eventName: eventName,
                 publicationDateUtc: publicationDateUtc,
                 expirationDateUtc: expirationDateUtc,
                 functionalKey: functionalKey,
@@ -55,6 +57,7 @@ namespace Resonance.Tests.Publishing
             // Assert
             Assert.NotNull(topicEvent.Id);
             Assert.Equal(topic.Id.Value, topicEvent.TopicId);
+            Assert.Equal(eventName, topicEvent.EventName);
             Assert.Equal(publicationDateUtc, topicEvent.PublicationDateUtc);
             Assert.Equal(expirationDateUtc, topicEvent.ExpirationDateUtc);
             Assert.Equal(functionalKey, topicEvent.FunctionalKey);
@@ -71,6 +74,7 @@ namespace Resonance.Tests.Publishing
             // Assert
             Assert.NotNull(consumableEvent);
             Assert.NotNull(consumableEvent.Id);
+            Assert.Equal(eventName, consumableEvent.EventName);
             Assert.Equal(functionalKey, consumableEvent.FunctionalKey);
             Assert.Equal(payload, consumableEvent.Payload);
             // Other properties do not exist on an consumable event
@@ -94,6 +98,7 @@ namespace Resonance.Tests.Publishing
 
             // Assert
             Assert.NotNull(topicEvent.Id);
+            Assert.Null(topicEvent.EventName);
             Assert.Equal(topic.Id.Value, topicEvent.TopicId);
             Assert.NotNull(topicEvent.PublicationDateUtc);
             Assert.True(topicEvent.PublicationDateUtc < DateTime.UtcNow); // Older than now
@@ -110,8 +115,52 @@ namespace Resonance.Tests.Publishing
             // Assert
             Assert.NotNull(consumableEvent);
             Assert.NotNull(consumableEvent.Id);
+            Assert.Null(consumableEvent.EventName);
             Assert.Null(consumableEvent.FunctionalKey);
             Assert.Null(consumableEvent.Payload);
+            // Other properties do not exist on an consumable event
+        }
+
+        [Fact]
+        public void PublishTakeEventNameFromHeaders()
+        {
+            // Arrange
+            var topicName = "Publishing.PublishTakeEventNameFromHeaders";
+            var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
+            var sub = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = Guid.NewGuid().ToString(),
+                TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true, } }
+            });
+
+            var eventNameFromHeader = "Order.Purchased";
+            var headers = new Dictionary<string, string>
+            {
+                { "EventName", eventNameFromHeader },
+                { "MessageId", Guid.NewGuid().ToString() },
+            };
+
+            // Act
+            var topicEvent = _publisher.Publish(topicName,
+                eventName: null, // Not passed
+                headers: headers);
+
+            // Assert
+            Assert.NotNull(topicEvent.Id);
+            Assert.Equal(topic.Id.Value, topicEvent.TopicId);
+            Assert.NotNull(topicEvent.Headers);
+            Assert.Equal(headers.Count, topicEvent.Headers.Count);
+            Assert.True(headers.All(h => topicEvent.Headers.Any(teH => teH.Key == h.Key)));
+            Assert.True(headers.All(h => h.Value == topicEvent.Headers[h.Key]));
+            Assert.Equal(eventNameFromHeader, topicEvent.EventName);
+
+            // Act
+            var consumableEvent = _consumer.ConsumeNext(sub.Name).SingleOrDefault();
+
+            // Assert
+            Assert.NotNull(consumableEvent);
+            Assert.NotNull(consumableEvent.Id);
+            Assert.Equal(eventNameFromHeader, consumableEvent.EventName);
             // Other properties do not exist on an consumable event
         }
 
