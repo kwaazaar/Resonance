@@ -99,7 +99,7 @@ namespace Resonance.Repo.Database
         /// <summary>
         /// Indicates whether the repo supports running parallel queries on a single connection. Default=false.
         /// </summary>
-        public override bool ParallelQueriesSupport { get { return false; } }
+        protected override bool ParallelQueriesSupport { get { return false; } }
 
         #endregion
 
@@ -108,7 +108,7 @@ namespace Resonance.Repo.Database
         /// Starts a new transaction.
         /// NB: Transactions can be nested.
         /// </summary>
-        public async override Task BeginTransactionAsync()
+        protected async override Task BeginTransactionAsync()
         {
             await EnsureConnectionReady().ConfigureAwait(false);
             lock (_tranLock)
@@ -126,7 +126,7 @@ namespace Resonance.Repo.Database
         /// Rolls back the the transaction and disposes it.
         /// Make sure there are no parallel threads/tasks still using the transaction!
         /// </summary>
-        public override async Task RollbackTransactionAsync()
+        protected override async Task RollbackTransactionAsync()
         {
             if (_runningTransaction == null) // Check before waiting for lock to prevent unnessecary locks
                 throw new ArgumentException($"No running transaction found");
@@ -158,7 +158,7 @@ namespace Resonance.Repo.Database
         /// Commits the transaction and disposes it.
         /// Make sure there are no parallel threads/tasks still using the transaction!
         /// </summary>
-        public override async Task CommitTransactionAsync()
+        protected override async Task CommitTransactionAsync()
         {
             if (_runningTransaction == null) // Check before waiting for lock to prevent unnessecary locks
                 throw new ArgumentException($"No running transaction found");

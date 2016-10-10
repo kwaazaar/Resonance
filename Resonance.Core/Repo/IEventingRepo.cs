@@ -10,12 +10,6 @@ namespace Resonance.Repo
 {
     public interface IEventingRepo : IDisposable
     {
-        // Transaction Management
-        bool ParallelQueriesSupport { get; }
-        Task BeginTransactionAsync();
-        Task RollbackTransactionAsync();
-        Task CommitTransactionAsync();
-
         // Topic & subscription management
         Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null);
         Task<Topic> GetTopicAsync(Int64 id);

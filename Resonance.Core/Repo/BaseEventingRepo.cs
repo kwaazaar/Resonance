@@ -83,11 +83,14 @@ namespace Resonance.Repo
             }
         }
 
-        public abstract bool ParallelQueriesSupport { get; }
-        public abstract Task RollbackTransactionAsync();
-        public abstract Task CommitTransactionAsync();
         public abstract Task<Int64> AddSubscriptionEventAsync(SubscriptionEvent newSubscriptionEvent);
         public abstract Task<Int64> AddTopicEventAsync(TopicEvent newTopicEvent);
-        public abstract Task BeginTransactionAsync();
+
+        #region EventingRepo stuff that does not need to be available outside the repo implementations, so not part of IEventingRepo
+        protected abstract bool ParallelQueriesSupport { get; }
+        protected abstract Task BeginTransactionAsync();
+        protected abstract Task RollbackTransactionAsync();
+        protected abstract Task CommitTransactionAsync();
+        #endregion
     }
 }

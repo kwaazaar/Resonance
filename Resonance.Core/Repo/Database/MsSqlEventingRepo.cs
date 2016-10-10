@@ -43,7 +43,7 @@ namespace Resonance.Repo.Database
                 return base.CanRetry(dbEx, attempts);
         }
 
-        public override bool ParallelQueriesSupport { get { return _connStringBuilder.MultipleActiveResultSets; } } // 'MARS' must be enabled in the connectionstring
+        protected override bool ParallelQueriesSupport { get { return _connStringBuilder.MultipleActiveResultSets; } } // 'MARS' must be enabled in the connectionstring
 
         public override string GetLastAutoIncrementValue
         {
