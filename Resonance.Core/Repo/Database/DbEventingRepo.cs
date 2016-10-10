@@ -612,7 +612,7 @@ namespace Resonance.Repo.Database
                 new Dictionary<string, object> { { "@id", id } }).ConfigureAwait(false);
         }
 
-        public async override Task<Int64> AddTopicEventAsync(TopicEvent topicEvent)
+        protected async override Task<Int64> AddTopicEventAsync(TopicEvent topicEvent)
         {
             if (topicEvent == null) throw new ArgumentNullException("topicEvent");
             if (topicEvent.Id.HasValue) throw new ArgumentException("topicEvent.Id cannot have a value", "topicEvent");
@@ -635,7 +635,7 @@ namespace Resonance.Repo.Database
             return ids.Single();
         }
 
-        public async override Task<Int64> AddSubscriptionEventAsync(SubscriptionEvent subscriptionEvent)
+        protected async override Task<Int64> AddSubscriptionEventAsync(SubscriptionEvent subscriptionEvent)
         {
             if (subscriptionEvent == null) throw new ArgumentNullException("subscriptionEvent");
             if (subscriptionEvent.Id.HasValue) throw new ArgumentException("subscriptionEvent.Id cannot have a value", "subscriptionEvent");

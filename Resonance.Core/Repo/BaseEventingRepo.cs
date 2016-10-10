@@ -83,8 +83,8 @@ namespace Resonance.Repo
             }
         }
 
-        public abstract Task<Int64> AddSubscriptionEventAsync(SubscriptionEvent newSubscriptionEvent);
-        public abstract Task<Int64> AddTopicEventAsync(TopicEvent newTopicEvent);
+        protected abstract Task<Int64> AddSubscriptionEventAsync(SubscriptionEvent newSubscriptionEvent);
+        protected abstract Task<Int64> AddTopicEventAsync(TopicEvent newTopicEvent);
 
         #region EventingRepo stuff that does not need to be available outside the repo implementations, so not part of IEventingRepo
         protected abstract bool ParallelQueriesSupport { get; }
