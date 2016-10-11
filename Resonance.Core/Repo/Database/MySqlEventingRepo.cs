@@ -263,7 +263,7 @@ namespace Resonance.Repo.Database
                     + " , @utcNow, 2, null" // 2 = MaxRetriesReached
                     + " FROM SubscriptionEvent se"
                     + " JOIN Subscription s ON s.Id = se.SubscriptionId"
-                    + " WHERE se.DeliveryCount >= s.MaxDeliveries;"
+                    + " WHERE (s.MaxDeliveries > 0 AND se.DeliveryCount >= s.MaxDeliveries);"
                     + " DELETE se"
                     + " FROM SubscriptionEvent se"
                     + " JOIN FailedSubscriptionEvent fse ON fse.Id = se.Id;";

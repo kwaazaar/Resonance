@@ -204,7 +204,7 @@ namespace Resonance.Repo.Database
                 + " , FailedDateUtc, Reason, ReasonOther)"
                 + " FROM     SubscriptionEvent se"
                 + " JOIN    Subscription s ON s.Id = se.SubscriptionId"
-                + " WHERE (se.DeliveryCount >= s.MaxDeliveries)";
+                + " WHERE (s.MaxDeliveries > 0 AND se.DeliveryCount >= s.MaxDeliveries)";
             var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
 
             return rowsAffected;
