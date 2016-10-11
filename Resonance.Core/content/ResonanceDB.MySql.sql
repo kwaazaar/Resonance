@@ -70,12 +70,10 @@ CREATE TABLE `failedsubscriptionevent` (
   `Priority` int(11) NOT NULL,
   `PayloadId` BIGINT(20) UNSIGNED DEFAULT NULL,
   `DeliveryDateUtc` datetime(6) NOT NULL,
-  `FailedDateUtc` datetime(6) NOT NULL,
+  `FailedDateUtc` datetime(6) DEFAULT NULL,
   `Reason` int(11) NOT NULL COMMENT '0=Unknown, 1=Expired, 2=MaxRetriesReached, 3=Other',
   `ReasonOther` varchar(1000) CHARACTER SET utf8mb4 DEFAULT NULL,
-  PRIMARY KEY (`Id`),
-  KEY `FK_FailedSubscriptionEvent_EventPayload` (`PayloadId`),
-  CONSTRAINT `FK_FailedSubscriptionEvent_EventPayload` FOREIGN KEY (`PayloadId`) REFERENCES `eventpayload` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION
+  PRIMARY KEY (`Id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
