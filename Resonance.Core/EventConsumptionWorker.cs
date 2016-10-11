@@ -18,10 +18,12 @@ namespace Resonance
         private CancellationTokenSource _cancellationToken;
         private int _attempts;
         private DateTime? _suspendedUntilUtc = null;
+        private DateTime? _lastHouseKeepingRun = null;
         private object _suspendTimeoutLock = new object();
         private readonly int _minDelayInMs;
         private readonly int _maxDelayInMs;
         private readonly int _batchSize;
+        private readonly int _housekeepingIntervalMin;
 
         private readonly IEventConsumer _eventConsumer;
         private readonly ILogger _logger;
@@ -37,11 +39,14 @@ namespace Resonance
         /// <param name="maxBackOffDelayInMs">Maximum backoff delay in milliseconds. Backoff-delay will increment exponentially up until this value.</param>
         /// <param name="batchSize">Number of events to process in parallel (> 1 can result in slower processing when ordered delivery is used)</param>
         /// <param name="visibilityTimeout">Number of seconds the business event must be locked</param>
+        /// <param name="eventConsumer">EventConsumer instance to use</param>
+        /// <param name="logger">ILogger to use for logging purposes</param>
+        /// <param name="housekeepingIntervalMin">Interval between housekeeping intervals. Set to 0 to disable housekeeping.</param>
         /// <param name="consumeAction">Action that must be invoked for each event. Make sure it is thread-safe when parallelExecution is enabled!</param>
         public EventConsumptionWorker(IEventConsumer eventConsumer, string subscriptionName,
             Func<ConsumableEvent, Task<ConsumeResult>> consumeAction, int visibilityTimeout = 60,
             ILogger logger = null,
-            int minBackOffDelayInMs = 1, int maxBackOffDelayInMs = 60000, int batchSize = 1)
+            int minBackOffDelayInMs = 1, int maxBackOffDelayInMs = 60000, int batchSize = 1, int housekeepingIntervalMin = 5)
         {
             if (maxBackOffDelayInMs < minBackOffDelayInMs) throw new ArgumentOutOfRangeException("maxBackOffDelayInSeconds", "maxBackOffDelayInSeconds must be greater than minBackOffDelay");
 
@@ -49,6 +54,7 @@ namespace Resonance
             this._maxDelayInMs = maxBackOffDelayInMs;
             this._cancellationToken = new CancellationTokenSource();
             this._batchSize = batchSize;
+            this._housekeepingIntervalMin = housekeepingIntervalMin;
 
             this._eventConsumer = eventConsumer;
             this._logger = logger;
@@ -88,6 +94,24 @@ namespace Resonance
             var backoffDelay = this.GetBackOffDelay(this._attempts, this._minDelayInMs, this._maxDelayInMs);
             if (backoffDelay.TotalMilliseconds > 0)
             {
+                if (_housekeepingIntervalMin > 0 // Enabled
+                    && (backoffDelay.TotalMilliseconds == this._maxDelayInMs) // Currently idle/backing off for maxDelay
+                    && _lastHouseKeepingRun.GetValueOrDefault() < DateTime.UtcNow.AddMinutes(-1 * _housekeepingIntervalMin)) // More than x minutes passed since last housekeeping run
+                {
+                    try
+                    {
+                        LogTrace("Running housekeeping tasks...");
+                        _eventConsumer.PerformHouseKeepingTasks(); // No await, blocking is no problem here.
+                        LogTrace("Housekeeping tasks done.");
+                        _lastHouseKeepingRun = DateTime.UtcNow;
+                    }
+                    catch (Exception ex)
+                    {
+                        LogWarning("Housekeeping tasks have failed. Worker will continue, but this may indicate a serious problem. Details: {0}", ex);
+                        _lastHouseKeepingRun = DateTime.UtcNow; // Even though it failed, we still set it, because we don't want it to retry too soon after this error.
+                    }
+                }
+
                 LogTrace("Backing off for {backoffDelay}", backoffDelay);
 
                 try
