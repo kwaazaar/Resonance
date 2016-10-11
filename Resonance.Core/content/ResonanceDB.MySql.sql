@@ -69,8 +69,8 @@ CREATE TABLE `failedsubscriptionevent` (
   `FunctionalKey` varchar(100) CHARACTER SET utf8mb4 DEFAULT NULL,
   `Priority` int(11) NOT NULL,
   `PayloadId` BIGINT(20) UNSIGNED DEFAULT NULL,
-  `DeliveryDateUtc` datetime(6) NOT NULL,
-  `FailedDateUtc` datetime(6) DEFAULT NULL,
+  `DeliveryDateUtc` datetime(6) DEFAULT NULL,
+  `FailedDateUtc` datetime(6) NOT NULL,
   `Reason` int(11) NOT NULL COMMENT '0=Unknown, 1=Expired, 2=MaxRetriesReached, 3=Other',
   `ReasonOther` varchar(1000) CHARACTER SET utf8mb4 DEFAULT NULL,
   PRIMARY KEY (`Id`)
