@@ -2,7 +2,7 @@
   "title": "Resonance",
   "copyright": "Copyright 2016 - Robert te Kaat",
   "description": "Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc.",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "authors": [ "Robert te Kaat" ],
 
   "buildOptions": {
@@ -40,7 +40,7 @@
     "summary": "Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc. To get a quick idea, check the repo on GitHub for documentation and code samples: https://github.com/kwaazaar/Resonance",
     "tags": [ "pub", "sub", "esb", "queue", "topic", "subscription", "microservice", "messaging", "event", "publish", "subscribe", "mssql", "mysql", "netcore" ],
     "owners": [ "Robert te Kaat" ],
-    "releaseNotes": "Housekeeping logic added for moving SubscriptionEvents that have reached MaxDeliveries or have expired to FailedSubscriptionEvents. Enabled by default for the EventConsumptionWorker. NB: Datamodel has changed once again (both MySql and MsSql).",
+    "releaseNotes": "",
     "iconUrl": "https://raw.githubusercontent.com/kwaazaar/Resonance/master/Resonance-Icon-64x64.png",
     "projectUrl": "https://github.com/kwaazaar/Resonance",
     "licenseUrl": "https://opensource.org/licenses/MIT",
