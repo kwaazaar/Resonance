@@ -17,6 +17,7 @@ namespace Resonance
         Topic GetTopicByName(string name);
         Topic AddOrUpdateTopic(Topic topic);
         void DeleteTopic(Int64 id, bool inclSubscriptions);
+        void PerformHouseKeepingTasks();
         #endregion
 
         #region Async
@@ -28,6 +29,7 @@ namespace Resonance
         Task<Topic> GetTopicByNameAsync(string name);
         Task<Topic> AddOrUpdateTopicAsync(Topic topic);
         Task DeleteTopicAsync(Int64 id, bool inclSubscriptions);
+        Task PerformHouseKeepingTasksAsync();
         #endregion
     }
 }

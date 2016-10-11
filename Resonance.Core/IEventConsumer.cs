@@ -18,6 +18,7 @@ namespace Resonance
         Subscription GetSubscriptionByName(string name);
         Subscription AddOrUpdateSubscription(Subscription subscription);
         void DeleteSubscription(Int64 id);
+        void PerformHouseKeepingTasks();
         #endregion
 
         #region Async
@@ -31,6 +32,7 @@ namespace Resonance
         Task<Subscription> GetSubscriptionByNameAsync(string name);
         Task<Subscription> AddOrUpdateSubscriptionAsync(Subscription subscription);
         Task DeleteSubscriptionAsync(Int64 id);
+        Task PerformHouseKeepingTasksAsync();
         #endregion
     }
 }

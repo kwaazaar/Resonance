@@ -52,6 +52,11 @@ namespace Resonance
         {
             return PublishAsync<T>(topicName, eventName, publicationDateUtc, expirationDateUtc, functionalKey, priority, headers, payload).GetAwaiter().GetResult();
         }
+
+        public void PerformHouseKeepingTasks()
+        {
+            PerformHouseKeepingTasksAsync().GetAwaiter().GetResult();
+        }
         #endregion
 
         #region Async
@@ -152,6 +157,12 @@ namespace Resonance
                 payloadAsString = JsonConvert.SerializeObject(payload); // No specific parameters: the consumer must understand the json as well
 
             return await PublishAsync(topicName, eventName, publicationDateUtc, expirationDateUtc, functionalKey, priority, headers, payloadAsString).ConfigureAwait(false);
+        }
+
+        public async Task PerformHouseKeepingTasksAsync()
+        {
+            using (var repo = _repoFactory.CreateRepo())
+                await repo.PerformHouseKeepingTasksAsync().ConfigureAwait(false);
         }
         #endregion
 

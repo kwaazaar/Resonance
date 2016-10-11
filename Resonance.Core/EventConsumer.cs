@@ -63,6 +63,11 @@ namespace Resonance
         {
             DeleteSubscriptionAsync(id).GetAwaiter().GetResult();
         }
+
+        public void PerformHouseKeepingTasks()
+        {
+            PerformHouseKeepingTasksAsync().GetAwaiter().GetResult();
+        }
         #endregion
 
         #region Async
@@ -134,6 +139,12 @@ namespace Resonance
         {
             using (var repo = _repoFactory.CreateRepo())
                 await repo.MarkFailedAsync(id, deliveryKey, reason).ConfigureAwait(false);
+        }
+
+        public async Task PerformHouseKeepingTasksAsync()
+        {
+            using (var repo = _repoFactory.CreateRepo())
+                await repo.PerformHouseKeepingTasksAsync().ConfigureAwait(false);
         }
         #endregion
     }

@@ -169,5 +169,45 @@ namespace Resonance.Repo.Database
 
             return ces;
         }
+
+        public async Task PerformHouseKeepingTasksAsync()
+        {
+            await HouseKeeping_MaxDeliveriesReachedSubscriptionEvents().ConfigureAwait(false);
+            await HouseKeeping_ExpiredSubscriptionEvents().ConfigureAwait(false);
+        }
+
+        private async Task<int> HouseKeeping_ExpiredSubscriptionEvents()
+        {
+            var query = "DELETE	SubscriptionEvent"
+                + " OUTPUT deleted.Id, deleted.SubscriptionId"
+                + " , deleted.EventName, deleted.PublicationDateUtc, deleted.FunctionalKey, deleted.Priority, deleted.PayloadId, deleted.DeliveryDateUtc"
+                + "	, @utcNow, 1, null" // 1 = expired
+                + " INTO FailedSubscriptionEvent"
+                + " (Id, SubscriptionId"
+                + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
+                + " , FailedDateUtc, Reason, ReasonOther)"
+                + " WHERE (SubscriptionEvent.ExpirationDateUtc IS NOT NULL AND SubscriptionEvent.ExpirationDateUtc < @utcNow)";
+            var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
+
+            return rowsAffected;
+        }
+
+        private async Task<int> HouseKeeping_MaxDeliveriesReachedSubscriptionEvents()
+        {
+            var query = "DELETE	se"
+                + " OUTPUT deleted.Id, deleted.SubscriptionId"
+                + "	, deleted.EventName, deleted.PublicationDateUtc, deleted.FunctionalKey, deleted.Priority, deleted.PayloadId, deleted.DeliveryDateUtc"
+                + "	, @utcNow, 2, null" // 2 = MaxRetriesReached
+                + " INTO FailedSubscriptionEvent"
+                + " (Id, SubscriptionId"
+                + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
+                + " , FailedDateUtc, Reason, ReasonOther)"
+                + " FROM     SubscriptionEvent se"
+                + " JOIN    Subscription s ON s.Id = se.SubscriptionId"
+                + " WHERE (se.DeliveryCount >= s.MaxDeliveries)";
+            var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
+
+            return rowsAffected;
+        }
     }
 }

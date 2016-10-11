@@ -211,5 +211,72 @@ namespace Resonance.Repo.Database
             }
             return lockedIds;
         }
+
+        public async Task PerformHouseKeepingTasksAsync()
+        {
+            await HouseKeeping_MaxDeliveriesReachedSubscriptionEvents().ConfigureAwait(false);
+            await HouseKeeping_ExpiredSubscriptionEvents().ConfigureAwait(false);
+        }
+
+        private async Task<int> HouseKeeping_ExpiredSubscriptionEvents()
+        {
+            await BeginTransactionAsync().ConfigureAwait(false);
+
+            try
+            {
+                var query = "INSERT INTO FailedSubscriptionEvent"
+                    + " ( Id, SubscriptionId"
+                    + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
+                    + " , FailedDateUtc, Reason, ReasonOther)"
+                    + " SELECT Id, SubscriptionId"
+                    + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
+                    + " , @utcNow, 1, null" // 1 = Expired
+                    + " FROM SubscriptionEvent"
+                    + " WHERE (SubscriptionEvent.ExpirationDateUtc IS NOT NULL AND SubscriptionEvent.ExpirationDateUtc < @utcNow);"
+                    + " DELETE se"
+                    + " FROM SubscriptionEvent se"
+                    + " JOIN FailedSubscriptionEvent fse ON fse.Id = se.Id;";
+                var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
+                await CommitTransactionAsync().ConfigureAwait(false);
+
+                return rowsAffected;
+            }
+            catch (Exception)
+            {
+                await RollbackTransactionAsync().ConfigureAwait(false);
+                throw;
+            }
+        }
+
+        private async Task<int> HouseKeeping_MaxDeliveriesReachedSubscriptionEvents()
+        {
+            await BeginTransactionAsync().ConfigureAwait(false);
+
+            try
+            {
+                var query = "INSERT INTO FailedSubscriptionEvent"
+                    + " (Id, SubscriptionId"
+                    + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
+                    + " , FailedDateUtc, Reason, ReasonOther)"
+                    + " SELECT se.Id, se.SubscriptionId"
+                    + " , se.EventName, se.PublicationDateUtc, se.FunctionalKey, se.Priority, se.PayloadId, se.DeliveryDateUtc"
+                    + " , @utcNow, 2, null" // 2 = MaxRetriesReached
+                    + " FROM SubscriptionEvent se"
+                    + " JOIN Subscription s ON s.Id = se.SubscriptionId"
+                    + " WHERE se.DeliveryCount >= s.MaxDeliveries;"
+                    + " DELETE se"
+                    + " FROM SubscriptionEvent se"
+                    + " JOIN FailedSubscriptionEvent fse ON fse.Id = se.Id;";
+                var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
+                await CommitTransactionAsync().ConfigureAwait(false);
+
+                return rowsAffected;
+            }
+            catch (Exception)
+            {
+                await RollbackTransactionAsync().ConfigureAwait(false);
+                throw;
+            }
+        }
     }
 }
