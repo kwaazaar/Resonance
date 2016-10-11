@@ -1,7 +1,7 @@
 ![Resonance](https://github.com/kwaazaar/Resonance/blob/master/Resonance-Icon-64x64.png "Resonance") [![Build status](https://ci.appveyor.com/api/projects/status/3wu0str4v3e8hgx4/branch/master?svg=true)](https://ci.appveyor.com/project/RobertTeKaat/resonance/branch/master) [![NuGet](https://img.shields.io/nuget/v/Resonance.Core.svg?maxAge=300)](https://www.nuget.org/packages/Resonance.Core/)
 #Resonance
 Messaging library, supporting pub-sub, using MS SQL Server or MySql Server for storage.
-Ideal for implementing a (business) event driven architecture, CQRS, pub-sub, microservices, etc.
+Ideal for implementing a (business) event driven architecture, CQRS/EVS, pub-sub, microservices, etc.
 
 **Core features:**
 * Pub-sub (using topics and subscriptions)
@@ -72,14 +72,14 @@ The subscription can receive messages from multiple topics. In this case it only
     var orderEvent = consumer.ConsumeNext<Order>("Demo Subscription").SingleOrDefault();
 
 ## Locking: the Visibility Timeout ##
-If no messages are available, ConsumeNext will return null. If it *does* return a message (order in this case), the order can be processed, eg: by sending an invoice. However, if multiple eventconsumers are consuming events from the same subscription (which is a very valid scenario when many using an event driven architecture), other consumers should not receive the same order, since it would be processed more than once. This is the reason the message must be locked, before it can be consumed.
+If no messages are available, ConsumeNext will return null. If it *does* return a message (order in this case), the order can be processed, eg: by sending an invoice. However, if multiple eventconsumers are consuming events from the same subscription (which is a very valid scenario when requiring high throughput and scaling out), other consumers should not receive the same order, since it would be processed more than once. This is the reason the message must be locked, before it can be consumed.
 
 Locking is done by using a making the message invisible to other consumers, so that it will not be consumed more than once. The consumer gets a certain time to perform the processing. Once the message is processed, the consumer must explicitly *mark it consumed*:
 
     consumer.MarkConsumed(orderEvent.Id, orderEvent.DeliveryKey);
     
-This will remove the event from the subscription-queue so that it cannot be consumed anymore. If the consumer does not process the message before the visibility timeout expires, the message becomes visible again and can be consumed again (*retried*).
-The *delivery key* is generated on every 'lock' and must be provided when marking the message consumed as a way of prove the lock is yours to begin with.
+This will remove the event from the subscription-queue so that it cannot be consumed anymore. If the consumer does not process the message before the visibility timeout expires, the message becomes visible again and can be consumed once more (*retried*).
+The *delivery key* is generated on every 'lock' and must be provided when marking the message consumed as a way of prove the lock was yours to begin with.
 
 The consumer decides how long the message must remain invisible. It can do so by providing the optional *visibilityTimeout* parameter to the ConsumeNext-method. By default it is set to 60 seconds. It's usually best to keep it rather large: if processing runs out of time, it can be very complex (if not impossible) to undo all processing done so far. And if it needs to be retried, it's rarely a problem to wait a while for the visibility timeout to expire.
 
@@ -112,7 +112,7 @@ Using the EventConsumptionWorker is not much harder than using the EventConsumer
 Messages are always *delivered* in the order of publication: first in, first out (fifo).
 However, this is no guarantee that messages are also processed in the same order: when a subscription is consumed by multiple eventconsumers, perhaps each processing messages on multiple threads, it is very likely that the processing of a later message finishes sooner than earlier messages. It is a best practice to design a consuming system in such way that it handles these situations gracefully, eg. by dropping older messages.
 
-However, this is often not very trivial, especially when different parts of a business process are handled by different subsystems. These systems are normally not aware of eachother and have no clue what messages the others have or have not processed. In this case *functional ordering* can be used.
+However, this is often not very trivial, especially when different parts of a business process are handled by different subsystems. These systems are normally not aware of eachother and have no knowledge about which messages others have or have not processed. In this case *functional ordering* can be used.
 
 Functional ordering means that messages are still delivered in the order of publication, but this is done *per functional key*. The functional key can be specified for a message, which allows all messages marked with the same functional key to be delivered in the correct order.
 
@@ -121,7 +121,7 @@ Functional ordering means that messages are still delivered in the order of publ
 * It is the next in line for messages with the same functional key (for each functional key the publishingdate of the last consumed message is stored (per subscription))
 * There are currently no messages being locked (invisible) with the same functional key: the current processing of that message may time out, requiring it to be redelivered.
 
-In this way, Resonance relieves the event consumers of the complex task of handling incorrectly ordered messages themselves and is therefore a very powerfull feature.
+In this way, Resonance relieves the event consumers of the complex task of handling incorrectly ordered messages themselves and is therefore a very powerfull feature, not found in any other library (at least I couldn't spot it ;-)).
 
 ## Advanced features ##
 The examples above show basic usage of Resonance. There are however some more supported scenarios. These are briefly explained here.
