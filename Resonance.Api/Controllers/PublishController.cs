@@ -25,7 +25,7 @@ namespace Resonance.Api.Controllers
         [HttpPost("{name}/{functionalKey?}")]
         [ProducesResponseType(typeof(TopicEvent), 200)]
         public async Task<IActionResult> Publish([FromRoute]string name, [FromRoute]string functionalKey = null,
-            [FromQuery]DateTime? publicationDateUtc = null, [FromQuery]DateTime? expirationDateUtc = null, [FromQuery]string payload = null)
+            [FromQuery]DateTime? publicationDateUtc = null, [FromQuery]DateTime? expirationDateUtc = null, [FromQuery] int priority = 0, [FromQuery]string payload = null)
         {
             if (String.IsNullOrWhiteSpace(name))
                 return BadRequest("No topicname specified");
@@ -42,7 +42,13 @@ namespace Resonance.Api.Controllers
                     payload = await new StreamReader(Request.Body).ReadToEndAsync();
 
                 // Now publish
-                var te = await _publisher.PublishAsync(topicName: name, publicationDateUtc: publicationDateUtc, expirationDateUtc: expirationDateUtc, functionalKey: functionalKey, headers: headers, payload: payload);
+                var te = await _publisher.PublishAsync(topicName: name,
+                    publicationDateUtc: publicationDateUtc, 
+                    expirationDateUtc: expirationDateUtc, 
+                    functionalKey: functionalKey, 
+                    priority: priority,
+                    headers: headers, 
+                    payload: payload);
                 return Ok(te);
             }
             catch (ArgumentException argEx)
