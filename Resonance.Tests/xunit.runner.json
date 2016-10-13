@@ -2,5 +2,6 @@
   "ConnectionStrings": {
     "Resonance.MsSql": "Server=(local)\\SQL2016;Database=ResonanceDB;User ID=sa;Password=Password12!",
     "Resonance.MySql": "Server=localhost;Database=ResonanceDB;UserId=root;Password=Password12!;Allow User Variables=True;"
-  }
+  },
+  "_UseMySql": "true"
 }

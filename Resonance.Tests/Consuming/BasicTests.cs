@@ -41,7 +41,7 @@ namespace Resonance.Tests.Consuming
             var ce2 = _consumer.ConsumeNextAsync(subName).Result.SingleOrDefault();
             Assert.Null(ce2); // Locked, so should not be returned.
 
-            Thread.Sleep(TimeSpan.FromSeconds(visibilityTimeout)); // Wait until visibilitytimeout has expired
+            Thread.Sleep(TimeSpan.FromSeconds(visibilityTimeout+1)); // Wait until visibilitytimeout has expired
             ce2 = _consumer.ConsumeNextAsync(subName).Result.SingleOrDefault();
             Assert.NotNull(ce2); // Should be unlocked again
         }

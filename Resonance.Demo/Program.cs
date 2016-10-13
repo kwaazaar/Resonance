@@ -18,6 +18,8 @@ namespace Resonance.Demo
 {
     public class Program
     {
+        private const int WORKER_COUNT = 2;
+
         private static IServiceProvider serviceProvider;
 
         #region Payloads
@@ -114,24 +116,38 @@ namespace Resonance.Demo
             //if (ce != null)
             //    consumer.MarkConsumed(ce.Id, ce.DeliveryKey);
 
-            var worker = new EventConsumptionWorker(
-                eventConsumer: consumer,
-                subscriptionName: "Demo Subscription 1",
-                consumeAction: (ceW) =>
-                {
-                    //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
-                    return Task.FromResult<ConsumeResult>(DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded);
-                },
-                logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>()
-                );
 
-            worker.Start();
-            Console.WriteLine("Press a key to stop the worker...");
+            var workers = new EventConsumptionWorker[WORKER_COUNT];
+            for (int i = 0; i < WORKER_COUNT; i++)
+            {
+                workers[i] = CreateWorker(consumer, "Demo Subscription 1");
+                workers[i].Start();
+            }
+            Console.WriteLine("Press a key to stop the worker(s)...");
             Console.ReadKey();
-            worker.Stop();
+            for (int i = 0; i < WORKER_COUNT; i++)
+            {
+                if (workers[i].IsRunning())
+                    workers[i].Stop();
+            }
 
             //consumer.DeleteSubscription(subscription1.Id);
             //publisher.DeleteTopic(topic1.Id, true);
+        }
+
+        public static EventConsumptionWorker CreateWorker(IEventConsumer consumer, string subscriptionName)
+        {
+            var worker = new EventConsumptionWorker(
+                            eventConsumer: consumer,
+                            subscriptionName: subscriptionName,
+                            consumeAction: (ceW) =>
+                            {
+                    //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
+                    return Task.FromResult<ConsumeResult>(DateTime.UtcNow.Millisecond == 1 ? ConsumeResult.Failed("sorry") : ConsumeResult.Succeeded);
+                            },
+                            logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>()
+                            );
+            return worker;
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)
@@ -153,18 +169,18 @@ namespace Resonance.Demo
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
 
             // To use MSSQLServer:
-            //var connectionString = config.GetConnectionString("Resonance.MsSql");
-            //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
-            //{
-            //    return new MsSqlEventingRepoFactory(connectionString);
-            //});
-
-            // To use MySQL:
-            var connectionString = config.GetConnectionString("Resonance.MySql");
+            var connectionString = config.GetConnectionString("Resonance.MsSql");
             serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
             {
-                return new MySqlEventingRepoFactory(connectionString);
+                return new MsSqlEventingRepoFactory(connectionString);
             });
+
+            // To use MySQL:
+            //var connectionString = config.GetConnectionString("Resonance.MySql");
+            //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
+            //{
+            //    return new MySqlEventingRepoFactory(connectionString);
+            //});
 
             // Configure EventPublisher
             serviceCollection.AddTransient<IEventPublisher, EventPublisher>();
