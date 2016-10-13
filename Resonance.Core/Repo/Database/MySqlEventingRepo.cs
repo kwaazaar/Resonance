@@ -129,7 +129,7 @@ namespace Resonance.Repo.Database
                         "   and(seInner.InvisibleUntilUtc IS NULL OR seInner.InvisibleUntilUtc < @utcNow)" +
                         "   and(s.MaxDeliveries = 0 OR s.MaxDeliveries > seInner.DeliveryCount)" +
                         "   order by seInner.Priority DESC, seInner.PublicationDateUtc ASC" +
-                        "   limit 1) tmp on tmp.Id = se.Id and IFNULL(tmp.DeliveryKey, '') = IFNULL(se.DeliveryKey, '')" +
+                        "   limit 1 FOR UPDATE) tmp on tmp.Id = se.Id and IFNULL(tmp.DeliveryKey, '') = IFNULL(se.DeliveryKey, '')" +
                         " set se.InvisibleUntilUtc = @invisibleUntilUtc," +
                         " se.DeliveryCount = DeliveryCount + 1," +
                         " se.DeliveryKey = @deliveryKey," +
@@ -183,7 +183,7 @@ namespace Resonance.Repo.Database
                         "     and       seInv.Id IS NULL" + // Geen in behandeling nu
                         "     and       (lc.SubscriptionId IS NULL OR (lc.PublicationDateUtc <= seInner.PublicationDateUtc))" + // <=, because publicationdateutc may be same :-s
                         "   order by    seInner.Priority DESC, seInner.PublicationDateUtc ASC" +
-                        "   limit 1) tmp on tmp.Id = se.Id and IFNULL(tmp.DeliveryKey, '') = IFNULL(se.DeliveryKey, '')" +
+                        "   limit 1 FOR UPDATE) tmp on tmp.Id = se.Id and IFNULL(tmp.DeliveryKey, '') = IFNULL(se.DeliveryKey, '')" +
                         " set se.InvisibleUntilUtc = @invisibleUntilUtc," +
                         "   se.DeliveryCount = DeliveryCount + 1," +
                         "   se.DeliveryKey = @deliveryKey," +

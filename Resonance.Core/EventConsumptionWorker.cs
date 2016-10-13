@@ -198,7 +198,7 @@ namespace Resonance
                         try
                         {
                             // Suspend processing
-                            await Task.Delay(suspendedUntilUtc.Value - DateTime.UtcNow, _cancellationToken.Token);
+                            await Task.Delay(suspendedUntilUtc.Value - DateTime.UtcNow, _cancellationToken.Token).ConfigureAwait(false);
                         }
                         catch (OperationCanceledException) { } // Because the delay was cancelled through the _cancellationToken
                         lock (_suspendTimeoutLock)
@@ -216,7 +216,7 @@ namespace Resonance
         {
             try
             {
-                var workitems = await this.TryGetWork(this._batchSize);
+                var workitems = await this.TryGetWork(this._batchSize).ConfigureAwait(false);
                 if (workitems == null || (!workitems.Any<ConsumableEvent>())) // No result or empty list
                 {
                     this._attempts++;
@@ -306,7 +306,7 @@ namespace Resonance
         {
             try
             {
-                var consEvent = await _eventConsumer.ConsumeNextAsync(_subscriptionName, _visibilityTimeout, maxWorkItems);
+                var consEvent = await _eventConsumer.ConsumeNextAsync(_subscriptionName, _visibilityTimeout, maxWorkItems).ConfigureAwait(false);
                 return consEvent;
             }
             catch (Exception ex)
@@ -354,12 +354,12 @@ namespace Resonance
 
             if (result.ResultType == ConsumeResultType.Succeeded)
             {
-                bool markedComplete = false;
+                bool markedConsumed = false;
 
                 try
                 {
                     await _eventConsumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey).ConfigureAwait(false);
-                    markedComplete = true;
+                    markedConsumed = true;
                     LogTrace("Event consumption succeeded for event with id {Id} and functional key {FunctionalKey}.",
                         ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a");
                 }
@@ -371,13 +371,12 @@ namespace Resonance
                     mustRollback = true;
                 }
 
-                if (!markedComplete)
+                if (!markedConsumed)
                     mustRollback = true;
             }
             else if (result.ResultType == ConsumeResultType.Failed)
             {
                 mustRollback = true;
-                // Let op: een exception anders dan BusinessEventWorkerException, wordt als corrupt beschouwd!
                 LogError("Exception occurred while processing event with id {Id} and functional key {FunctionalKey}: {Reason}.",
                     ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", result.Reason);
 
