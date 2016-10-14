@@ -257,7 +257,9 @@ namespace Resonance.Repo.Database
 
                     // Update TopicSubscriptions (by removing them and rebuilding them again)
                     await RemoveTopicSubscriptions(subscription.Id.Value).ConfigureAwait(false);
-                    await AddTopicSubscriptions(subscription.Id.Value, subscription.TopicSubscriptions).ConfigureAwait(false);
+
+                    if (subscription.TopicSubscriptions != null && subscription.TopicSubscriptions.Count > 0)
+                        await AddTopicSubscriptions(subscription.Id.Value, subscription.TopicSubscriptions).ConfigureAwait(false);
 
                     await CommitTransactionAsync().ConfigureAwait(false);
                 }

@@ -8,12 +8,39 @@ namespace Resonance.Models
 {
     public class Subscription
     {
+        /// <summary>
+        /// Id of the subscription. Will be automatically determined by the repo on add/insert.
+        /// </summary>
         public Int64? Id { get; set; }
+        
+        /// <summary>
+        /// Name of the subscription. Must be unique across the repo.
+        /// </summary>
         public string Name { get; set; }
-        public List<TopicSubscription> TopicSubscriptions { get; set; }
+
+        /// <summary>
+        /// Topic subscriptions for this subscription.
+        /// </summary>
+        public List<TopicSubscription> TopicSubscriptions { get; set; } = new List<TopicSubscription>();
+        
+        /// <summary>
+        /// Apply functional ordering (only enable this when required)
+        /// </summary>
         public bool Ordered { get; set; }
+        
+        /// <summary>
+        /// Time to live (seconds)
+        /// </summary>
         public int? TimeToLive { get; set; }
+
+        /// <summary>
+        /// 0 = Unlimited
+        /// </summary>
         public int MaxDeliveries { get; set; }
+
+        /// <summary>
+        /// Delivery delay (seconds)
+        /// </summary>
         public int? DeliveryDelay { get; set; }
     }
 
@@ -21,7 +48,7 @@ namespace Resonance.Models
     {
         public Int64? Id { get; set; }
         public Int64 TopicId { get; set; }
-        public bool Enabled { get; set; }
+        public bool Enabled { get; set; } = true;
         /// <summary>
         /// Indicates wheter this subscriptions is filtered, meaning not all messages of the topic will be propagated, but only the ones that match the specified filter.
         /// Make sure filters are specified, otherwise no messages will match.
@@ -30,7 +57,7 @@ namespace Resonance.Models
         /// <summary>
         /// Topic-filters. Make sure Filtered is set to true, otherwise the filters are ignored.
         /// </summary>
-        public List<TopicSubscriptionFilter> Filters { get; set; }
+        public List<TopicSubscriptionFilter> Filters { get; set; } = new List<TopicSubscriptionFilter>();
     }
 
     public class TopicSubscriptionFilter
