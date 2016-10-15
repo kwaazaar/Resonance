@@ -17,11 +17,11 @@ namespace Resonance.Models
         public int Priority { get; set; }
         public Int64? PayloadId { get; set; }
         public string Payload { get; set; }
-        public DateTime? ExpirationDateUtc { get; set; }
-        public DateTime? DeliveryDelayedUntilUtc { get; set; }
+        public DateTime ExpirationDateUtc { get; set; }
+        public DateTime DeliveryDelayedUntilUtc { get; set; }
         public int DeliveryCount { get; set; }
         public DateTime? DeliveryDateUtc { get; set; }
         public string DeliveryKey { get; set; }
-        public DateTime? InvisibleUntilUtc { get; set; }
+        public DateTime InvisibleUntilUtc { get; set; }
     }
 }

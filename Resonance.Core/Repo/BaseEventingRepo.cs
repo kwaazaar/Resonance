@@ -8,12 +8,25 @@ namespace Resonance.Repo
 {
     public abstract class BaseEventingRepo
     {
+
+        /// <summary>
+        /// Min datetime to use (Sql Server does not support any lower value than this)
+        /// </summary>
+        public static DateTime MinDateTime { get { return new DateTime(1753, 1, 1); } }
+
+        /// <summary>
+        /// Max datetime to use
+        /// </summary>
+        public static DateTime MaxDateTime { get { return new DateTime(9999, 12, 31); } }
+
         public async Task<TopicEvent> PublishTopicEventAsync(TopicEvent newTopicEvent, IEnumerable<Subscription> subscriptionsMatching)
         {
             await BeginTransactionAsync().ConfigureAwait(false);
 
             try
             {
+                PrepareTopicEvent(newTopicEvent);
+
                 var topicEventId = await AddTopicEventAsync(newTopicEvent).ConfigureAwait(false);
                 newTopicEvent.Id = topicEventId;
 
@@ -28,14 +41,14 @@ namespace Resonance.Repo
                     if (subscription.TimeToLive.HasValue)
                     {
                         subExpirationDateUtc = newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.TimeToLive.Value);
-                        if (newTopicEvent.ExpirationDateUtc.HasValue && (newTopicEvent.ExpirationDateUtc.Value < subExpirationDateUtc))
+                        if (newTopicEvent.ExpirationDateUtc < subExpirationDateUtc)
                             subExpirationDateUtc = newTopicEvent.ExpirationDateUtc;
                     }
 
                     // Delivery can be initially delayed, but it cannot exceed the expirationdate (would be useless)
                     var deliveryDelayedUntilUtc = subscription.DeliveryDelay.HasValue
                         ? newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value)
-                        : default(DateTime?);
+                        : MinDateTime;
 
                     var newSubscriptionEvent = new SubscriptionEvent
                     {
@@ -50,8 +63,8 @@ namespace Resonance.Repo
                         ExpirationDateUtc = subExpirationDateUtc,
                         DeliveryDelayedUntilUtc = deliveryDelayedUntilUtc,
                         DeliveryCount = 0,
-                        DeliveryKey = null,
-                        InvisibleUntilUtc = null,
+                        DeliveryKey = string.Empty,
+                        InvisibleUntilUtc = MinDateTime,
                     };
 
                     if (ParallelQueriesSupport)
@@ -82,6 +95,14 @@ namespace Resonance.Repo
                 await RollbackTransactionAsync().ConfigureAwait(false);
                 throw;
             }
+        }
+
+        private void PrepareTopicEvent(TopicEvent newTopicEvent)
+        {
+            if (!newTopicEvent.PublicationDateUtc.HasValue)
+                newTopicEvent.PublicationDateUtc = DateTime.UtcNow;
+            if (newTopicEvent.FunctionalKey == null)
+                newTopicEvent.FunctionalKey = string.Empty;
         }
 
         protected abstract Task<Int64> AddSubscriptionEventAsync(SubscriptionEvent newSubscriptionEvent);

@@ -654,10 +654,10 @@ namespace Resonance.Repo.Database
                     { "@payloadId", subscriptionEvent.PayloadId },
                     { "@expirationDateUtc", subscriptionEvent.ExpirationDateUtc },
                     { "@deliveryDelayedUntilUtc", subscriptionEvent.DeliveryDelayedUntilUtc },
-                    { "@deliveryCount", default(int) },
-                    { "@deliveryDateUtc", default(DateTime?) },
-                    { "@deliveryKey", default(string) },
-                    { "@invisibleUntilUtc", default(DateTime?) },
+                    { "@deliveryCount", subscriptionEvent.DeliveryCount },
+                    { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
+                    { "@deliveryKey", subscriptionEvent.DeliveryKey },
+                    { "@invisibleUntilUtc", subscriptionEvent.InvisibleUntilUtc },
                 };
             var ids = await TranQueryAsync<Int64>("insert into SubscriptionEvent (SubscriptionId, TopicEventId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryDateUtc, DeliveryKey, InvisibleUntilUtc)"
                 + " values (@subscriptionId, @topicEventId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryDateUtc, @deliveryKey, @invisibleUntilUtc)"

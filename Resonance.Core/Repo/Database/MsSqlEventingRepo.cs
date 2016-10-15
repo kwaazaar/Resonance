@@ -82,11 +82,11 @@ namespace Resonance.Repo.Database
                     + " from SubscriptionEvent se"
                     + " join Subscription s on s.Id = se.SubscriptionId" // Needed for MaxRetries
                     + " where se.SubscriptionId = @subscriptionId"
-                    + " and (se.DeliveryDelayedUntilUtc IS NULL OR se.DeliveryDelayedUntilUtc < @utcNow)" // Must be allowed to be delivered
-                    + " and (se.ExpirationDateUtc IS NULL OR se.ExpirationDateUtc > @utcNow)" // Must not yet have expired
-                    + " and (se.InvisibleUntilUtc IS NULL OR se.InvisibleUntilUtc < @utcNow)" // Must not be 'locked'/made invisible by other consumer
+                    + " and se.DeliveryDelayedUntilUtc < @utcNow" // Must be allowed to be delivered
+                    + " and se.ExpirationDateUtc > @utcNow" // Must not yet have expired
+                    + " and se.InvisibleUntilUtc < @utcNow" // Must not be 'locked'/made invisible by other consumer
                     + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
-                    + " order by se.Priority DESC, se.PublicationDateUtc ASC" // Warning: prio can mess everything up!
+                    + " order by se.Priority ASC, se.PublicationDateUtc ASC" // Warning: prio can mess everything up!
                     + ") UPDATE DE"
                     + " SET InvisibleUntilUtc = @invisibleUntilUtc,"
                     + "    DeliveryCount = DE.DeliveryCount + 1,"
@@ -121,18 +121,17 @@ namespace Resonance.Repo.Database
                         + "   on seInv.SubscriptionId = se.SubscriptionId"
                         + "   and seInv.FunctionalKey = se.FunctionalKey"
                         + "   and seInv.Id != se.Id"
-                        + "   and seInv.InvisibleUntilUtc IS NOT NULL"
                         + "   and seInv.InvisibleUntilUtc > @utcNow"
                         + " left join LastConsumedSubscriptionEvent lc" // For functional ordering
                         + "   on lc.SubscriptionId = se.SubscriptionId and lc.FunctionalKey = se.FunctionalKey"
                         + " where se.SubscriptionId = @subscriptionId"
-                        + " and (se.DeliveryDelayedUntilUtc IS NULL OR se.DeliveryDelayedUntilUtc < @utcNow)" // Must be allowed to be delivered
-                        + " and (se.ExpirationDateUtc IS NULL OR se.ExpirationDateUtc > @utcNow)" // Must not yet have expired
-                        + " and (se.InvisibleUntilUtc IS NULL OR se.InvisibleUntilUtc < @utcNow)" // Must not be 'locked'/made invisible by other consumer
+                        + " and se.DeliveryDelayedUntilUtc < @utcNow" // Must be allowed to be delivered
+                        + " and se.ExpirationDateUtc > @utcNow" // Must not yet have expired
+                        + " and se.InvisibleUntilUtc < @utcNow" // Must not be 'locked'/made invisible by other consumer
                         + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
                         + "	and	seInv.Id IS NULL" // Geen in behandeling nu
                         + " and	(lc.SubscriptionId IS NULL OR (lc.PublicationDateUtc < se.PublicationDateUtc))" // Newer than last published (TODO: PRIORITY!!)
-                        + " order by se.Priority DESC, se.PublicationDateUtc ASC" // Warning: prio can mess everything up!
+                        + " order by se.Priority ASC, se.PublicationDateUtc ASC" // Warning: prio can mess everything up!
                         + ") UPDATE DE"
                         + " SET InvisibleUntilUtc = @invisibleUntilUtc,"
                         + "    DeliveryCount = DE.DeliveryCount + 1,"

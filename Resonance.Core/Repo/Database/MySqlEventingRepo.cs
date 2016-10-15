@@ -124,12 +124,12 @@ namespace Resonance.Repo.Database
                         "   from SubscriptionEvent seInner" +
                         "   join Subscription s on s.Id = seInner.SubscriptionId" +
                         "   where seInner.SubscriptionId = @subscriptionId" +
-                        "   and(seInner.DeliveryDelayedUntilUtc IS NULL OR seInner.DeliveryDelayedUntilUtc < @utcNow)" +
-                        "   and(seInner.ExpirationDateUtc IS NULL OR seInner.ExpirationDateUtc > @utcNow)" +
-                        "   and(seInner.InvisibleUntilUtc IS NULL OR seInner.InvisibleUntilUtc < @utcNow)" +
+                        "   and seInner.DeliveryDelayedUntilUtc < @utcNow" +
+                        "   and seInner.ExpirationDateUtc > @utcNow" +
+                        "   and seInner.InvisibleUntilUtc < @utcNow" +
                         "   and(s.MaxDeliveries = 0 OR s.MaxDeliveries > seInner.DeliveryCount)" +
-                        "   order by seInner.Priority DESC, seInner.PublicationDateUtc ASC" +
-                        "   limit 1 FOR UPDATE) tmp on tmp.Id = se.Id and IFNULL(tmp.DeliveryKey, '') = IFNULL(se.DeliveryKey, '')" +
+                        "   order by seInner.Priority ASC, seInner.PublicationDateUtc ASC" +
+                        "   limit 1 FOR UPDATE) tmp on tmp.Id = se.Id and tmp.DeliveryKey = se.DeliveryKey" +
                         " set se.InvisibleUntilUtc = @invisibleUntilUtc," +
                         " se.DeliveryCount = DeliveryCount + 1," +
                         " se.DeliveryKey = @deliveryKey," +
@@ -161,34 +161,36 @@ namespace Resonance.Repo.Database
                     var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout);
 
                     var query = "set @updatedSeId := 0;" +
-                        " update SubscriptionEvent se" +
-                        " join(" +
-                        "   select seInner.Id, seInner.DeliveryKey" +
-                        "   from SubscriptionEvent seInner" +
-                        "   join Subscription s on s.Id = seInner.SubscriptionId" +
-                        "   left join   SubscriptionEvent seInv" +
-                        "     on        seInv.SubscriptionId = seInner.SubscriptionId" +
-                        "     and       seInv.FunctionalKey = seInner.FunctionalKey" +
-                        "     and       seInv.Id != seInner.Id" +
-                        "     and       seInv.InvisibleUntilUtc IS NOT NULL" +
-                        "     and       seInv.InvisibleUntilUtc > @utcNow" +
-                        "   left join   LastConsumedSubscriptionEvent lc" + // Functional ordering
-                        "     on        lc.SubscriptionId = seInner.SubscriptionId" +
-                        "     and       lc.FunctionalKey = seInner.FunctionalKey" +
-                        "   where       seInner.SubscriptionId = @subscriptionId" +
-                        "     and       (seInner.DeliveryDelayedUntilUtc IS NULL OR seInner.DeliveryDelayedUntilUtc < @utcNow)" +
-                        "     and       (seInner.ExpirationDateUtc IS NULL OR seInner.ExpirationDateUtc > @utcNow)" +
-                        "     and       (seInner.InvisibleUntilUtc IS NULL OR seInner.InvisibleUntilUtc < @utcNow)" +
-                        "     and       (s.MaxDeliveries = 0 OR s.MaxDeliveries > seInner.DeliveryCount)" +
-                        "     and       seInv.Id IS NULL" + // Geen in behandeling nu
-                        "     and       (lc.SubscriptionId IS NULL OR (lc.PublicationDateUtc <= seInner.PublicationDateUtc))" + // <=, because publicationdateutc may be same :-s
-                        "   order by    seInner.Priority DESC, seInner.PublicationDateUtc ASC" +
-                        "   limit 1 FOR UPDATE) tmp on tmp.Id = se.Id and IFNULL(tmp.DeliveryKey, '') = IFNULL(se.DeliveryKey, '')" +
-                        " set se.InvisibleUntilUtc = @invisibleUntilUtc," +
-                        "   se.DeliveryCount = DeliveryCount + 1," +
-                        "   se.DeliveryKey = @deliveryKey," +
-                        "   se.DeliveryDateUtc = @utcNow," +
-                        "   se.Id = (select @updatedSeId := se.Id);" +
+                        " update SubscriptionEvent seOuter" +
+                        " join (" +
+                            " select      se.Id, se.DeliveryKey"+
+                            " from        subscriptionevent se" +
+                            " join subscription s on s.Id = se.SubscriptionId" +
+                            " left join	LastConsumedSubscriptionEvent lc" +
+                            "     on		lc.SubscriptionId = se.SubscriptionId" +
+                            "     and		lc.FunctionalKey = se.FunctionalKey" +
+                            " left join	SubscriptionEvent seInv" +
+                            "     on		seInv.SubscriptionId = se.SubscriptionId" +
+                            "     and		seInv.FunctionalKey = se.FunctionalKey" +
+                            "     and		seInv.InvisibleUntilUtc > @utcNow" +
+                            "     and		seInv.Id != se.Id" +
+                            " where		se.SubscriptionId = @subscriptionId" +
+                            "     and		seInv.Id IS NULL" +
+                            "     and		se.DeliveryDelayedUntilUtc < @utcNow" +
+                            "     and		se.ExpirationDateUtc > @utcNow" +
+                            "     and		se.InvisibleUntilUtc < @utcNow" +
+                            "     and		(	s.MaxDeliveries = 0" +
+                            "             OR	se.DeliveryCount < s.MaxDeliveries)" +
+                            "     and		(	(se.PublicationDateUtc >= lc.PublicationDateUtc)" +
+                            "              OR	lc.SubscriptionId IS NULL)" +
+                            " order by 	se.Priority ASC, se.PublicationDateUtc ASC" + // Warning: prio must be stored inverted!
+                            " limit 1 FOR UPDATE" +
+                        " ) tmp on tmp.Id = seOuter.Id and tmp.DeliveryKey = seOuter.DeliveryKey" +
+                        " set seOuter.InvisibleUntilUtc = @invisibleUntilUtc," +
+                        "   seOuter.DeliveryCount = seOuter.DeliveryCount + 1," +
+                        "   seOuter.DeliveryKey = @deliveryKey," +
+                        "   seOuter.DeliveryDateUtc = @utcNow," +
+                        "   seOuter.Id = (select @updatedSeId := seOuter.Id);" +
                         "select @updatedSeId;";
 
                     var sIds = await TranQueryAsync<Int64?>(query,

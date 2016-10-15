@@ -14,6 +14,8 @@ namespace Resonance.Tests.Publishing
         private readonly IEventPublisher _publisher;
         private readonly IEventConsumer _consumer;
 
+        public DateTime MaxDateTime { get { return new DateTime(9999, 12, 31); } }
+
         public PublishTests(EventingRepoFactoryFixture fixture)
         {
             _publisher = new EventPublisher(fixture.RepoFactory);
@@ -103,9 +105,9 @@ namespace Resonance.Tests.Publishing
             Assert.NotNull(topicEvent.PublicationDateUtc);
             Assert.True(topicEvent.PublicationDateUtc < DateTime.UtcNow); // Older than now
             Assert.True(topicEvent.PublicationDateUtc > DateTime.UtcNow.AddMinutes(-1)); // Less than a minute old
-            Assert.Null(topicEvent.ExpirationDateUtc);
-            Assert.Null(topicEvent.FunctionalKey);
-            Assert.Equal(0, topicEvent.Priority);
+            Assert.Equal(MaxDateTime, topicEvent.ExpirationDateUtc);
+            Assert.Equal(string.Empty, topicEvent.FunctionalKey);
+            Assert.Equal(100, topicEvent.Priority);
             Assert.Null(topicEvent.Headers);
             Assert.Null(topicEvent.PayloadId);
 
@@ -116,7 +118,7 @@ namespace Resonance.Tests.Publishing
             Assert.NotNull(consumableEvent);
             Assert.NotNull(consumableEvent.Id);
             Assert.Null(consumableEvent.EventName);
-            Assert.Null(consumableEvent.FunctionalKey);
+            Assert.Equal(string.Empty, consumableEvent.FunctionalKey);
             Assert.Null(consumableEvent.Payload);
             // Other properties do not exist on an consumable event
         }
