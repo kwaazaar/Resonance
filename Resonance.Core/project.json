@@ -38,13 +38,13 @@
 
   "packOptions": {
     "summary": "Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc. To get a quick idea, check the repo on GitHub for documentation and code samples: https://github.com/kwaazaar/Resonance",
-    "tags": [ "pub", "sub", "esb", "queue", "topic", "subscription", "microservice", "messaging", "event", "publish", "subscribe", "servicebus", "mssql", "mysql", "netcore" ],
+    "tags": [ "pub", "sub", "esb", "queue", "topic", "subscription", "microservice", "messaging", "event", "publish", "subscribe", "servicebus", "mssql", "mysql", "mariadb", "netcore" ],
     "owners": [ "Robert te Kaat" ],
-    "releaseNotes": "MySql performs great now with many events (50K+). Datamodel changed again, for MsSql as well.",
+    "releaseNotes": "DB-tuning for both MySql and MsSql. Large amounts of events are no longer a problem. NB: DB-model changed for both repos.",
     "iconUrl": "https://raw.githubusercontent.com/kwaazaar/Resonance/master/Resonance-Icon-64x64.png",
     "projectUrl": "https://github.com/kwaazaar/Resonance",
     "licenseUrl": "https://opensource.org/licenses/MIT",
-    "requireLicenseAcceptance": true,
+    "requireLicenseAcceptance": false,
     "repository": {
       "type": "git",
       "url": "https://github.com/kwaazaar/Resonance"
@@ -53,9 +53,7 @@
       "include": "",
       "exclude": "",
       "includeFiles": [
-        "readme.txt",
-        "content/ResonanceDB.MsSql.sql",
-        "content/ResonanceDB.MySql.sql"
+        "readme.txt"
       ],
       "excludeFiles": [ "" ],
       "builtIns": {},

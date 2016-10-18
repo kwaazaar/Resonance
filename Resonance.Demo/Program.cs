@@ -1,19 +1,14 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.PlatformAbstractions;
+using Resonance.Models;
+using Resonance.Repo;
+using Resonance.Repo.Database;
 using System;
 using System.Collections.Generic;
-using System.Data;
-using System.Data.SqlClient;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using System.IO;
-using Resonance.Repo;
-using Resonance.Models;
-using Resonance.Repo.Database;
-using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using Microsoft.Extensions.PlatformAbstractions;
-using System.Threading;
+using System.Threading.Tasks;
 
 namespace Resonance.Demo
 {
@@ -74,7 +69,7 @@ namespace Resonance.Demo
                     },
                 });
 
-            if (1 == 0) // Change to add data to the subscription
+            if (1 == 1) // Change to enable/disable the adding of data to the subscription
             {
                 var sw = new Stopwatch();
                 sw.Start();
