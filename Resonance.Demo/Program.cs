@@ -78,7 +78,7 @@ namespace Resonance.Demo
             {
                 var sw = new Stopwatch();
                 sw.Start();
-                int maxLoop = 10;
+                int maxLoop = 50;
                 for (int i = 1; i <= maxLoop; i++)
                 {
                     var iAsString = i.ToString();
@@ -156,18 +156,18 @@ namespace Resonance.Demo
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
 
             // To use MSSQLServer:
-            //var connectionString = config.GetConnectionString("Resonance.MsSql");
-            //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
-            //{
-            //    return new MsSqlEventingRepoFactory(connectionString);
-            //});
-
-            // To use MySQL:
-            var connectionString = config.GetConnectionString("Resonance.MySql");
+            var connectionString = config.GetConnectionString("Resonance.MsSql");
             serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
             {
-                return new MySqlEventingRepoFactory(connectionString);
+                return new MsSqlEventingRepoFactory(connectionString);
             });
+
+            // To use MySQL:
+            //var connectionString = config.GetConnectionString("Resonance.MySql");
+            //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
+            //{
+            //    return new MySqlEventingRepoFactory(connectionString);
+            //});
 
             // Configure EventPublisher
             serviceCollection.AddTransient<IEventPublisher, EventPublisher>();
