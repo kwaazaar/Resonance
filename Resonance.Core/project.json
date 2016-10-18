@@ -2,7 +2,7 @@
   "title": "Resonance",
   "copyright": "Copyright 2016 - Robert te Kaat",
   "description": "Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc.",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "authors": [ "Robert te Kaat" ],
 
   "buildOptions": {
@@ -18,15 +18,15 @@
   "dependencies": {
     "Dapper": "1.50.2",
     "Microsoft.Extensions.Logging.Abstractions": "1.0.0",
-    "Newtonsoft.Json": "9.0.1",
-    "System.Linq.Parallel": "4.0.1"
+    "Newtonsoft.Json": "9.0.1"
   },
 
   "frameworks": {
     "netstandard1.6": {
       "dependencies": {
         "NETStandard.Library": "1.6.0",
-        "MySqlConnector": "0.4.0"
+        "MySqlConnector": "0.4.0",
+        "System.Linq.Parallel": "4.0.1"
       }
     },
     "net452": {
