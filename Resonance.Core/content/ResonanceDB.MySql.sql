@@ -51,7 +51,7 @@ CREATE TABLE `eventpayload` (
   `Id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `Payload` longtext NOT NULL,
   PRIMARY KEY (`Id`)
-) ENGINE=InnoDB AUTO_INCREMENT=396194 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -108,7 +108,7 @@ CREATE TABLE `subscription` (
   `DeliveryDelay` int(11) DEFAULT NULL COMMENT 'Delay the delivery by number of seconds',
   PRIMARY KEY (`Id`,`MaxDeliveries`),
   UNIQUE KEY `UK_Subscription_Name` (`Name`)
-) ENGINE=InnoDB AUTO_INCREMENT=329 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -142,7 +142,7 @@ CREATE TABLE `subscriptionevent` (
   CONSTRAINT `FK_SubscriptionEvent_EventPayload` FOREIGN KEY (`PayloadId`) REFERENCES `eventpayload` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `FK_SubscriptionEvent_Subscription` FOREIGN KEY (`SubscriptionId`) REFERENCES `subscription` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `FK_SubscriptionEvent_TopicEvent` FOREIGN KEY (`TopicEventId`) REFERENCES `topicevent` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=396813 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -158,7 +158,7 @@ CREATE TABLE `topic` (
   `Notes` varchar(500) CHARACTER SET utf8mb4 DEFAULT NULL,
   PRIMARY KEY (`Id`),
   UNIQUE KEY `UK_Topic_Name` (`Name`)
-) ENGINE=InnoDB AUTO_INCREMENT=472 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -181,7 +181,7 @@ CREATE TABLE `topicevent` (
   PRIMARY KEY (`Id`),
   KEY `FK_TopicEvent_EventPayload` (`PayloadId`),
   CONSTRAINT `FK_TopicEvent_EventPayload` FOREIGN KEY (`PayloadId`) REFERENCES `eventpayload` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=396518 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -202,7 +202,7 @@ CREATE TABLE `topicsubscription` (
   KEY `FK_TopicSubscription_Topic` (`TopicId`),
   CONSTRAINT `FK_TopicSubscription_Subscription` FOREIGN KEY (`SubscriptionId`) REFERENCES `subscription` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `FK_TopicSubscription_Topic` FOREIGN KEY (`TopicId`) REFERENCES `topic` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=347 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -220,7 +220,7 @@ CREATE TABLE `topicsubscriptionfilter` (
   PRIMARY KEY (`Id`),
   KEY `FK_TopicSubscriptionFilter_TopicSubscription` (`TopicSubscriptionId`),
   CONSTRAINT `FK_TopicSubscriptionFilter_TopicSubscription` FOREIGN KEY (`TopicSubscriptionId`) REFERENCES `topicsubscription` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=79 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
