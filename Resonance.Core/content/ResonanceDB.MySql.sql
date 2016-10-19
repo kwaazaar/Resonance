@@ -88,7 +88,7 @@ CREATE TABLE `lastconsumedsubscriptionevent` (
   `SubscriptionId` bigint(20) unsigned NOT NULL,
   `FunctionalKey` varchar(50) CHARACTER SET utf8mb4 NOT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
-  PRIMARY KEY (`SubscriptionId`,`FunctionalKey`,`PublicationDateUtc`)
+  PRIMARY KEY (`SubscriptionId`,`FunctionalKey`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
