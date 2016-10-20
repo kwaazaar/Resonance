@@ -71,7 +71,7 @@ CREATE TABLE `failedsubscriptionevent` (
   `PayloadId` bigint(20) unsigned DEFAULT NULL,
   `DeliveryDateUtc` datetime(6) DEFAULT NULL,
   `FailedDateUtc` datetime(6) NOT NULL,
-  `Reason` int(11) NOT NULL COMMENT '0=Unknown, 1=Expired, 2=MaxRetriesReached, 3=Other',
+  `Reason` int(11) NOT NULL COMMENT '0=Unknown, 1=Expired, 2=MaxRetriesReached, 3=Overtaken, 4=Other',
   `ReasonOther` varchar(1000) CHARACTER SET utf8mb4 DEFAULT NULL,
   PRIMARY KEY (`Id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

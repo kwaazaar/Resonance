@@ -215,6 +215,7 @@ namespace Resonance.Repo.Database
         {
             await HouseKeeping_MaxDeliveriesReachedSubscriptionEvents().ConfigureAwait(false);
             await HouseKeeping_ExpiredSubscriptionEvents().ConfigureAwait(false);
+            await HouseKeeping_OvertakenSubscriptionEvents().ConfigureAwait(false);
         }
 
         private async Task<int> HouseKeeping_ExpiredSubscriptionEvents()
@@ -223,7 +224,7 @@ namespace Resonance.Repo.Database
 
             try
             {
-                var query = "INSERT INTO FailedSubscriptionEvent"
+                var query = "INSERT IGNORE INTO FailedSubscriptionEvent"
                     + " ( Id, SubscriptionId"
                     + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
                     + " , FailedDateUtc, Reason, ReasonOther)"
@@ -253,7 +254,7 @@ namespace Resonance.Repo.Database
 
             try
             {
-                var query = "INSERT INTO FailedSubscriptionEvent"
+                var query = "INSERT IGNORE INTO FailedSubscriptionEvent"
                     + " (Id, SubscriptionId"
                     + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
                     + " , FailedDateUtc, Reason, ReasonOther)"
@@ -263,6 +264,37 @@ namespace Resonance.Repo.Database
                     + " FROM SubscriptionEvent se"
                     + " JOIN Subscription s ON s.Id = se.SubscriptionId"
                     + " WHERE (s.MaxDeliveries > 0 AND se.DeliveryCount >= s.MaxDeliveries);"
+                    + " DELETE se"
+                    + " FROM SubscriptionEvent se"
+                    + " JOIN FailedSubscriptionEvent fse ON fse.Id = se.Id;";
+                var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
+                await CommitTransactionAsync().ConfigureAwait(false);
+
+                return rowsAffected;
+            }
+            catch (Exception)
+            {
+                await RollbackTransactionAsync().ConfigureAwait(false);
+                throw;
+            }
+        }
+
+        private async Task<int> HouseKeeping_OvertakenSubscriptionEvents()
+        {
+            await BeginTransactionAsync().ConfigureAwait(false);
+
+            try
+            {
+                var query = "INSERT IGNORE INTO FailedSubscriptionEvent"
+                    + " (Id, SubscriptionId"
+                    + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
+                    + " , FailedDateUtc, Reason, ReasonOther)"
+                    + " SELECT se.Id, se.SubscriptionId"
+                    + " , se.EventName, se.PublicationDateUtc, se.FunctionalKey, se.Priority, se.PayloadId, se.DeliveryDateUtc"
+                    + " , @utcNow, 3, null" // 3 = Overtaken
+                    + " FROM SubscriptionEvent se"
+                    + " JOIN LastConsumedSubscriptionEvent lc ON lc.SubscriptionId = se.SubscriptionId AND lc.FunctionalKey = se.FunctionalKey"
+                    + " WHERE se.PublicationDateUtc < lc.PublicationDateUtc;"
                     + " DELETE se"
                     + " FROM SubscriptionEvent se"
                     + " JOIN FailedSubscriptionEvent fse ON fse.Id = se.Id;";

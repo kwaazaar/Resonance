@@ -173,6 +173,7 @@ namespace Resonance.Repo.Database
         {
             await HouseKeeping_MaxDeliveriesReachedSubscriptionEvents().ConfigureAwait(false);
             await HouseKeeping_ExpiredSubscriptionEvents().ConfigureAwait(false);
+            await HouseKeeping_OvertakenSubscriptionEvents().ConfigureAwait(false);
         }
 
         private async Task<int> HouseKeeping_ExpiredSubscriptionEvents()
@@ -208,5 +209,25 @@ namespace Resonance.Repo.Database
 
             return rowsAffected;
         }
+
+
+        private async Task<int> HouseKeeping_OvertakenSubscriptionEvents()
+        {
+            var query = "DELETE	se"
+                + " OUTPUT deleted.Id, deleted.SubscriptionId"
+                + "	, deleted.EventName, deleted.PublicationDateUtc, deleted.FunctionalKey, deleted.Priority, deleted.PayloadId, deleted.DeliveryDateUtc"
+                + "	, @utcNow, 3, null" // 3 = MaxRetriesReached
+                + " INTO FailedSubscriptionEvent"
+                + " (Id, SubscriptionId"
+                + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
+                + " , FailedDateUtc, Reason, ReasonOther)"
+                + " FROM     SubscriptionEvent se"
+                + " JOIN LastConsumedSubscriptionEvent lc ON  lc.SubscriptionId = se.SubscriptionId AND lc.FunctionalKey = se.FunctionalKey"
+                + " WHERE se.PublicationDateUtc < lc.PublicationDateUtc";
+            var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
+
+            return rowsAffected;
+        }
+
     }
 }

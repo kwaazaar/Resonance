@@ -13,7 +13,8 @@ namespace Resonance.Models
         Unknown = 0,
         Expired = 1,
         MaxRetriesReached = 2,
-        Other = 3,
+        Overtaken = 3,
+        Other = 4,
     }
 
     public class Reason
@@ -39,6 +40,17 @@ namespace Resonance.Models
                 return new Reason
                 {
                     Type = ReasonType.MaxRetriesReached,
+                };
+            }
+        }
+
+        public static Reason Overtaken
+        {
+            get
+            {
+                return new Reason
+                {
+                    Type = ReasonType.Overtaken,
                 };
             }
         }
