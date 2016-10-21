@@ -34,7 +34,7 @@ CREATE TABLE `consumedsubscriptionevent` (
   `PayloadId` bigint(20) unsigned DEFAULT NULL,
   `DeliveryDateUtc` datetime(6) NOT NULL,
   `ConsumedDateUtc` datetime(6) NOT NULL,
-  PRIMARY KEY (`Id`),
+  PRIMARY KEY (`SubscriptionId`,`PublicationDateUtc`,`DeliveryDateUtc`,`Id`),
   KEY `FK_ConsumedSubscriptionEvent_EventPayload` (`PayloadId`),
   CONSTRAINT `FK_ConsumedSubscriptionEvent_EventPayload` FOREIGN KEY (`PayloadId`) REFERENCES `eventpayload` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -71,9 +71,9 @@ CREATE TABLE `failedsubscriptionevent` (
   `PayloadId` bigint(20) unsigned DEFAULT NULL,
   `DeliveryDateUtc` datetime(6) DEFAULT NULL,
   `FailedDateUtc` datetime(6) NOT NULL,
-  `Reason` int(11) NOT NULL COMMENT '0=Unknown, 1=Expired, 2=MaxRetriesReached, 3=Overtaken, 4=Other',
+  `Reason` int(11) NOT NULL COMMENT '0=Unknown, 1=Expired, 2=MaxRetriesReached, 3=Other',
   `ReasonOther` varchar(1000) CHARACTER SET utf8mb4 DEFAULT NULL,
-  PRIMARY KEY (`Id`)
+  PRIMARY KEY (`SubscriptionId`,`PublicationDateUtc`,`FailedDateUtc`,`Reason`,`Id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -232,4 +232,4 @@ CREATE TABLE `topicsubscriptionfilter` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-10-15 16:22:01
+-- Dump completed on 2016-10-21 12:21:25

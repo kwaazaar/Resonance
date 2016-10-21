@@ -548,6 +548,32 @@ namespace Resonance.Repo.Database
             return subscription;
         }
 
+        public async Task<IEnumerable<SubscriptionSummary>> GetSubscriptionStatisticsAsync(DateTime periodStartUtc, DateTime periodEndUtc)
+        {
+            var parameters = new Dictionary<string, object>
+                {
+                    { "@start", periodStartUtc },
+                    { "@end", periodEndUtc },
+                };
+            var query = "select s.Id"
+                + "	,(select count(*) from SubscriptionEvent se where se.SubscriptionId = s.Id and se.PublicationDateUtc >= @start and se.PublicationDateUtc <= @end) as 'Open'"
+                + " ,(select count(*) from ConsumedSubscriptionEvent cse where cse.SubscriptionId = s.Id and cse.PublicationDateUtc >= @start and cse.DeliveryDateUtc <= @end) as 'Consumed'"
+                + " ,(select count(*) from FailedSubscriptionEvent fse where fse.SubscriptionId = s.Id and fse.PublicationDateUtc >= @start and fse.FailedDateUtc <= @end and fse.Reason = 0) as 'FailedUnknown'"
+                + " ,(select count(*) from FailedSubscriptionEvent fse where fse.SubscriptionId = s.Id and fse.PublicationDateUtc >= @start and fse.FailedDateUtc <= @end and fse.Reason = 1) as 'FailedExpired'"
+                + "	,(select count(*) from FailedSubscriptionEvent fse where fse.SubscriptionId = s.Id and fse.PublicationDateUtc >= @start and fse.FailedDateUtc <= @end and fse.Reason = 2) as 'FailedMaxDeliveriesReached'"
+                + "	,(select count(*) from FailedSubscriptionEvent fse where fse.SubscriptionId = s.Id and fse.PublicationDateUtc >= @start and fse.FailedDateUtc <= @end and fse.Reason = 3) as 'FailedOvertaken'"
+                + "	,(select count(*) from FailedSubscriptionEvent fse where fse.SubscriptionId = s.Id and fse.PublicationDateUtc >= @start and fse.FailedDateUtc <= @end and fse.Reason = 4) as 'FailedOther'"
+                + " from Subscription s"
+                + " group by s.Id";
+            var stats = await TranQueryAsync<SubscriptionSummary>(query, parameters).ConfigureAwait(false);
+
+            // Get subscriptions and enrich the statistics
+            var subscriptions = await GetSubscriptionsAsync().ConfigureAwait(false);
+            stats.ToList().ForEach(stat => stat.Subscription = subscriptions.Single(s => s.Id == stat.Id));
+
+            return stats;
+        }
+
         public async Task<Topic> GetTopicAsync(Int64 id)
         {
             var parameters = new Dictionary<string, object>

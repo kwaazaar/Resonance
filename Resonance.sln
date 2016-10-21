@@ -7,7 +7,7 @@ Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Resonance.Core", "Resonance
 EndProject
 Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Resonance.Demo", "Resonance.Demo\Resonance.Demo.xproj", "{435874BC-64B2-46CF-AA9C-B3467854B9C3}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Resonance.Api", "Resonance.Api\Resonance.Api.xproj", "{6AC94DF1-FCC5-4F87-8B07-77694A7F3676}"
+Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Resonance.Web", "Resonance.Web\Resonance.Web.xproj", "{6AC94DF1-FCC5-4F87-8B07-77694A7F3676}"
 EndProject
 Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Resonance.Tests", "Resonance.Tests\Resonance.Tests.xproj", "{29A2015D-3928-4B30-9E44-5100818E987D}"
 EndProject

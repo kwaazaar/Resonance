@@ -21,6 +21,7 @@ namespace Resonance.Repo
         Task<Subscription> GetSubscriptionByNameAsync(string name);
         Task<Subscription> AddOrUpdateSubscriptionAsync(Subscription subscription);
         Task DeleteSubscriptionAsync(Int64 id);
+        Task<IEnumerable<SubscriptionSummary>> GetSubscriptionStatisticsAsync(DateTime periodStartUtc, DateTime periodEndUtc);
 
         // Publication
         Task<Int64> StorePayloadAsync(string payload);

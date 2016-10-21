@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Dapper;
+using Microsoft.Extensions.Configuration;
 using MySql.Data.MySqlClient;
 using Resonance.Repo;
 using Resonance.Repo.Database;
@@ -42,7 +43,7 @@ namespace Resonance.Tests
             }
         }
 
-        private void CleanDb(IDbConnection conn)
+        public void CleanDb(IDbConnection conn)
         {
             var cmd = conn.CreateCommand();
             cmd.CommandText = "delete from LastConsumedSubscriptionEvent;"
@@ -58,6 +59,29 @@ namespace Resonance.Tests
             cmd.ExecuteNonQuery();
         }
 
+        public List<string> GetEventNamesForFailedEvents(Int64 subscriptionId)
+        {
+            var useMySql = (Configuration["UseMySql"] == "true"); // Can be set from environment variable
+            var connectionString = Configuration.GetConnectionString(useMySql ? "Resonance.MySql" : "Resonance.MsSql");
+
+
+            if (useMySql)
+            {
+                using (var conn = new MySqlConnection(connectionString))
+                {
+                    conn.Open();
+                    return conn.Query<string>("select EventName from FailedSubscriptionEvent where SubscriptionId = @subscriptionId;", new { subscriptionId = subscriptionId }).ToList();
+                }
+            }
+            else
+            {
+                using (var conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+                    return conn.Query<string>("select EventName from FailedSubscriptionEvent where SubscriptionId = @subscriptionId;", new { subscriptionId = subscriptionId }).ToList();
+                }
+            }
+        }
         public void Dispose()
         {
             Dispose(true);   

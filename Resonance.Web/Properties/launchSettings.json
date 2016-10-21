@@ -11,15 +11,14 @@
     "IIS Express": {
       "commandName": "IISExpress",
       "launchBrowser": true,
-      "launchUrl": "subscriptions",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "Resonance.Api": {
+    "Resonance.Web": {
       "commandName": "Project",
       "launchBrowser": true,
-      "launchUrl": "http://localhost:5000/subscriptions",
+      "launchUrl": "http://localhost:5000/swagger/ui",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }

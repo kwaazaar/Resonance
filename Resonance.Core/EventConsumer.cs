@@ -64,6 +64,11 @@ namespace Resonance
             DeleteSubscriptionAsync(id).GetAwaiter().GetResult();
         }
 
+        public IEnumerable<SubscriptionSummary> GetSubscriptionStatistics(DateTime periodStartUtc, DateTime periodEndUtc)
+        {
+            return GetSubscriptionStatisticsAsync(periodStartUtc, periodEndUtc).GetAwaiter().GetResult();
+        }
+
         public void PerformHouseKeepingTasks()
         {
             PerformHouseKeepingTasksAsync().GetAwaiter().GetResult();
@@ -99,6 +104,12 @@ namespace Resonance
         {
             using (var repo = _repoFactory.CreateRepo())
                 return await repo.GetSubscriptionsAsync(topicId).ConfigureAwait(false);
+        }
+
+        public async Task<IEnumerable<SubscriptionSummary>> GetSubscriptionStatisticsAsync(DateTime periodStartUtc, DateTime periodEndUtc)
+        {
+            using (var repo = _repoFactory.CreateRepo())
+                return await repo.GetSubscriptionStatisticsAsync(periodStartUtc, periodEndUtc).ConfigureAwait(false);
         }
 
         public async Task<IEnumerable<ConsumableEvent>> ConsumeNextAsync(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)

@@ -7,23 +7,36 @@ using Resonance.Repo;
 using Resonance.Models;
 using Microsoft.Extensions.Logging;
 
-namespace Resonance.Api.Controllers
+namespace Resonance.Web.Controllers
 {
+    /// <summary>
+    /// Topic Management
+    /// </summary>
     [Route("topics")]
     public class TopicController : Controller
     {
         private IEventPublisher _publisher;
         private ILogger<TopicController> _logger;
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="publisher"></param>
+        /// <param name="logger"></param>
         public TopicController(IEventPublisher publisher, ILogger<TopicController> logger)
         {
             _publisher = publisher;
             _logger = logger;
         }
 
+        /// <summary>
+        /// Gets a list of topics
+        /// </summary>
+        /// <param name="partOfName">Optional: part of the name of the topic</param>
+        /// <returns>List of topics</returns>
         [HttpGet()]
         [ProducesResponseType(typeof(IEnumerable<Topic>), 200)]
-        public async Task<IActionResult> GetTopics(string partOfName)
+        public async Task<IActionResult> GetTopics(string partOfName = null)
         {
             try
             {
@@ -36,6 +49,11 @@ namespace Resonance.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Gets a topic
+        /// </summary>
+        /// <param name="name">Name of the topic</param>
+        /// <returns>The topic</returns>
         [HttpGet("{name}")]
         [ProducesResponseType(typeof(Topic), 200)]
         public async Task<IActionResult> GetTopic(string name)
@@ -55,6 +73,11 @@ namespace Resonance.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Adds a new topic
+        /// </summary>
+        /// <param name="topic">Topic to add</param>
+        /// <returns>Resulting topic</returns>
         [HttpPost]
         [ProducesResponseType(typeof(Topic), 200)]
         public async Task<IActionResult> Post([FromBody]Topic topic)
@@ -63,6 +86,19 @@ namespace Resonance.Api.Controllers
             {
                 try
                 {
+                    // Name must be unique
+                    var topicWithNewName = await _publisher.GetTopicByNameAsync(topic.Name);
+                    if (topicWithNewName != null)
+                        return BadRequest("Topic with this name already exists");
+
+                    if (topic.Id.HasValue)
+                    {
+                        if (topic.Id.Value == 0) // Probably using SwaggerUI, so lets be forgiving
+                            topic.Id = null;
+                        else
+                            return BadRequest("Id must be null when adding a topic");
+                    }
+
                     return Ok(await _publisher.AddOrUpdateTopicAsync(topic));
                 }
                 catch (ArgumentException argEx)
@@ -79,6 +115,12 @@ namespace Resonance.Api.Controllers
                 return BadRequest(ModelState);
         }
 
+        /// <summary>
+        /// Updates an existing topic
+        /// </summary>
+        /// <param name="name">Name of the existing topic</param>
+        /// <param name="topic">Updated version of the topic</param>
+        /// <returns>Resulting topic</returns>
         [HttpPut("{name}")]
         [ProducesResponseType(typeof(Topic), 200)]
         public async Task<IActionResult> Put(string name, [FromBody]Topic topic)
@@ -90,8 +132,18 @@ namespace Resonance.Api.Controllers
                     var existingTopic = await _publisher.GetTopicByNameAsync(name);
                     if (existingTopic == null)
                         return NotFound($"No topic found with name {name}");
-                    if (existingTopic.Id != topic.Id)
+
+                    // The new version of the topic cannot have a (different) id
+                    if (topic.Id.HasValue && existingTopic.Id.Value != topic.Id.Value)
                         return BadRequest("Id of topic cannot be modified");
+
+                    // Name must be unique
+                    var topicWithNewName = await _publisher.GetTopicByNameAsync(topic.Name);
+                    if (topicWithNewName != null)
+                        return BadRequest("Topic with this name already exists");
+
+                    // Copy the id to make sure we actually UPDATE the topic, instead of adding a new one
+                    topic.Id = existingTopic.Id;
 
                     return Ok(await _publisher.AddOrUpdateTopicAsync(topic));
                 }
@@ -109,8 +161,14 @@ namespace Resonance.Api.Controllers
                 return BadRequest(ModelState);
         }
 
+        /// <summary>
+        /// Delete an existing topic
+        /// </summary>
+        /// <param name="name">Name of the topic</param>
+        /// <param name="includingSubscriptions">Optional: Specifies whether to delete its subscriptions as well (default: true).</param>
+        /// <returns></returns>
         [HttpDelete("{name}")]
-        public async Task<IActionResult> Delete(string name, bool? includingSubscriptions)
+        public async Task<IActionResult> Delete(string name, bool? includingSubscriptions = true)
         {
             if (String.IsNullOrWhiteSpace(name))
                 return BadRequest("Topic name not provided");

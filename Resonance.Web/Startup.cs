@@ -9,11 +9,20 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Resonance.Repo;
 using Resonance.Repo.Database;
+using Microsoft.Extensions.PlatformAbstractions;
+using System.IO;
 
-namespace Resonance.Api
+namespace Resonance.Web
 {
+    /// <summary>
+    /// OWIN startup class
+    /// </summary>
     public class Startup
     {
+        /// <summary>
+        /// Startup-constructor
+        /// </summary>
+        /// <param name="env"></param>
         public Startup(IHostingEnvironment env)
         {
             var builder = new ConfigurationBuilder()
@@ -24,9 +33,15 @@ namespace Resonance.Api
             Configuration = builder.Build();
         }
 
+        /// <summary>
+        /// Configuration for the application
+        /// </summary>
         public IConfigurationRoot Configuration { get; }
 
-        // This method gets called by the runtime. Use this method to add services to the container.
+        /// <summary>
+        /// This method gets called by the runtime. Use this method to add services to the container.
+        /// </summary>
+        /// <param name="services"></param>
         public void ConfigureServices(IServiceCollection services)
         {
             // Add IConfiguration dependency (reason: allows access to config from any injected component)
@@ -54,13 +69,39 @@ namespace Resonance.Api
             
             // Add framework services.
             services.AddMvc();
+
+            // Enable generation of Swagger-Json
+            services.AddSwaggerGen(options => {
+                options.SingleApiVersion(new Swashbuckle.Swagger.Model.Info
+                {
+                    Version = "v1",
+                    Title = "Resonance Api",
+                    Description = "REST-based API for Resonance",
+                    TermsOfService = "None"
+                });
+            });
+
+            // Let SwaggerUI include XML-comments
+            services.ConfigureSwaggerGen(c =>
+            {
+                c.IncludeXmlComments(Path.Combine(PlatformServices.Default.Application.ApplicationBasePath, "Resonance.Web.xml"));
+            });
         }
 
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+        /// <summary>
+        /// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+        /// </summary>
+        /// <param name="app"></param>
+        /// <param name="env"></param>
+        /// <param name="loggerFactory"></param>
         public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
         {
             loggerFactory.AddConsole(Configuration.GetSection("Logging"));
             loggerFactory.AddDebug();
+
+            // Enable Swagger, incl UI
+            app.UseSwagger();
+            app.UseSwaggerUi();
 
             app.UseMvc();
         }

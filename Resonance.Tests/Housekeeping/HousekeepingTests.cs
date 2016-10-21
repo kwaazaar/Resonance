@@ -1,13 +1,8 @@
-﻿using Dapper;
-using Microsoft.Extensions.Configuration;
-using MySql.Data.MySqlClient;
-using Resonance.Models;
+﻿using Resonance.Models;
 using System;
 using System.Collections.Generic;
-using System.Data.SqlClient;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace Resonance.Tests.Housekeeping
@@ -24,30 +19,6 @@ namespace Resonance.Tests.Housekeeping
             _publisher = new EventPublisher(fixture.RepoFactory);
             _consumer = new EventConsumer(fixture.RepoFactory);
             _fixture = fixture;
-        }
-
-        private List<string> GetEventNamesForFailedEvents(Int64 subscriptionId)
-        {
-            var useMySql = (_fixture.Configuration["UseMySql"] == "true"); // Can be set from environment variable
-            var connectionString = _fixture.Configuration.GetConnectionString(useMySql ? "Resonance.MySql" : "Resonance.MsSql");
-
-
-            if (useMySql)
-            {
-                using (var conn = new MySqlConnection(connectionString))
-                {
-                    conn.Open();
-                    return conn.Query<string>("select EventName from FailedSubscriptionEvent where SubscriptionId = @subscriptionId;", new { subscriptionId = subscriptionId }).ToList();
-                }
-            }
-            else
-            {
-                using (var conn = new SqlConnection(connectionString))
-                {
-                    conn.Open();
-                    return conn.Query<string>("select EventName from FailedSubscriptionEvent where SubscriptionId = @subscriptionId;", new { subscriptionId = subscriptionId }).ToList();
-                }
-            }
         }
 
         [Fact]
@@ -77,7 +48,7 @@ namespace Resonance.Tests.Housekeeping
             _consumer.PerformHouseKeepingTasks();
 
             // Check that only 1 se in table
-            var eventNames = GetEventNamesForFailedEvents(sub1.Id.Value);
+            var eventNames = _fixture.GetEventNamesForFailedEvents(sub1.Id.Value);
             Assert.Equal(1, eventNames.Count);
             Assert.Equal(topicName + "1", eventNames.First());
 
@@ -108,9 +79,40 @@ namespace Resonance.Tests.Housekeeping
             _consumer.PerformHouseKeepingTasks();
 
             // Check that only 1 se in table
-            var eventNames = GetEventNamesForFailedEvents(sub1.Id.Value);
+            var eventNames = _fixture.GetEventNamesForFailedEvents(sub1.Id.Value);
             Assert.Equal(1, eventNames.Count);
             Assert.Equal(topicName + "1", eventNames.First());
+        }
+
+        [Fact]
+        public void Overtaken()
+        {
+            // Arrange
+            var topicName = "HousekeepingTests.Overtaken";
+            var subName = topicName + "_Sub1";
+            var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
+            var sub1 = _consumer.AddOrUpdateSubscriptionAsync(new Subscription
+            {
+                Name = subName,
+                Ordered = true,
+                TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
+            }).Result;
+
+            var utcNow = DateTime.UtcNow;
+            var funcKey = "A";
+            _publisher.Publish(topicName, eventName: topicName + "1", publicationDateUtc: utcNow, functionalKey: funcKey);
+            var ce = _consumer.ConsumeNextAsync(subName).Result.SingleOrDefault();
+            _consumer.MarkConsumed(ce.Id, ce.DeliveryKey);
+            _publisher.Publish(topicName, eventName: topicName + "2", publicationDateUtc: utcNow.AddSeconds(-1), functionalKey: funcKey);
+            ce = _consumer.ConsumeNextAsync(subName).Result.SingleOrDefault();
+            Assert.Null(ce); // Already overtaken, so should not be delivered
+
+            _consumer.PerformHouseKeepingTasks();
+
+            // Check that only 1 se in table
+            var eventNames = _fixture.GetEventNamesForFailedEvents(sub1.Id.Value);
+            Assert.Equal(1, eventNames.Count);
+            Assert.Equal(topicName + "2", eventNames.First());
         }
     }
 }

@@ -18,6 +18,7 @@ namespace Resonance
         Subscription GetSubscriptionByName(string name);
         Subscription AddOrUpdateSubscription(Subscription subscription);
         void DeleteSubscription(Int64 id);
+        IEnumerable<SubscriptionSummary> GetSubscriptionStatistics(DateTime periodStartUtc, DateTime periodEndUtc);
         void PerformHouseKeepingTasks();
         #endregion
 
@@ -32,6 +33,7 @@ namespace Resonance
         Task<Subscription> GetSubscriptionByNameAsync(string name);
         Task<Subscription> AddOrUpdateSubscriptionAsync(Subscription subscription);
         Task DeleteSubscriptionAsync(Int64 id);
+        Task<IEnumerable<SubscriptionSummary>> GetSubscriptionStatisticsAsync(DateTime periodStartUtc, DateTime periodEndUtc);
         Task PerformHouseKeepingTasksAsync();
         #endregion
     }
