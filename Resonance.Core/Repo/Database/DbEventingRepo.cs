@@ -195,7 +195,8 @@ namespace Resonance.Repo.Database
         protected async virtual Task<int> TranExecuteAsync(string sql, object param = null, int? commandTimeout = null)
         {
             await EnsureConnectionReady().ConfigureAwait(false);
-            return await _conn.ExecuteAsync(sql, param: param, transaction: _runningTransaction, commandTimeout: commandTimeout).ConfigureAwait(false);
+            var query = sql.ToLowerInvariant(); // MySql requires lower-case table names. This way the queries do not need to change, which is more readable.
+            return await _conn.ExecuteAsync(query, param: param, transaction: _runningTransaction, commandTimeout: commandTimeout).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -209,7 +210,8 @@ namespace Resonance.Repo.Database
         protected async virtual Task<IEnumerable<T>> TranQueryAsync<T>(string sql, object param = null, int? commandTimeout = null)
         {
             await EnsureConnectionReady().ConfigureAwait(false);
-            return await _conn.QueryAsync<T>(sql, param: param, transaction: _runningTransaction, commandTimeout: commandTimeout).ConfigureAwait(false);
+            var query = sql.ToLowerInvariant(); // MySql requires lower-case table names. This way the queries do not need to change, which is more readable.
+            return await _conn.QueryAsync<T>(query, param: param, transaction: _runningTransaction, commandTimeout: commandTimeout).ConfigureAwait(false);
         }
         #endregion
 
