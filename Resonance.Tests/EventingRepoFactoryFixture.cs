@@ -46,16 +46,16 @@ namespace Resonance.Tests
         public void CleanDb(IDbConnection conn)
         {
             var cmd = conn.CreateCommand();
-            cmd.CommandText = "delete from LastConsumedSubscriptionEvent;"
-                + "delete from ConsumedSubscriptionEvent;"
-                + "delete from FailedSubscriptionEvent;"
-                + "delete from SubscriptionEvent;"
-                + "delete from TopicEvent;"
-                + "delete from EventPayload;"
-                + "delete from TopicSubscriptionFilter;"
-                + "delete from TopicSubscription;"
-                + "delete from Subscription;"
-                + "delete from Topic;";
+            cmd.CommandText = "delete from lastconsumedsubscriptionevent;"
+                + "delete from consumedsubscriptionevent;"
+                + "delete from failedsubscriptionevent;"
+                + "delete from subscriptionevent;"
+                + "delete from topicevent;"
+                + "delete from eventpayload;"
+                + "delete from topicsubscriptionfilter;"
+                + "delete from topicsubscription;"
+                + "delete from subscription;"
+                + "delete from topic;";
             cmd.ExecuteNonQuery();
         }
 
@@ -70,7 +70,7 @@ namespace Resonance.Tests
                 using (var conn = new MySqlConnection(connectionString))
                 {
                     conn.Open();
-                    return conn.Query<string>("select EventName from FailedSubscriptionEvent where SubscriptionId = @subscriptionId;", new { subscriptionId = subscriptionId }).ToList();
+                    return conn.Query<string>("select EventName from failedsubscriptionevent where SubscriptionId = @subscriptionId;", new { subscriptionId = subscriptionId }).ToList();
                 }
             }
             else
@@ -78,7 +78,7 @@ namespace Resonance.Tests
                 using (var conn = new SqlConnection(connectionString))
                 {
                     conn.Open();
-                    return conn.Query<string>("select EventName from FailedSubscriptionEvent where SubscriptionId = @subscriptionId;", new { subscriptionId = subscriptionId }).ToList();
+                    return conn.Query<string>("select EventName from failedsubscriptionevent where SubscriptionId = @subscriptionId;", new { subscriptionId = subscriptionId }).ToList();
                 }
             }
         }
