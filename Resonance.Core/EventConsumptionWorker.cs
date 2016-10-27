@@ -191,7 +191,7 @@ namespace Resonance
                 while (!this._cancellationToken.IsCancellationRequested)
                 {
                     var suspendedUntilUtc = _suspendedUntilUtc;
-                    if (!_suspendedUntilUtc.HasValue)
+                    if (!suspendedUntilUtc.HasValue)
                         await this.TryExecuteWorkItems();
                     else
                     {
