@@ -191,16 +191,21 @@ namespace Resonance
                 while (!this._cancellationToken.IsCancellationRequested)
                 {
                     var suspendedUntilUtc = _suspendedUntilUtc;
-                    if (!suspendedUntilUtc.HasValue)
-                        await this.TryExecuteWorkItems();
+                    if (!suspendedUntilUtc.HasValue || (suspendedUntilUtc.Value < DateTime.UtcNow))
+                        await this.TryExecuteWorkItems().ConfigureAwait(false);
                     else
                     {
+                        LogWarning("Processing is temporary suspended until {suspendedUntilUtc} (UTC).", suspendedUntilUtc.Value);
+                        var suspendDuration = suspendedUntilUtc.Value - DateTime.UtcNow;
                         try
                         {
                             // Suspend processing
-                            await Task.Delay(suspendedUntilUtc.Value - DateTime.UtcNow, _cancellationToken.Token).ConfigureAwait(false);
+                            await Task.Delay(suspendDuration, _cancellationToken.Token).ConfigureAwait(false);
+                            LogWarning("Processing has been suspended for {seconds} seconds and will now continue.", suspendDuration.TotalSeconds);
                         }
                         catch (OperationCanceledException) { } // Because the delay was cancelled through the _cancellationToken
+
+                        // Clear _suspendedUntilUtc to make sure we continue next time in this look
                         lock (_suspendTimeoutLock)
                             _suspendedUntilUtc = null;
                     }
@@ -230,10 +235,13 @@ namespace Resonance
                 {
                     this._attempts = 0;
 
-                    if (this._batchSize > 1)
+                    if (workitems.Count() > 1)
+                    {
+                        LogInformation("Processing {items} events in parallel.", workitems.Count());
                         workitems.AsParallel().ForAll(async (w) => await this.ExecuteWork(w).ConfigureAwait(false));
+                    }
                     else
-                        workitems.ToList().ForEach(async (w) => await this.ExecuteWork(w).ConfigureAwait(false)); // Executed on single (current) thread, but theoretically the TryGetWork could have returned more than one workitem
+                        await this.ExecuteWork(workitems.First()).ConfigureAwait(false); // Executed on single (current) thread, but theoretically the TryGetWork could have returned more than one workitem
 
                     this.BackOff(); // Using backoff here as well to pause for minBackoffDelay between batches
                 }
@@ -325,7 +333,7 @@ namespace Resonance
             // Only process if still invisible (serial processing of a list of workitems may cause workitems to expire before being processed)
             if (workItem.InvisibleUntilUtc > DateTime.UtcNow)
             {
-                return await ExecuteConcrete(workItem);
+                return await ExecuteConcrete(workItem).ConfigureAwait(false);
             }
             else
             {
@@ -390,8 +398,8 @@ namespace Resonance
             {
                 mustRollback = true;
                 var suspendedUntilUtc = this.Suspend(result.SuspendDuration.GetValueOrDefault(TimeSpan.FromSeconds(60)));
-                LogError("Event consumption failed for event with id {Id} and functional key {FunctionalKey}. Processing suspended until {SuspendedUntilUtc} (UTC). Reason: {Reason}.",
-                    ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", suspendedUntilUtc, result.Reason);
+                LogError("Event consumption failed for event with id {Id} and functional key {FunctionalKey}. Processing should (continue to) suspend. Details: {Reason}.",
+                    ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", result.Reason);
             }
             // MustRetry does nothing: default behaviour when not marked consumed/failed
 
