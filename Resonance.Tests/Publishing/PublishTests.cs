@@ -274,6 +274,67 @@ namespace Resonance.Tests.Publishing
         }
 
         [Fact]
+        public void PublishSingleSubscriberExactFilter_Not()
+        {
+            // Arrange
+            var topicName = "PublishSingleSubscriberExactFilter_Not";
+            var topic1 = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = Guid.NewGuid().ToString(),
+                TopicSubscriptions = new List<TopicSubscription>
+                {
+                    new TopicSubscription
+                    {
+                        TopicId = topic1.Id.Value, Enabled = true,
+                        Filtered = true,
+                        Filters = new List<TopicSubscriptionFilter>
+                        {
+                            new TopicSubscriptionFilter { Header="Headr1", MatchExpression="HdrVALUE", NotMatch = true }
+                        },
+                    },
+                },
+            });
+
+            // Act
+            var te1 = _publisher.Publish(topicName, functionalKey: "1", headers: new Dictionary<string, string> { { "Headr1", "HdrValue" }, { "Headr2", "HdrValue" } }); // We (ab)use functionalkey for correlation
+            var te2 = _publisher.Publish(topicName, functionalKey: "2", headers: new Dictionary<string, string> { }); // Absent
+            var te3 = _publisher.Publish(topicName, functionalKey: "3", headers: new Dictionary<string, string> { { "Headr1", "NotMatching" } }); // Present and not matching
+
+            // Assert
+            var se = _consumer.ConsumeNext(sub1.Name, visibilityTimeout: 1).SingleOrDefault();
+            Assert.NotNull(se);
+            Assert.Equal(te2.FunctionalKey, se.FunctionalKey); // Header absent, so match!
+            _consumer.MarkConsumed(se.Id, se.DeliveryKey);
+            se = _consumer.ConsumeNext(sub1.Name, visibilityTimeout: 1).SingleOrDefault();
+            Assert.NotNull(se);
+            Assert.Equal(te3.FunctionalKey, se.FunctionalKey); // Header present and different, so match!
+            _consumer.MarkConsumed(se.Id, se.DeliveryKey);
+            se = _consumer.ConsumeNext(sub1.Name, visibilityTimeout: 1).SingleOrDefault();
+            Assert.Null(se); // Nothing left
+
+            // Disable the filter
+            sub1.TopicSubscriptions[0].Filtered = false;
+            sub1 = _consumer.AddOrUpdateSubscription(sub1);
+            Assert.False(sub1.TopicSubscriptions[0].Filtered);
+
+            var te4 = _publisher.Publish(topicName, functionalKey: "4", headers: new Dictionary<string, string> { { "Headr1", "HdrValue" }, { "Headr2", "HdrValue" } }); // We (ab)use functionalkey for correlation
+            var te5 = _publisher.Publish(topicName, functionalKey: "5", headers: new Dictionary<string, string> { }); // Absent
+            var te6 = _publisher.Publish(topicName, functionalKey: "6", headers: new Dictionary<string, string> { { "Headr1", "NotMatching" } }); // Present and not matching
+
+            // Filter disabled, so everything should match
+            var se4 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            var se5 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            var se6 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.NotNull(se4); // Must be delivered: filter may not match, but it's disabled
+            Assert.Equal(te4.FunctionalKey, se4.FunctionalKey);
+            Assert.NotNull(se5); // Must be delivered: filter may not match, but it's disabled
+            Assert.Equal(te5.FunctionalKey, se5.FunctionalKey);
+            Assert.NotNull(se6); // Must be delivered: filter may not match, but it's disabled
+            Assert.Equal(te6.FunctionalKey, se6.FunctionalKey);
+        }
+
+        [Fact]
         public void PublishSingleSubscriberStartsWithFilter()
         {
             // Arrange
@@ -312,6 +373,45 @@ namespace Resonance.Tests.Publishing
         }
 
         [Fact]
+        public void PublishSingleSubscriberStartsWithFilter_Not()
+        {
+            // Arrange
+            var topicName = "PublishSingleSubscriberStartsWithFilter_Not";
+            var topic1 = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = Guid.NewGuid().ToString(),
+                TopicSubscriptions = new List<TopicSubscription>
+                {
+                    new TopicSubscription
+                    {
+                        TopicId = topic1.Id.Value, Enabled = true,
+                        Filtered = true,
+                        Filters = new List<TopicSubscriptionFilter>
+                        {
+                            new TopicSubscriptionFilter { Header="Headr1", MatchExpression="HdR*", NotMatch = true }
+                        },
+                    },
+                },
+            });
+
+            // Act
+            var te1 = _publisher.Publish(topicName, functionalKey: "1", headers: new Dictionary<string, string> { { "Headr1", "HdrValueA" } }); // Does not match
+            var te2 = _publisher.Publish(topicName, functionalKey: "2", headers: new Dictionary<string, string> { { "Headr1", "ValueAHdr" } }); // Matches
+            var te3 = _publisher.Publish(topicName, functionalKey: "3", headers: new Dictionary<string, string> { }); // Matches
+
+            // Assert
+            var se = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.NotNull(se);
+            Assert.Equal(te2.FunctionalKey, se.FunctionalKey);
+            se = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.NotNull(se);
+            Assert.Equal(te3.FunctionalKey, se.FunctionalKey);
+            se = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.Null(se);
+        }
+
+        [Fact]
         public void PublishSingleSubscriberEndsWithFilter()
         {
             // Arrange
@@ -347,6 +447,45 @@ namespace Resonance.Tests.Publishing
             Assert.Null(se2);
             var se3 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
             Assert.Null(se3);
+        }
+
+        [Fact]
+        public void PublishSingleSubscriberEndsWithFilter_Not()
+        {
+            // Arrange
+            var topicName = "PublishSingleSubscriberEndsWithFilter_Not";
+            var topic1 = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = Guid.NewGuid().ToString(),
+                TopicSubscriptions = new List<TopicSubscription>
+                {
+                    new TopicSubscription
+                    {
+                        TopicId = topic1.Id.Value, Enabled = true,
+                        Filtered = true,
+                        Filters = new List<TopicSubscriptionFilter>
+                        {
+                            new TopicSubscriptionFilter { Header="Headr1", MatchExpression="*VALUEa", NotMatch = true }
+                        },
+                    },
+                },
+            });
+
+            // Act
+            var te1 = _publisher.Publish(topicName, functionalKey: "1", headers: new Dictionary<string, string> { { "Headr1", "HdrValueA" } }); // No match
+            var te2 = _publisher.Publish(topicName, functionalKey: "2", headers: new Dictionary<string, string> { { "Headr1", "HdrValueB" } }); // Match
+            var te3 = _publisher.Publish(topicName, functionalKey: "3", headers: new Dictionary<string, string> { }); // Match
+
+            // Assert
+            var se = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.NotNull(se); // Value ends with "ValueA" (case insensitive)
+            Assert.Equal(te2.FunctionalKey, se.FunctionalKey);
+            se = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.NotNull(se); // Value ends with "ValueA" (case insensitive)
+            Assert.Equal(te3.FunctionalKey, se.FunctionalKey);
+            se = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.Null(se);
         }
 
         [Fact]
@@ -392,6 +531,51 @@ namespace Resonance.Tests.Publishing
             Assert.Equal(te4.FunctionalKey, se4.FunctionalKey);
             var seNext = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
             Assert.Null(seNext);
+        }
+
+        [Fact]
+        public void PublishSingleSubscriberStartsWithEndsWithFilter_Not()
+        {
+            // Arrange
+            var topicName = "PublishSingleSubscriberSWEWFilter_Not";
+            var topic1 = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = Guid.NewGuid().ToString(),
+                TopicSubscriptions = new List<TopicSubscription>
+                {
+                    new TopicSubscription
+                    {
+                        TopicId = topic1.Id.Value, Enabled = true,
+                        Filtered = true,
+                        Filters = new List<TopicSubscriptionFilter>
+                        {
+                            new TopicSubscriptionFilter { Header="Headr1", MatchExpression="*VaLuE*", NotMatch = true}
+                        },
+                    },
+                },
+            });
+
+            // Act
+            var te1 = _publisher.Publish(topicName, functionalKey: "1", headers: new Dictionary<string, string> { { "Headr1", "XValueY" } }); // No match
+            var te2 = _publisher.Publish(topicName, functionalKey: "2", headers: new Dictionary<string, string> { { "Headr2", "MValueN" } }); // Match
+            var te3 = _publisher.Publish(topicName, functionalKey: "3", headers: new Dictionary<string, string> { { "Headr1", "PValue" } }); // No match
+            var te4 = _publisher.Publish(topicName, functionalKey: "4", headers: new Dictionary<string, string> { { "Headr1", "ValueQ" } }); // No match
+            var te5 = _publisher.Publish(topicName, functionalKey: "5", headers: new Dictionary<string, string> { { "Headr1", "NoMatch" } }); // Matches
+            var te6 = _publisher.Publish(topicName, functionalKey: "6", headers: new Dictionary<string, string> { }); // Matches
+
+            // Assert
+            var se = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.NotNull(se);
+            Assert.Equal(te2.FunctionalKey, se.FunctionalKey);
+            se = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.NotNull(se);
+            Assert.Equal(te5.FunctionalKey, se.FunctionalKey);
+            se = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.NotNull(se);
+            Assert.Equal(te6.FunctionalKey, se.FunctionalKey);
+            se = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
+            Assert.Null(se);
         }
     }
 }

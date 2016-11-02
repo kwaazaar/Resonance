@@ -217,6 +217,7 @@ CREATE TABLE `topicsubscriptionfilter` (
   `TopicSubscriptionId` bigint(20) unsigned NOT NULL,
   `Header` varchar(100) CHARACTER SET utf8mb4 NOT NULL,
   `MatchExpression` varchar(100) CHARACTER SET utf8mb4 NOT NULL,
+  `NotMatch` tinyint(1) NOT NULL,
   PRIMARY KEY (`Id`),
   KEY `FK_TopicSubscriptionFilter_TopicSubscription` (`TopicSubscriptionId`),
   CONSTRAINT `FK_TopicSubscriptionFilter_TopicSubscription` FOREIGN KEY (`TopicSubscriptionId`) REFERENCES `topicsubscription` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION

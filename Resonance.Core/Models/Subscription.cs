@@ -75,5 +75,11 @@ namespace Resonance.Models
         /// - *Cancelled will match OrderCancelled, PaymentCancelled, etc.
         /// </summary>
         public string MatchExpression { get; set; }
+
+        /// <summary>
+        /// Indicates whether this filter must NOT match.
+        /// When set to true, the filter-result is inverted.
+        /// </summary>
+        public bool NotMatch { get; set; }
     }
 }

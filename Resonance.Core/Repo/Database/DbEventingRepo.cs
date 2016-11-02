@@ -333,8 +333,9 @@ namespace Resonance.Repo.Database
                                 { "@topicSubscriptionId", topicSubscriptionId },
                                 { "@header", filter.Header },
                                 { "@matchExpression", filter.MatchExpression },
+                                { "@notmatch", filter.NotMatch },
                             };
-                            await TranExecuteAsync("insert into TopicSubscriptionFilter (TopicSubscriptionId, Header, MatchExpression) values (@topicSubscriptionId, @header, @matchExpression)", parameters).ConfigureAwait(false);
+                            await TranExecuteAsync("insert into TopicSubscriptionFilter (TopicSubscriptionId, Header, MatchExpression, NotMatch) values (@topicSubscriptionId, @header, @matchExpression, @notmatch)", parameters).ConfigureAwait(false);
                         }
                     }
                 }

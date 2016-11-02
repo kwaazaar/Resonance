@@ -168,28 +168,30 @@ namespace Resonance
 
         private bool CheckFilters(List<TopicSubscriptionFilter> filters, Dictionary<string, string> headers)
         {
-            if (headers == null)
-                return false;
             if (filters == null)
                 return false;
             if (filters.Count == 0)
                 return false;
+            if (headers == null)
+                return filters.Any(f => f.NotMatch) ? true : false; // If any filter says it cannot match, then that filter automatically matches when no headers where supplied
 
             foreach (var filter in filters)
             {
-                if (!CheckFilters(filter, headers))
+                if (!CheckFilter(filter, headers))
                     return false;
             }
 
             return true;
         }
 
-        private bool CheckFilters(TopicSubscriptionFilter filter, Dictionary<string, string> headers)
+        private bool CheckFilter(TopicSubscriptionFilter filter, Dictionary<string, string> headers)
         {
-            if (!headers.Any((h) => h.Key.Equals(filter.Header, StringComparison.OrdinalIgnoreCase))) // Header must be provided, otherwise mismatch anyway (even with MatchExpression '*')
-                return false;
+            var notMask = !filter.NotMatch;
 
-            if (filter.MatchExpression == "*") return true;
+            if (!headers.Any((h) => h.Key.Equals(filter.Header, StringComparison.OrdinalIgnoreCase))) // Header must be provided, otherwise mismatch anyway (even with MatchExpression '*')
+                return (false == notMask);
+
+            if (filter.MatchExpression == "*") return (true && notMask);
 
             var headerValue = headers.First((h) => h.Key.Equals(filter.Header, StringComparison.OrdinalIgnoreCase)).Value;
             var endsWith = filter.MatchExpression.StartsWith("*");
@@ -197,22 +199,25 @@ namespace Resonance
 
             if (endsWith && startsWith)
             {
-                return ((filter.MatchExpression.Length >= 3)
-                    && headerValue.ToLowerInvariant().Contains(filter.MatchExpression.Substring(1).Substring(0, filter.MatchExpression.Length - 2).ToLowerInvariant()));
+                return (((filter.MatchExpression.Length >= 3)
+                    && headerValue.ToLowerInvariant().Contains(filter.MatchExpression.Substring(1).Substring(0, filter.MatchExpression.Length - 2).ToLowerInvariant()))
+                    == notMask);
             }
             else if (endsWith)
             {
-                return ((filter.MatchExpression.Length >= 2)
-                    && headerValue.EndsWith(filter.MatchExpression.Substring(1, filter.MatchExpression.Length - 1), StringComparison.OrdinalIgnoreCase));
+                return (((filter.MatchExpression.Length >= 2)
+                    && headerValue.EndsWith(filter.MatchExpression.Substring(1, filter.MatchExpression.Length - 1), StringComparison.OrdinalIgnoreCase))
+                    == notMask);
             }
             else if (startsWith)
             {
-                return ((filter.MatchExpression.Length >= 2)
-                    && headerValue.StartsWith(filter.MatchExpression.Substring(0, filter.MatchExpression.Length - 1), StringComparison.OrdinalIgnoreCase));
+                return (((filter.MatchExpression.Length >= 2)
+                    && headerValue.StartsWith(filter.MatchExpression.Substring(0, filter.MatchExpression.Length - 1), StringComparison.OrdinalIgnoreCase))
+                    == notMask);
             }
             else
             {
-                return filter.MatchExpression.Equals(headerValue, StringComparison.OrdinalIgnoreCase);
+                return (filter.MatchExpression.Equals(headerValue, StringComparison.OrdinalIgnoreCase) == notMask);
             }
         }
     }
