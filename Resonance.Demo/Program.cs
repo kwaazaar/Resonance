@@ -8,6 +8,8 @@ using Resonance.Repo.Database;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Resonance.Demo
@@ -69,22 +71,34 @@ namespace Resonance.Demo
                     },
                 });
 
-            if (1 == 1) // Change to enable/disable the adding of data to the subscription
+            if (1 == 0) // Change to enable/disable the adding of data to the subscription
             {
                 var sw = new Stopwatch();
                 sw.Start();
-                int maxLoop = 50;
-                for (int i = 1; i <= maxLoop; i++)
+
+                var arrLen = 500;
+                var nrs = new List<int>(arrLen);
+                for (int i = 0; i < arrLen; i++) { nrs.Add(i); };
+
+                nrs.AsParallel().ForAll((i) => 
+                //Task.WhenAll(nrs.Select(async (i) => 
+
+                Task.Run(async () => // Threadpool task to wait for async parts in inner task
                 {
-                    var iAsString = i.ToString();
-                    for (int fk = 1; fk <= 1000; fk++) // 1000 different functional keys, 4 TopicEvents per fk
+                    Console.WriteLine($"Run {i:D4} - Start  [{Thread.CurrentThread.ManagedThreadId}]");
+                    for (int fk = 1; fk <= 100; fk++) // 1000 different functional keys, 4 TopicEvents per fk
                     {
+                        //await Task.Delay(1).ConfigureAwait(false);
                         var fkAsString = fk.ToString();
-                        publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload100);
-                        publisher.Publish(topic1.Name, functionalKey: fkAsString, payload: payload2000);
+                        await publisher.PublishAsync(topic1.Name, functionalKey: fkAsString, payload: payload100);
                     }
-                    Console.WriteLine($"Runs done: {i} of {maxLoop}");
+                    Console.WriteLine($"Run {i:D4} - Finish [{Thread.CurrentThread.ManagedThreadId}]");
                 }
+
+                ).GetAwaiter().GetResult() // Block until all async work is done (ForAll does not await on Task as result-type)
+                //)
+
+                );
                 sw.Stop();
                 Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
             }
@@ -116,16 +130,16 @@ namespace Resonance.Demo
             var worker = new EventConsumptionWorker(
                 eventConsumer: consumer,
                 subscriptionName: subscriptionName,
-                consumeAction: (ceW) =>
+                consumeAction: async (ceW) =>
                 {
-                    //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
+                    Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     //var delayMs = DateTime.UtcNow.Second * 10;
                     //Thread.Sleep(delayMs); // Different processing time on every run
-
+                    await Task.Delay(1);
                     if (DateTime.UtcNow.Millisecond == 1)
                         throw new Exception("Sorry");
 
-                    return Task.FromResult<ConsumeResult>(ConsumeResult.Succeeded);
+                    return ConsumeResult.Succeeded;
                 },
                 logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>()
                 );
@@ -151,18 +165,18 @@ namespace Resonance.Demo
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
 
             // To use MSSQLServer:
-            var connectionString = config.GetConnectionString("Resonance.MsSql");
-            serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
-            {
-                return new MsSqlEventingRepoFactory(connectionString);
-            });
-
-            // To use MySQL:
-            //var connectionString = config.GetConnectionString("Resonance.MySql");
+            //var connectionString = config.GetConnectionString("Resonance.MsSql");
             //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
             //{
-            //    return new MySqlEventingRepoFactory(connectionString);
+            //    return new MsSqlEventingRepoFactory(connectionString);
             //});
+
+            // To use MySQL:
+            var connectionString = config.GetConnectionString("Resonance.MySql");
+            serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
+            {
+                return new MySqlEventingRepoFactory(connectionString);
+            });
 
             // Configure EventPublisher
             serviceCollection.AddTransient<IEventPublisher, EventPublisher>();
