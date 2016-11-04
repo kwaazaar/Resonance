@@ -186,13 +186,13 @@ namespace Resonance
                 throw new InvalidOperationException("Task is already running or has not yet finished stopping");
 
             this._cancellationToken = new CancellationTokenSource();
-            this._internalTask = Task.Factory.StartNew(async () =>
+            this._internalTask = Task.Factory.StartNew(() =>
             {
                 while (!this._cancellationToken.IsCancellationRequested)
                 {
                     var suspendedUntilUtc = _suspendedUntilUtc;
                     if (!suspendedUntilUtc.HasValue || (suspendedUntilUtc.Value < DateTime.UtcNow))
-                        await this.TryExecuteWorkItems().ConfigureAwait(false);
+                        this.TryExecuteWorkItems().GetAwaiter().GetResult(); // Execute synchroniously
                     else
                     {
                         LogWarning("Processing is temporary suspended until {suspendedUntilUtc} (UTC).", suspendedUntilUtc.Value);
@@ -200,7 +200,7 @@ namespace Resonance
                         try
                         {
                             // Suspend processing
-                            await Task.Delay(suspendDuration, _cancellationToken.Token).ConfigureAwait(false);
+                            Task.Delay(suspendDuration, _cancellationToken.Token).GetAwaiter().GetResult(); // Synchroniously, but by using Task.Delay, the cancellationtoken can be passed.
                             LogWarning("Processing has been suspended for {seconds} seconds and will now continue.", suspendDuration.TotalSeconds);
                         }
                         catch (OperationCanceledException) { } // Because the delay was cancelled through the _cancellationToken
@@ -237,8 +237,13 @@ namespace Resonance
 
                     if (workitems.Count() > 1)
                     {
-                        LogInformation("Processing {items} events in parallel.", workitems.Count());
-                        workitems.AsParallel().ForAll(async (w) => await this.ExecuteWork(w).ConfigureAwait(false));
+                        LogTrace("Processing {items} events in parallel.", workitems.Count());
+                        workitems.AsParallel().ForAll(ce => // AsParallel takes care of partitioning, resulting in using less threads than Parallal.ForEach, but still fast enough.
+                            Task.Run(async () => // Threadpool task to wait for async parts in inner task (ExecuteWork)
+                            {
+                                await this.ExecuteWork(ce).ConfigureAwait(false);
+                            }).GetAwaiter().GetResult() // Need to block, because ForAll does not
+                        );
                     }
                     else
                         await this.ExecuteWork(workitems.First()).ConfigureAwait(false); // Executed on single (current) thread, but theoretically the TryGetWork could have returned more than one workitem

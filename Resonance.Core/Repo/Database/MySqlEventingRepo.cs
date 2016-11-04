@@ -154,10 +154,14 @@ namespace Resonance.Repo.Database
 
         private async Task<Int64?> TryLockNextSubscriptionEventAsync(Int64 subscriptionId, int visibilityTimeout, bool ordered)
         {
-            int attempt = 1;
+            int attempt = 0;
+            bool canRetry = false;
 
             do
             {
+                attempt++;
+                canRetry = false;
+
                 var deliveryKey = Guid.NewGuid().ToString();
                 var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout);
 
@@ -197,7 +201,8 @@ namespace Resonance.Repo.Database
                             }).ConfigureAwait(false);
 
                         var sId = sIds.FirstOrDefault();
-                        return (sId.HasValue && (sId.Value > 0)) ? sId.Value : default(Int64?); // MySql returns the 0 used to initialize this variable with.
+                        // sId may be null/0, event though there are more events. See comment below.
+                        return (sId.HasValue && (sId.Value > 0)) ? sId.Value : default(Int64?);
                     }
                     else
                     {
@@ -245,12 +250,18 @@ namespace Resonance.Repo.Database
                             }).ConfigureAwait(false);
 
                         var sId = sIds.FirstOrDefault();
-                        return (sId.HasValue && (sId.Value > 0)) ? sId.Value : default(Int64?); // MySql returns the 0 used to initialize this variable with.
+
+                        // The update-statement (above) can fail (0 rows affected and @updatedSeId not set/still 0) when the found record was modified before it could be updated.
+                        // (we no longer actively lock (FOR UPDATE) because of its performance impact on large tables (>200K records)
+                        // This may occur under heavy load. We also cannot retry, because we cannot determine if this is the case: they may actually be no more events to process.
+                        // When using the EventConsumptionWorker, the result will be that it backs off (minBackoffDelayMs), which may usually relief the process shortly.
+                        return (sId.HasValue && (sId.Value > 0)) ? sId.Value : default(Int64?);
                     }
                 }
                 catch (DbException dbEx)
                 {
-                    if (!CanRetry(dbEx, attempt))
+                    canRetry = CanRetry(dbEx, attempt);
+                    if (!canRetry)
                     {
                         if (attempt > 1)
                             throw new InvalidOperationException($"DB-error after attempt #{attempt}", dbEx); // We need the 'attempt-count' in the message
@@ -258,8 +269,9 @@ namespace Resonance.Repo.Database
                             throw;
                     }
                 }
-            } while (attempt < _maxRetriesOnDeadlock + 1);
-            return null; // Will never get here, since exception will have been thrown above
+            } while (canRetry);
+
+            return null; // Still no result after retrying, then just return null (give up).
         }
 
         public async Task PerformHouseKeepingTasksAsync()

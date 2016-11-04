@@ -16,10 +16,10 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 1; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        private const int WORKER_COUNT = 4; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
         // 1=1750
         // 2=3350
-        // 4=5500
+        // 4=6000
         // 5=6700
         // 7=7000
         //10=5200
@@ -138,8 +138,6 @@ namespace Resonance.Demo
                 consumeAction: async (ceW) =>
                 {
                     //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
-                    //var delayMs = DateTime.UtcNow.Second * 10;
-                    //Thread.Sleep(delayMs); // Different processing time on every run
                     await Task.Delay(1);
                     if (DateTime.UtcNow.Millisecond == 1)
                         throw new Exception("Sorry");
