@@ -185,7 +185,7 @@ namespace Resonance.Repo.Database
                             " se.DeliveryDateUtc = @utcNow," +
                             " se.Id = (select @updatedSeId:= se.Id)" +
                             " WHERE se.Id = tmp.Id AND se.DeliveryKey = tmp.DeliveryKey" + // Where is required, because FOR UPDATE is not used, thus no locks where aquired
-                            " select @updatedSeId;";
+                            ";select @updatedSeId;";
 
                         var sIds = await TranQueryAsync<Int64?>(query,
                             new Dictionary<string, object>
@@ -251,7 +251,12 @@ namespace Resonance.Repo.Database
                 catch (DbException dbEx)
                 {
                     if (!CanRetry(dbEx, attempt))
-                        throw new InvalidOperationException($"Did not recover from deadlock after {attempt} attempts.", dbEx);
+                    {
+                        if (attempt > 1)
+                            throw new InvalidOperationException($"DB-error after attempt #{attempt}", dbEx); // We need the 'attempt-count' in the message
+                        else
+                            throw;
+                    }
                 }
             } while (attempt < _maxRetriesOnDeadlock + 1);
             return null; // Will never get here, since exception will have been thrown above

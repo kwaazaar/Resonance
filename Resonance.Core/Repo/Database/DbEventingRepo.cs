@@ -817,7 +817,12 @@ namespace Resonance.Repo.Database
                     await RollbackTransactionAsync().ConfigureAwait(false);
                     allowRetry = CanRetry(dbEx, attempt);
                     if (!allowRetry)
-                        throw new InvalidOperationException($"Did not recover from deadlock after {attempt} attempts.", dbEx); 
+                    {
+                        if (attempt > 1)
+                            throw new InvalidOperationException($"DB-error after attempt #{attempt}", dbEx); // We need the 'attempt-count' in the message
+                        else
+                            throw;
+                    }
                 }
                 catch (Exception)
                 {
