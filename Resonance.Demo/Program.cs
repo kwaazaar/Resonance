@@ -16,8 +16,13 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 5; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
-
+        private const int WORKER_COUNT = 1; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        // 1=1750
+        // 2=3350
+        // 4=5500
+        // 5=6700
+        // 7=7000
+        //10=5200
         private static IServiceProvider serviceProvider;
 
         #region Payloads
@@ -71,7 +76,7 @@ namespace Resonance.Demo
                     },
                 });
 
-            if (1 == 1) // Change to enable/disable the adding of data to the subscription
+            if (1 == 0) // Change to enable/disable the adding of data to the subscription
             {
                 var sw = new Stopwatch();
                 sw.Start();
@@ -132,7 +137,7 @@ namespace Resonance.Demo
                 subscriptionName: subscriptionName,
                 consumeAction: async (ceW) =>
                 {
-                    Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
+                    //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     //var delayMs = DateTime.UtcNow.Second * 10;
                     //Thread.Sleep(delayMs); // Different processing time on every run
                     await Task.Delay(1);
@@ -158,7 +163,7 @@ namespace Resonance.Demo
             serviceCollection.AddSingleton<IConfiguration>(config);
 
             ILoggerFactory loggerFactory = new LoggerFactory()
-                .AddConsole(LogLevel.Warning)
+                .AddConsole(LogLevel.Information)
                 .AddDebug(LogLevel.Trace);
             serviceCollection.AddSingleton<ILoggerFactory>(loggerFactory);
 

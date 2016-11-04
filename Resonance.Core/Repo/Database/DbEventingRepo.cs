@@ -770,12 +770,12 @@ namespace Resonance.Repo.Database
                && se.InvisibleUntilUtc > DateTime.UtcNow) // ... if not currently locked
                 throw new ArgumentException($"Subscription-event with id {id} had expired and it has already been locked again.");
 
-            int attempts = 0;
+            int attempt = 0;
             bool success = false;
             bool allowRetry = false;
             do
             {
-                attempts++;
+                attempt++;
                 // Reinit these on very loop:
                 success = false;
                 allowRetry = false;
@@ -815,9 +815,9 @@ namespace Resonance.Repo.Database
                 catch (DbException dbEx)
                 {
                     await RollbackTransactionAsync().ConfigureAwait(false);
-                    allowRetry = CanRetry(dbEx, attempts);
+                    allowRetry = CanRetry(dbEx, attempt);
                     if (!allowRetry)
-                        throw;
+                        throw new InvalidOperationException($"Did not recover from deadlock after {attempt} attempts.", dbEx); 
                 }
                 catch (Exception)
                 {
