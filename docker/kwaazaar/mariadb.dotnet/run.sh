@@ -1,0 +1,1 @@
+docker run -d -p 3309:3306 kwaazaar/mariadb.dotnet:latest

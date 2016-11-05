@@ -1,0 +1,1 @@
+docker run -d -p 3309:3306 -p 5000:5000 -v /var/share/docker/kwaazaar/resonance/db:/var/lib/mysql kwaazaar/resonance:latest
