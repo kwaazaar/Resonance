@@ -62,10 +62,10 @@ namespace Resonance.Web
             });
 
             // Configure EventPublisher
-            services.AddTransient<IEventPublisher, EventPublisher>();
+            services.AddTransient<IEventPublisherAsync, EventPublisher>();
 
             // Configure EventConsumer
-            services.AddTransient<IEventConsumer, EventConsumer>();
+            services.AddTransient<IEventConsumerAsync, EventConsumer>();
             
             // Add framework services.
             services.AddMvc();

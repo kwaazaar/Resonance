@@ -6,6 +6,7 @@
   "authors": [ "Robert te Kaat" ],
 
   "buildOptions": {
+    "outputName": "resonance.core",
     "copyToOutput": {
       "includeFiles": [
         "content\\ResonanceDB.MsSql.sql",

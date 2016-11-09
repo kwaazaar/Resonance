@@ -33,7 +33,7 @@ namespace Resonance.APIClient
 
         protected HttpClient CreateHttpClient()
         {
-            var httpClient = new HttpClient(_messageHandler)
+            var httpClient = new HttpClient(_messageHandler, false)
             {
                 BaseAddress = _resonanceApiBaseAddress,
                 Timeout = _timeout,
