@@ -14,7 +14,7 @@ namespace Resonance.Web.Controllers
     [Route("consume")]
     public class ConsumeController : Controller
     {
-        private IEventConsumer _consumer;
+        private IEventConsumerAsync _consumer;
         private ILogger<ConsumeController> _logger;
 
         /// <summary>
@@ -22,7 +22,7 @@ namespace Resonance.Web.Controllers
         /// </summary>
         /// <param name="consumer"></param>
         /// <param name="logger"></param>
-        public ConsumeController(IEventConsumer consumer, ILogger<ConsumeController> logger)
+        public ConsumeController(IEventConsumerAsync consumer, ILogger<ConsumeController> logger)
         {
             _consumer = consumer;
             _logger = logger;

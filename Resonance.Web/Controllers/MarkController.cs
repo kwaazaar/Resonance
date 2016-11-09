@@ -14,7 +14,7 @@ namespace Resonance.Web.Controllers
     [Route("mark")]
     public class MarkController : Controller
     {
-        private IEventConsumer _consumer;
+        private IEventConsumerAsync _consumer;
         private ILogger<MarkController> _logger;
 
         /// <summary>
@@ -22,7 +22,7 @@ namespace Resonance.Web.Controllers
         /// </summary>
         /// <param name="consumer"></param>
         /// <param name="logger"></param>
-        public MarkController(IEventConsumer consumer, ILogger<MarkController> logger)
+        public MarkController(IEventConsumerAsync consumer, ILogger<MarkController> logger)
         {
             _consumer = consumer;
             _logger = logger;

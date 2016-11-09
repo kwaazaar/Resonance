@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 // associated with an assembly.
 //[assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Robert te Kaat")]
-[assembly: AssemblyProduct("Resonance")]
+[assembly: AssemblyProduct("Resonance.Core")]
 //[assembly: AssemblyTrademark("")]
 
 

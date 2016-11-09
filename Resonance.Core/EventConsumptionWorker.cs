@@ -25,7 +25,7 @@ namespace Resonance
         private readonly int _batchSize;
         private readonly int _housekeepingIntervalMin;
 
-        private readonly IEventConsumer _eventConsumer;
+        private readonly IEventConsumerAsync _eventConsumer;
         private readonly ILogger _logger;
         private readonly string _subscriptionName;
         private readonly Func<ConsumableEvent, Task<ConsumeResult>> _consumeAction;
@@ -43,7 +43,7 @@ namespace Resonance
         /// <param name="logger">ILogger to use for logging purposes</param>
         /// <param name="housekeepingIntervalMin">Interval between housekeeping intervals. Set to 0 to disable housekeeping.</param>
         /// <param name="consumeAction">Action that must be invoked for each event. Make sure it is thread-safe when parallelExecution is enabled!</param>
-        public EventConsumptionWorker(IEventConsumer eventConsumer, string subscriptionName,
+        public EventConsumptionWorker(IEventConsumerAsync eventConsumer, string subscriptionName,
             Func<ConsumableEvent, Task<ConsumeResult>> consumeAction, int visibilityTimeout = 60,
             ILogger logger = null,
             int minBackOffDelayInMs = 1, int maxBackOffDelayInMs = 60000, int batchSize = 1, int housekeepingIntervalMin = 5)
@@ -101,7 +101,7 @@ namespace Resonance
                     try
                     {
                         LogTrace("Running housekeeping tasks...");
-                        _eventConsumer.PerformHouseKeepingTasks(); // No await, blocking is no problem here.
+                        _eventConsumer.PerformHouseKeepingTasksAsync().GetAwaiter().GetResult(); // No await, blocking is no problem here.
                         LogTrace("Housekeeping tasks done.");
                         _lastHouseKeepingRun = DateTime.UtcNow;
                     }

@@ -27,7 +27,7 @@ namespace Resonance.Tests.Publishing
         {
             // Arrange
             var topicName = "Publishing.PublishTests.PublishComplete";
-            var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
             var sub = _consumer.AddOrUpdateSubscription(new Subscription
             {
                 Name = Guid.NewGuid().ToString(),
@@ -87,7 +87,7 @@ namespace Resonance.Tests.Publishing
         {
             // Arrange
             var topicName = "Publishing.PublishTests.PublishMinimal";
-            var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
             var sub = _consumer.AddOrUpdateSubscription(new Subscription
             {
                 Name = Guid.NewGuid().ToString(),
@@ -95,7 +95,7 @@ namespace Resonance.Tests.Publishing
             });
 
             // Act
-            var topicEvent = _publisher.PublishAsync(topicName).Result;
+            var topicEvent = _publisher.Publish(topicName);
             Thread.Sleep(TimeSpan.FromMilliseconds(200)); // To make sure that DateTime.UtcNow returns a later datetime than during the Publish-call
 
             // Assert
@@ -128,7 +128,7 @@ namespace Resonance.Tests.Publishing
         {
             // Arrange
             var topicName = "Publishing.PublishTakeEventNameFromHeaders";
-            var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
             var sub = _consumer.AddOrUpdateSubscription(new Subscription
             {
                 Name = Guid.NewGuid().ToString(),

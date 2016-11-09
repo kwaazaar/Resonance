@@ -55,14 +55,14 @@ namespace Resonance.Demo
             ConfigureServices(serviceCollection);
             serviceProvider = serviceCollection.BuildServiceProvider();
 
-            var publisher = serviceProvider.GetRequiredService<IEventPublisher>();
-            var consumer = serviceProvider.GetRequiredService<IEventConsumer>();
+            var publisher = serviceProvider.GetRequiredService<IEventPublisherAsync>();
+            var consumer = serviceProvider.GetRequiredService<IEventConsumerAsync>();
 
             // Make sure the topic exists
-            var topic1 = publisher.GetTopicByName("Demo Topic 1") ?? publisher.AddOrUpdateTopic(new Topic { Name = "Demo Topic 1" });
-            var subscription1 = consumer.GetSubscriptionByName("Demo Subscription 1");
+            var topic1 = publisher.GetTopicByNameAsync("Demo Topic 1").GetAwaiter().GetResult() ?? publisher.AddOrUpdateTopicAsync(new Topic { Name = "Demo Topic 1" }).GetAwaiter().GetResult();
+            var subscription1 = consumer.GetSubscriptionByNameAsync("Demo Subscription 1").GetAwaiter().GetResult();
             if (subscription1 == null)
-                subscription1 = consumer.AddOrUpdateSubscription(new Subscription
+                subscription1 = consumer.AddOrUpdateSubscriptionAsync(new Subscription
                 {
                     Name = "Demo Subscription 1",
                     MaxDeliveries = 2,
@@ -74,7 +74,7 @@ namespace Resonance.Demo
                             TopicId = topic1.Id.Value, Enabled = true,
                         },
                     },
-                });
+                }).GetAwaiter().GetResult();
 
             if (1 == 0) // Change to enable/disable the adding of data to the subscription
             {
@@ -126,11 +126,9 @@ namespace Resonance.Demo
                     workers[i].Stop();
             }
 
-            //consumer.DeleteSubscription(subscription1.Id);
-            //publisher.DeleteTopic(topic1.Id, true);
         }
 
-        public static EventConsumptionWorker CreateWorker(IEventConsumer consumer, string subscriptionName)
+        public static EventConsumptionWorker CreateWorker(IEventConsumerAsync consumer, string subscriptionName)
         {
             var worker = new EventConsumptionWorker(
                 eventConsumer: consumer,
@@ -182,10 +180,10 @@ namespace Resonance.Demo
             });
 
             // Configure EventPublisher
-            serviceCollection.AddTransient<IEventPublisher, EventPublisher>();
+            serviceCollection.AddTransient<IEventPublisherAsync, EventPublisher>();
 
             // Configure EventConsumer
-            serviceCollection.AddTransient<IEventConsumer, EventConsumer>();
+            serviceCollection.AddTransient<IEventConsumerAsync, EventConsumer>();
         }
     }
 }

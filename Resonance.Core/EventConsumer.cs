@@ -8,7 +8,7 @@ using Resonance.Repo;
 
 namespace Resonance
 {
-    public class EventConsumer : IEventConsumer
+    public class EventConsumer : IEventConsumer, IEventConsumerAsync
     {
         private IEventingRepoFactory _repoFactory;
 

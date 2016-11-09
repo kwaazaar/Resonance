@@ -15,7 +15,7 @@ namespace Resonance.Web.Controllers
     [Route("publish")]
     public class PublishController : Controller
     {
-        private IEventPublisher _publisher;
+        private IEventPublisherAsync _publisher;
         private ILogger<PublishController> _logger;
 
         /// <summary>
@@ -23,7 +23,7 @@ namespace Resonance.Web.Controllers
         /// </summary>
         /// <param name="publisher"></param>
         /// <param name="logger"></param>
-        public PublishController(IEventPublisher publisher, ILogger<PublishController> logger)
+        public PublishController(IEventPublisherAsync publisher, ILogger<PublishController> logger)
         {
             _publisher = publisher;
             _logger = logger;

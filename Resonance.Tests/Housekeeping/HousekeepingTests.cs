@@ -27,20 +27,20 @@ namespace Resonance.Tests.Housekeeping
             // Arrange
             var topicName = "HousekeepingTests.Expiration";
             var subName = topicName + "_Sub1";
-            var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
-            var sub1 = _consumer.AddOrUpdateSubscriptionAsync(new Subscription
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
             {
                 Name = subName,
                 TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
-            }).Result;
+            });
 
             var utcNow = DateTime.UtcNow;
             _publisher.Publish(topicName, eventName: topicName + "1", expirationDateUtc: utcNow.AddSeconds(5), payload: "1");
             _publisher.Publish(topicName, eventName: topicName + "2", expirationDateUtc: utcNow.AddMinutes(15), payload: "2");
 
             var visibilityTimeout = 1; // Must expire asap
-            var ce1 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
-            var ce2 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            var ce1 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
+            var ce2 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
             Assert.Equal("1", ce1.Payload); // Not yet expired
             Assert.Equal("2", ce2.Payload);
             Thread.Sleep(TimeSpan.FromSeconds(5+1));
@@ -60,20 +60,20 @@ namespace Resonance.Tests.Housekeeping
             // Arrange
             var topicName = "HousekeepingTests.MaxDeliveries";
             var subName = topicName + "_Sub1";
-            var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
-            var sub1 = _consumer.AddOrUpdateSubscriptionAsync(new Subscription
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
             {
                 Name = subName,
                 MaxDeliveries = 1,
                 TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
-            }).Result;
+            });
 
             var utcNow = DateTime.UtcNow;
             _publisher.Publish(topicName, eventName: topicName + "1", publicationDateUtc: utcNow, payload: "1");
             _publisher.Publish(topicName, eventName: topicName + "2", publicationDateUtc: utcNow.AddSeconds(1), payload: "2");
 
             var visibilityTimeout = 1; // Must expire asap
-            var ce1 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            var ce1 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
             Assert.Equal("1", ce1.Payload); // Not yet maxDeliveriesReached
 
             _consumer.PerformHouseKeepingTasks();
@@ -90,21 +90,21 @@ namespace Resonance.Tests.Housekeeping
             // Arrange
             var topicName = "HousekeepingTests.Overtaken";
             var subName = topicName + "_Sub1";
-            var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
-            var sub1 = _consumer.AddOrUpdateSubscriptionAsync(new Subscription
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
             {
                 Name = subName,
                 Ordered = true,
                 TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
-            }).Result;
+            });
 
             var utcNow = DateTime.UtcNow;
             var funcKey = "A";
             _publisher.Publish(topicName, eventName: topicName + "1", publicationDateUtc: utcNow, functionalKey: funcKey);
-            var ce = _consumer.ConsumeNextAsync(subName).Result.SingleOrDefault();
+            var ce = _consumer.ConsumeNext(subName).SingleOrDefault();
             _consumer.MarkConsumed(ce.Id, ce.DeliveryKey);
             _publisher.Publish(topicName, eventName: topicName + "2", publicationDateUtc: utcNow.AddSeconds(-1), functionalKey: funcKey);
-            ce = _consumer.ConsumeNextAsync(subName).Result.SingleOrDefault();
+            ce = _consumer.ConsumeNext(subName).SingleOrDefault();
             Assert.Null(ce); // Already overtaken, so should not be delivered
 
             _consumer.PerformHouseKeepingTasks();

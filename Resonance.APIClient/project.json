@@ -1,0 +1,20 @@
+{
+  "version": "0.7.0-*",
+
+  "dependencies": {
+    "Resonance.Core": "0.*"
+  },
+
+  "frameworks": {
+    "netstandard1.6": {
+      "dependencies": {
+        "NETStandard.Library": "1.6.0"
+      }
+    },
+    "net452": {
+      "dependencies": {
+        "System.Net.Http": "4.0.0"
+      }
+    }
+  }
+}
