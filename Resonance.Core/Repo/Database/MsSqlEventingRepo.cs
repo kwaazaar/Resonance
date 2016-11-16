@@ -130,7 +130,7 @@ namespace Resonance.Repo.Database
                         + " and se.InvisibleUntilUtc < @utcNow" // Must not be 'locked'/made invisible by other consumer
                         + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
                         + "	and	seInv.Id IS NULL" // Geen in behandeling nu
-                        + " and	(lc.SubscriptionId IS NULL OR (lc.PublicationDateUtc < se.PublicationDateUtc))" // Newer than last published (TODO: PRIORITY!!)
+                        + " and	(lc.SubscriptionId IS NULL OR (lc.PublicationDateUtc <= se.PublicationDateUtc))" // Newer than last published
                         + " order by se.Priority ASC, se.PublicationDateUtc ASC" // Warning: prio can mess everything up!
                         + ") UPDATE DE"
                         + " SET InvisibleUntilUtc = @invisibleUntilUtc,"
