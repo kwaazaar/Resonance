@@ -16,7 +16,7 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 4; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        private const int WORKER_COUNT = 1; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
         // 1=1750
         // 2=3350
         // 4=6000
@@ -118,8 +118,13 @@ namespace Resonance.Demo
                 workers[i] = CreateWorker(consumer, "Demo Subscription 1");
                 workers[i].Start();
             }
-            Console.WriteLine("Press a key to stop the worker(s)...");
-            Console.ReadKey();
+
+            // Wait for a user to press Ctrl+C or when windows sends the stop process signal
+            Console.WriteLine("Press Ctrl+C to stop the worker(s)...");
+            var handle = new ManualResetEvent(false);
+            Console.CancelKeyPress += (s, e) => { handle.Set(); e.Cancel = true; }; // Cancel must be true, to make sure the process is not killed and we can clean up nicely below
+            handle.WaitOne();
+
             for (int i = 0; i < WORKER_COUNT; i++)
             {
                 if (workers[i].IsRunning())
@@ -139,8 +144,12 @@ namespace Resonance.Demo
                 {
                     //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     await Task.Delay(1);
+
                     if (DateTime.UtcNow.Millisecond == 1)
                         throw new Exception("Sorry");
+
+                    if (DateTime.UtcNow.Millisecond > 200)
+                        return ConsumeResult.MustRetry("Retry nodig");
 
                     return ConsumeResult.Succeeded;
                 },
