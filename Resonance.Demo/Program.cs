@@ -16,38 +16,8 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 1; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
-        // 1=1750
-        // 2=3350
-        // 4=6000
-        // 5=6700
-        // 7=7000
-        //10=5200
+        private const int WORKER_COUNT = 2; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
         private static IServiceProvider serviceProvider;
-
-        #region Payloads
-        private static string payload100 = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
-        private static string payload2000 = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" +
-            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
-        #endregion
 
         public static void Main(string[] args)
         {
@@ -76,34 +46,30 @@ namespace Resonance.Demo
                     },
                 });
 
-            if (1 == 0) // Change to enable/disable the adding of data to the subscription
+            if (1 == 1) // Change to enable/disable the adding of data to the subscription
             {
                 var sw = new Stopwatch();
                 sw.Start();
 
-                var arrLen = 500;
+                var arrLen = 5;
                 var nrs = new List<int>(arrLen);
                 for (int i = 0; i < arrLen; i++) { nrs.Add(i); };
 
                 nrs.AsParallel().ForAll((i) => 
-                //Task.WhenAll(nrs.Select(async (i) => 
-
-                Task.Run(async () => // Threadpool task to wait for async parts in inner task
-                {
-                    Console.WriteLine($"Run {i:D4} - Start  [{Thread.CurrentThread.ManagedThreadId}]");
-                    for (int fk = 1; fk <= 100; fk++) // 1000 different functional keys, 4 TopicEvents per fk
-                    {
-                        //await Task.Delay(1).ConfigureAwait(false);
-                        var fkAsString = fk.ToString();
-                        await publisher.PublishAsync(topic1.Name, functionalKey: fkAsString, payload: payload100);
-                    }
-                    Console.WriteLine($"Run {i:D4} - Finish [{Thread.CurrentThread.ManagedThreadId}]");
-                }
-
-                ).GetAwaiter().GetResult() // Block until all async work is done (ForAll does not await on Task as result-type)
-                //)
-
+                    Task.Run(async () => // Threadpool task to wait for async parts in inner task
+                        {
+                            Console.WriteLine($"Run {i:D4} - Start  [{Thread.CurrentThread.ManagedThreadId}]");
+                            for (int fk = 1; fk <= 100; fk++) // 1000 different functional keys, 4 TopicEvents per fk
+                            {
+                                //await Task.Delay(1).ConfigureAwait(false);
+                                var fkAsString = fk.ToString();
+                                await publisher.PublishAsync(topic1.Name, functionalKey: fkAsString, payload: "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"); // 100 bytes
+                            }
+                            Console.WriteLine($"Run {i:D4} - Finish [{Thread.CurrentThread.ManagedThreadId}]");
+                        }
+                    ).GetAwaiter().GetResult() // Block until all async work is done (ForAll does not await on Task as result-type)
                 );
+
                 sw.Stop();
                 Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
             }
@@ -143,13 +109,13 @@ namespace Resonance.Demo
                 consumeAction: async (ceW) =>
                 {
                     //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
-                    await Task.Delay(1);
+                    await Task.Delay(5); // Some processing delay
 
-                    if (DateTime.UtcNow.Millisecond == 1)
-                        throw new Exception("Sorry");
+                    if (DateTime.UtcNow.Millisecond < 50)
+                        throw new Exception("This exception was unhandled by the ConsumeAction.");
 
-                    if (DateTime.UtcNow.Millisecond > 200)
-                        return ConsumeResult.MustRetry("Retry nodig");
+                    if (DateTime.UtcNow.Millisecond > 900)
+                        return ConsumeResult.MustRetry("ConsumeAction decided this event has to be retried.");
 
                     return ConsumeResult.Succeeded;
                 },
