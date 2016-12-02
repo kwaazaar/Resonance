@@ -109,7 +109,7 @@ namespace Resonance.Demo
                 consumeAction: async (ceW) =>
                 {
                     //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
-                    await Task.Delay(5); // Some processing delay
+                    await Task.Delay(1); // Some processing delay
 
                     if (DateTime.UtcNow.Millisecond < 50)
                         throw new Exception("This exception was unhandled by the ConsumeAction.");

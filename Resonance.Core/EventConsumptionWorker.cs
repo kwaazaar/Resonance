@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Resonance.Repo;
 
 namespace Resonance
 {
@@ -321,6 +322,16 @@ namespace Resonance
             {
                 var consEvent = await _eventConsumer.ConsumeNextAsync(_subscriptionName, _visibilityTimeout, maxWorkItems).ConfigureAwait(false);
                 return consEvent;
+            }
+            catch (RepoException repoEx)
+            {
+                if (repoEx.Error == RepoError.TooBusy) // TooBusy (usually because of deadlocks) is treated as warning
+                {
+                    LogWarning("Failed to get consumable event, because repository is too busy: {repoEx}", repoEx);
+                }
+                else
+                    LogError("Failed to get consumable event: {repoEx}", repoEx);
+                return null;
             }
             catch (Exception ex)
             {
