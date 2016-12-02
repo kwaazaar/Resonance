@@ -819,10 +819,12 @@ namespace Resonance.Repo.Database
                     if (!allowRetry)
                     {
                         if (attempt > 1)
-                            throw new InvalidOperationException($"DB-error after attempt #{attempt}", dbEx); // We need the 'attempt-count' in the message
+                            throw new RepoException($"Repo-action failed after {attempt} attempts", dbEx, RepoError.TooBusy);
                         else
-                            throw;
+                            throw new RepoException(dbEx);
                     }
+                    else
+                        await Task.Delay(TimeSpan.FromMilliseconds(50)).ConfigureAwait(false); // Wait shortly before retrying to let the repo take some breath
                 }
                 catch (Exception)
                 {

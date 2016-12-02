@@ -114,5 +114,39 @@ namespace Resonance.Tests.Consuming
             Assert.Equal("5", p5.Payload);
             Assert.Null(pNext); // Nothing more to deliver
         }
+
+        [Fact]
+        public void SerialDelivery_SamePublicationDate()
+        {
+            // Arrange
+            var topicName = "SerialDelivery_SamePublicationDate";
+            var subName = topicName + "_Sub1"; // Substring to prevent too long sub-names
+            var topic = _publisher.AddOrUpdateTopicAsync(new Topic { Name = topicName }).Result;
+            var sub1 = _consumer.AddOrUpdateSubscriptionAsync(new Subscription
+            {
+                Name = subName,
+                Ordered = true,
+                TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
+            }).Result;
+
+            var publishedDateUtcBaseLine = DateTime.UtcNow.AddSeconds(-60); // Explicitly setting publicationdates to make sure none are the same!
+            _publisher.PublishAsync(topicName, payload: "1", functionalKey: "f1", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(1)).Wait();
+            _publisher.PublishAsync(topicName, payload: "2", functionalKey: "f1", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(2)).Wait();
+            _publisher.PublishAsync(topicName, payload: "3", functionalKey: "f1", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(2)).Wait();
+            _publisher.PublishAsync(topicName, payload: "4", functionalKey: "f1", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(3)).Wait();
+
+            var visibilityTimeout = 5;
+            var p1 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault(); // p1 stands for payload "1"
+            Assert.Equal("1", p1.Payload);
+            _consumer.MarkConsumed(p1.Id, p1.DeliveryKey);
+            var p2 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            Assert.Equal("2", p2.Payload);
+            _consumer.MarkConsumed(p2.Id, p2.DeliveryKey);
+            var p3 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            Assert.Equal("3", p3.Payload); // P3 should be delivered, publicationdate is same as p2, but same <> overtaken!
+            _consumer.MarkConsumed(p3.Id, p3.DeliveryKey);
+            var p4 = _consumer.ConsumeNextAsync(subName, visibilityTimeout: visibilityTimeout).Result.SingleOrDefault();
+            Assert.Equal("4", p4.Payload); // P3 should be delivered, since 
+        }
     }
 }

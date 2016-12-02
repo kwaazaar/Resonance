@@ -86,8 +86,6 @@ namespace Resonance.Repo.Database
 
         protected override async Task<IEnumerable<ConsumableEvent>> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
         {
-            // TODO: Optimize when not ordered: use old code
-
             // 1. Lock and get ids
             var lockedIds = await LockNextSubscriptionEventsAsync(subscription.Id.Value, subscription.Ordered, visibilityTimeout, maxCount).ConfigureAwait(false);
 
@@ -263,10 +261,10 @@ namespace Resonance.Repo.Database
                     canRetry = CanRetry(dbEx, attempt);
                     if (!canRetry)
                     {
-                        if (attempt > 1)
-                            throw new InvalidOperationException($"DB-error after attempt #{attempt}", dbEx); // We need the 'attempt-count' in the message
+                        if (attempt > 1) // Retries only occur when repo is busy and since retries happened, this is the cause
+                            throw new RepoException($"Repo-action failed after {attempt} attempts", dbEx, RepoError.TooBusy);
                         else
-                            throw;
+                            throw new RepoException(dbEx);
                     }
                 }
             } while (canRetry);

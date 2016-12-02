@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Resonance.Repo;
 
 namespace Resonance
 {
@@ -322,6 +323,16 @@ namespace Resonance
                 var consEvent = await _eventConsumer.ConsumeNextAsync(_subscriptionName, _visibilityTimeout, maxWorkItems).ConfigureAwait(false);
                 return consEvent;
             }
+            catch (RepoException repoEx)
+            {
+                if (repoEx.Error == RepoError.TooBusy) // TooBusy (usually because of deadlocks) is treated as warning
+                {
+                    LogWarning("Failed to get consumable event, because repository is too busy: {repoEx}", repoEx);
+                }
+                else
+                    LogError("Failed to get consumable event: {repoEx}", repoEx);
+                return null;
+            }
             catch (Exception ex)
             {
                 LogError("Failed to get consumable event: {exception}", ex);
@@ -361,52 +372,71 @@ namespace Resonance
             }
             catch (Exception procEx)
             {
+                // Unhandled exception is translated to Failed
                 result = ConsumeResult.Failed(procEx.ToString());
             }
 
-
-            if (result.ResultType == ConsumeResultType.Succeeded)
+            switch (result.ResultType)
             {
-                bool markedConsumed = false;
+                case ConsumeResultType.Succeeded:
+                    { 
+                        bool markedConsumed = false;
 
-                try
-                {
-                    await _eventConsumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey).ConfigureAwait(false);
-                    markedConsumed = true;
-                    LogTrace("Event consumption succeeded for event with id {Id} and functional key {FunctionalKey}.",
-                        ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a");
-                }
-                catch (Exception ex)
-                {
-                    LogError("Failed to mark event consumed with id {Id} and functional key {FunctionalKey}, cause event to be processes again! Details: {Exception}.",
-                        ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", ex);
-                    // mustRollback hoeft eigenlijk niet geset te worden, want markedComplete zal niet meer true zijn
-                    mustRollback = true;
-                }
+                        try
+                        {
+                            await _eventConsumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey).ConfigureAwait(false);
+                            markedConsumed = true;
+                            LogTrace("Event consumption succeeded for event with id {Id} and functional key {FunctionalKey}.",
+                                ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a");
+                        }
+                        catch (Exception ex)
+                        {
+                            LogError("Failed to mark event consumed with id {Id} and functional key {FunctionalKey}, cause event to be processes again! Details: {Exception}.",
+                                ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", ex);
+                            // mustRollback doesn't actually need to be set, since markedConsumed will no longer be true
+                            mustRollback = true;
+                        }
 
-                if (!markedConsumed)
-                    mustRollback = true;
-            }
-            else if (result.ResultType == ConsumeResultType.Failed)
-            {
-                mustRollback = true;
-                LogError("Exception occurred while processing event with id {Id} and functional key {FunctionalKey}: {Reason}.",
-                    ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", result.Reason);
+                        if (!markedConsumed)
+                            mustRollback = true;
+                    }
+                    break;
 
-                try
-                {
-                    await _eventConsumer.MarkFailedAsync(ce.Id, ce.DeliveryKey, Reason.Other(result.Reason)).ConfigureAwait(false);
-                }
-                catch (Exception) { } // Swallow, want is geen ramp als deze toch opnieuw wordt aangeboden (dan wordt hij alsnog corrupt gemeld)
+                case ConsumeResultType.Failed:
+                    {
+                        mustRollback = true;
+                        LogError("Exception occurred while processing event with id {Id} and functional key {FunctionalKey}: {Reason}.",
+                            ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", result.Reason);
+
+                        try
+                        {
+                            await _eventConsumer.MarkFailedAsync(ce.Id, ce.DeliveryKey, Reason.Other(result.Reason)).ConfigureAwait(false);
+                        }
+                        catch (Exception) { } // Swallow, since it's not a disaster if this gets processed again
+                    }
+                    break;
+
+                case ConsumeResultType.MustSuspend:
+                    {
+                        mustRollback = true;
+                        var suspendedUntilUtc = this.Suspend(result.SuspendDuration.GetValueOrDefault(TimeSpan.FromSeconds(60)));
+                        LogError("Event consumption failed for event with id {Id} and functional key {FunctionalKey}. Processing should (continue to) suspend. Details: {Reason}.",
+                            ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", result.Reason);
+                    }
+                    break;
+
+                case ConsumeResultType.MustRetry:
+                    {
+                        mustRollback = true;
+                        LogWarning("Retry requested while processing event with id {Id} and functional key {FunctionalKey}: {Reason}.",
+                            ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", result.Reason); // Logged as warning, since a requested retry is not (yet) an error
+                    }
+                    break;
+
+                default:
+                    // No special handling for other cases
+                    break;
             }
-            else if (result.ResultType == ConsumeResultType.MustSuspend)
-            {
-                mustRollback = true;
-                var suspendedUntilUtc = this.Suspend(result.SuspendDuration.GetValueOrDefault(TimeSpan.FromSeconds(60)));
-                LogError("Event consumption failed for event with id {Id} and functional key {FunctionalKey}. Processing should (continue to) suspend. Details: {Reason}.",
-                    ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", result.Reason);
-            }
-            // MustRetry does nothing: default behaviour when not marked consumed/failed
 
             return (result.ResultType == ConsumeResultType.Succeeded && !mustRollback);
         }
