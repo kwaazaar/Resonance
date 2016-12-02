@@ -32,7 +32,7 @@ namespace Resonance.APIClient
                     if (existingSub == null)
                         throw new ArgumentException($"Subscription with Id {subscription.Id.Value} not found");
 
-                    response = await httpClient.PutAsync("subscriptions/" + WebUtility.UrlEncode(subscription.Name), subscription.ToStringContent()).ConfigureAwait(false);
+                    response = await httpClient.PutAsync("subscriptions/" + Uri.EscapeDataString(subscription.Name), subscription.ToStringContent()).ConfigureAwait(false);
                 }
                 else
                     response = await httpClient.PostAsync("subscriptions", subscription.ToStringContent()).ConfigureAwait(false);
@@ -60,7 +60,7 @@ namespace Resonance.APIClient
                 var existingSub = await GetSubscriptionAsync(id).ConfigureAwait(false);
                 if (existingSub != null)
                 {
-                    var response = await httpClient.DeleteAsync("subscriptions/" + WebUtility.UrlEncode(existingSub.Name));
+                    var response = await httpClient.DeleteAsync("subscriptions/" + Uri.EscapeDataString(existingSub.Name));
                     response.EnsureSuccessStatusCode();
                 }
                 else
@@ -87,7 +87,7 @@ namespace Resonance.APIClient
             using (var httpClient = CreateHttpClient())
             {
                 // Cannot get by id, so get all subscriptions and then look it up
-                var response = await httpClient.GetAsync("subscriptions/" + WebUtility.UrlEncode(name)).ConfigureAwait(false);
+                var response = await httpClient.GetAsync("subscriptions/" + Uri.EscapeDataString(name)).ConfigureAwait(false);
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return null;
 

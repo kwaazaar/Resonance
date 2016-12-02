@@ -17,14 +17,14 @@
 
   "dependencies": {
     "Dapper": "1.50.2",
-    "Microsoft.Extensions.Logging.Abstractions": "1.0.0",
+    "Microsoft.Extensions.Logging.Abstractions": "1.1.0",
     "Newtonsoft.Json": "9.0.1"
   },
 
   "frameworks": {
     "netstandard1.6": {
       "dependencies": {
-        "NETStandard.Library": "1.6.0",
+        "NETStandard.Library": "1.6.1",
         "MySqlConnector": "0.7.2",
         "System.Linq.Parallel": "4.0.1"
       }
