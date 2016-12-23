@@ -43,14 +43,14 @@ namespace Resonance
             return GetTopicsAsync(partOfName).GetAwaiter().GetResult();
         }
 
-        public TopicEvent Publish(string topicName, string eventName = null, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, string payload = null)
+        public TopicEvent Publish(string topicName, string eventName = null, DateTime? publicationDateUtc = default(DateTime?), DateTime? deliveryDelayedUntilUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, string payload = null)
         {
-            return PublishAsync(topicName, eventName, publicationDateUtc, expirationDateUtc, functionalKey, priority, headers, payload).GetAwaiter().GetResult();
+            return PublishAsync(topicName, eventName, publicationDateUtc, deliveryDelayedUntilUtc, expirationDateUtc, functionalKey, priority, headers, payload).GetAwaiter().GetResult();
         }
 
-        public TopicEvent Publish<T>(string topicName, string eventName = null, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, T payload = null) where T : class
+        public TopicEvent Publish<T>(string topicName, string eventName = null, DateTime? publicationDateUtc = default(DateTime?), DateTime? deliveryDelayedUntilUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, T payload = null) where T : class
         {
-            return PublishAsync<T>(topicName, eventName, publicationDateUtc, expirationDateUtc, functionalKey, priority, headers, payload).GetAwaiter().GetResult();
+            return PublishAsync<T>(topicName, eventName, publicationDateUtc, deliveryDelayedUntilUtc, expirationDateUtc, functionalKey, priority, headers, payload).GetAwaiter().GetResult();
         }
 
         public void PerformHouseKeepingTasks()
@@ -90,7 +90,7 @@ namespace Resonance
                 return await repo.GetTopicsAsync(partOfName).ConfigureAwait(false);
         }
 
-        public async Task<TopicEvent> PublishAsync(string topicName, string eventName = null, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, string payload = null)
+        public async Task<TopicEvent> PublishAsync(string topicName, string eventName = null, DateTime? publicationDateUtc = default(DateTime?), DateTime? deliveryDelayedUntilUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, string payload = null)
         {
             using (var repo = _repoFactory.CreateRepo())
             {
@@ -131,7 +131,7 @@ namespace Resonance
 
                 try
                 {
-                    var topicEvent = await repo.PublishTopicEventAsync(newTopicEvent, subscriptionsMatching).ConfigureAwait(false);
+                    var topicEvent = await repo.PublishTopicEventAsync(newTopicEvent, subscriptionsMatching, deliveryDelayedUntilUtc).ConfigureAwait(false);
                     return topicEvent;
                 }
                 catch (Exception)
@@ -150,13 +150,13 @@ namespace Resonance
             }
         }
 
-        public async Task<TopicEvent> PublishAsync<T>(string topicName, string eventName = null, DateTime? publicationDateUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, T payload = null) where T : class
+        public async Task<TopicEvent> PublishAsync<T>(string topicName, string eventName = null, DateTime? publicationDateUtc = default(DateTime?), DateTime? deliveryDelayedUntilUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, T payload = null) where T : class
         {
             string payloadAsString = null;
             if (payload != null)
                 payloadAsString = JsonConvert.SerializeObject(payload); // No specific parameters: the consumer must understand the json as well
 
-            return await PublishAsync(topicName, eventName, publicationDateUtc, expirationDateUtc, functionalKey, priority, headers, payloadAsString).ConfigureAwait(false);
+            return await PublishAsync(topicName, eventName, publicationDateUtc, deliveryDelayedUntilUtc, expirationDateUtc, functionalKey, priority, headers, payloadAsString).ConfigureAwait(false);
         }
 
         public async Task PerformHouseKeepingTasksAsync()

@@ -8,8 +8,8 @@ namespace Resonance
 {
     public interface IEventPublisher
     {
-        TopicEvent Publish(string topicName, string eventName = null, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, string payload = null);
-        TopicEvent Publish<T>(string topicName, string eventName = null, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, T payload = null) where T : class;
+        TopicEvent Publish(string topicName, string eventName = null, DateTime? publicationDateUtc = null, DateTime? deliveryDelayedUntilUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, string payload = null);
+        TopicEvent Publish<T>(string topicName, string eventName = null, DateTime? publicationDateUtc = null, DateTime? deliveryDelayedUntilUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, T payload = null) where T : class;
 
         IEnumerable<Topic> GetTopics(string partOfName = null);
         Topic GetTopic(Int64 id);

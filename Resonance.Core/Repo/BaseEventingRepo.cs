@@ -19,7 +19,7 @@ namespace Resonance.Repo
         /// </summary>
         public static DateTime MaxDateTime { get { return new DateTime(9999, 12, 31); } }
 
-        public async Task<TopicEvent> PublishTopicEventAsync(TopicEvent newTopicEvent, IEnumerable<Subscription> subscriptionsMatching)
+        public async Task<TopicEvent> PublishTopicEventAsync(TopicEvent newTopicEvent, IEnumerable<Subscription> subscriptionsMatching, DateTime? deliveryDelayedUntilUtc)
         {
             await BeginTransactionAsync().ConfigureAwait(false);
 
@@ -46,9 +46,11 @@ namespace Resonance.Repo
                     }
 
                     // Delivery can be initially delayed, but it cannot exceed the expirationdate (would be useless)
-                    var deliveryDelayedUntilUtc = subscription.DeliveryDelay.HasValue
-                        ? newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value)
-                        : MinDateTime;
+                    DateTime subDeliveryDelayedUntilUtc = MinDateTime;
+                    if (deliveryDelayedUntilUtc.HasValue) // Passed values always go overwrite subscription settings
+                        subDeliveryDelayedUntilUtc = deliveryDelayedUntilUtc.Value;
+                    else if (subscription.DeliveryDelay.HasValue)
+                        subDeliveryDelayedUntilUtc = newTopicEvent.PublicationDateUtc.Value.AddSeconds(subscription.DeliveryDelay.Value);
 
                     var newSubscriptionEvent = new SubscriptionEvent
                     {
@@ -61,7 +63,7 @@ namespace Resonance.Repo
                         PayloadId = newTopicEvent.PayloadId,
                         Payload = null, // Only used when consuming
                         ExpirationDateUtc = subExpirationDateUtc,
-                        DeliveryDelayedUntilUtc = deliveryDelayedUntilUtc,
+                        DeliveryDelayedUntilUtc = subDeliveryDelayedUntilUtc,
                         DeliveryCount = 0,
                         DeliveryKey = string.Empty,
                         InvisibleUntilUtc = MinDateTime,

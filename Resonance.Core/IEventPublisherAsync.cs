@@ -8,8 +8,8 @@ namespace Resonance
 {
     public interface IEventPublisherAsync
     {
-        Task<TopicEvent> PublishAsync(string topicName, string eventName = null, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, string payload = null);
-        Task<TopicEvent> PublishAsync<T>(string topicName, string eventName = null, DateTime? publicationDateUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, T payload = null) where T : class;
+        Task<TopicEvent> PublishAsync(string topicName, string eventName = null, DateTime? publicationDateUtc = null, DateTime? deliveryDelayedUntilUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, string payload = null);
+        Task<TopicEvent> PublishAsync<T>(string topicName, string eventName = null, DateTime? publicationDateUtc = null, DateTime? deliveryDelayedUntilUtc = null, DateTime? expirationDateUtc = null, string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, T payload = null) where T : class;
 
         Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null);
         Task<Topic> GetTopicAsync(Int64 id);
