@@ -56,15 +56,15 @@ namespace Resonance.Web.Controllers
             {
                 if (repoEx.Error == RepoError.TooBusy) // TooBusy (usually because of deadlocks) is treated as warning
                 {
-                    _logger.LogWarning("Failed to get consumable event, because repository is too busy: {repoEx}", repoEx);
+                    _logger.LogWarning(new EventId(3), repoEx, "Failed to get consumable event, because repository is too busy");
                     return NotFound();
                 }
-                _logger.LogError(repoEx.ToString());
+                _logger.LogError(new EventId(3), repoEx, "Failed to get consumable event because of repoException {repoError}", repoEx.Error);
                 return StatusCode(500);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex.ToString());
+                _logger.LogError(new EventId(3), ex, "Failed to get consumable event");
                 return StatusCode(500);
             }
         }

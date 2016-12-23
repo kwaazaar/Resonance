@@ -17,7 +17,7 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 200; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        private const int WORKER_COUNT = 2; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
         private static IServiceProvider serviceProvider;
 
         public static void Main(string[] args)
@@ -36,7 +36,7 @@ namespace Resonance.Demo
                 subscription1 = consumer.AddOrUpdateSubscriptionAsync(new Subscription
                 {
                     Name = "Demo Subscription 1",
-                    MaxDeliveries = 0,
+                    MaxDeliveries = 2,
                     Ordered = true,
                     TopicSubscriptions = new List<TopicSubscription>
                     {
@@ -139,8 +139,9 @@ namespace Resonance.Demo
                 .AddDebug(LogLevel.Trace);
             serviceCollection.AddSingleton<ILoggerFactory>(loggerFactory);
 
-            //ConfigureRepoServices(serviceCollection, config);
-            ConfigureApiServices(serviceCollection, config);
+
+            //ConfigureRepoServices(serviceCollection, config); // Using the db-repo's doesn't have any api/web dependencies
+            ConfigureApiServices(serviceCollection, config); // When using the ApiClient, make sure Resonance.Web is also running
         }
 
         private static void ConfigureRepoServices(IServiceCollection serviceCollection, IConfiguration config)

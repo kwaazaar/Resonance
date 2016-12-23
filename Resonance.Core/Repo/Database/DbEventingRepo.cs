@@ -778,9 +778,9 @@ namespace Resonance.Repo.Database
             var se = await GetSubscriptionEvent(id).ConfigureAwait(false);
             if (se == null) throw new ArgumentException($"No subscription-event found with id {id}. Maybe it has already been consumed (by another). Using a higher visibility timeout may help.");
 
-            if (!se.DeliveryKey.Equals(deliveryKey, StringComparison.OrdinalIgnoreCase) // Mismatch is only ok... (we DID consume it)
-               && se.InvisibleUntilUtc > DateTime.UtcNow) // ... if not currently locked
-                throw new ArgumentException($"Subscription-event with id {id} had expired and it has already been locked again.");
+            if ((!se.DeliveryKey.Equals(deliveryKey, StringComparison.OrdinalIgnoreCase)) // Locked by another
+                || (se.InvisibleUntilUtc < DateTime.UtcNow)) // expired
+                throw new ArgumentException($"Subscription-event with id {id} has expired and/or it has already been locked again.");
 
             int attempt = 0;
             bool success = false;
@@ -851,9 +851,9 @@ namespace Resonance.Repo.Database
             var se = await GetSubscriptionEvent(id).ConfigureAwait(false);
             if (se == null) throw new ArgumentException($"No subscription-event found with id {id}.");
 
-            if (!se.DeliveryKey.Equals(deliveryKey, StringComparison.OrdinalIgnoreCase) // Mismatch is only ok... (we DID consume it)
-               && se.InvisibleUntilUtc > DateTime.UtcNow) // ... If not currently locked
-                throw new ArgumentException($"Subscription-event with id {id} had expired and it has already been locked again.");
+            if ((!se.DeliveryKey.Equals(deliveryKey, StringComparison.OrdinalIgnoreCase)) // Locked by another
+                || (se.InvisibleUntilUtc < DateTime.UtcNow)) // expired
+                throw new ArgumentException($"Subscription-event with id {id} has expired and/or it has already been locked again.");
 
             await BeginTransactionAsync().ConfigureAwait(false);
             try

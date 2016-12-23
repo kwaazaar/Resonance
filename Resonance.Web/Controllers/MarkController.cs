@@ -52,11 +52,12 @@ namespace Resonance.Web.Controllers
             }
             catch (ArgumentException argEx)
             {
+                _logger.LogWarning(new EventId(1), argEx, "Failed to mark event Consumed with id {id} and deliveryKey {deliveryKey}", id, deliveryKey);
                 return NotFound(argEx.Message);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex.ToString());
+                _logger.LogError(new EventId(1), ex, "Failed to mark event Consumed with id {id} and deliveryKey {deliveryKey}", id, deliveryKey);
                 return StatusCode(500);
             }
         }
@@ -87,11 +88,12 @@ namespace Resonance.Web.Controllers
             }
             catch (ArgumentException argEx)
             {
+                _logger.LogWarning(new EventId(2), argEx, "Failed to mark event Failed with id {id}, deliveryKey {deliveryKey} and reason {reason}", id, deliveryKey, reason);
                 return NotFound(argEx.Message);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex.ToString());
+                _logger.LogError(new EventId(2), ex, "Failed to mark event Failed with id {id}, deliveryKey {deliveryKey} and reason {reason}", id, deliveryKey, reason);
                 return StatusCode(500);
             }
         }
