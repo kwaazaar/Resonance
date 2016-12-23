@@ -47,7 +47,7 @@ namespace Resonance.Demo
                     },
                 }).GetAwaiter().GetResult();
 
-            if (1 == 1) // Change to enable/disable the adding of data to the subscription
+            if (1 == 0) // Change to enable/disable the adding of data to the subscription
             {
                 var sw = new Stopwatch();
                 sw.Start();

@@ -45,7 +45,7 @@ namespace Resonance.APIClient
         {
             using (var httpClient = CreateHttpClient())
             {
-                var response = await httpClient.PostAsync($"maintenance/housekeeping", null).ConfigureAwait(false);
+                var response = await httpClient.GetAsync($"maintenance/housekeeping").ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode)
                     throw await HttpResponseException.Create(response);
             }
