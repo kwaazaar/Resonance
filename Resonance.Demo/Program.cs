@@ -47,12 +47,12 @@ namespace Resonance.Demo
                     },
                 }).GetAwaiter().GetResult();
 
-            if (1 == 0) // Change to enable/disable the adding of data to the subscription
+            if (1 == 1) // Change to enable/disable the adding of data to the subscription
             {
                 var sw = new Stopwatch();
                 sw.Start();
 
-                var arrLen = 5;
+                var arrLen = 50;
                 var nrs = new List<int>(arrLen);
                 for (int i = 0; i < arrLen; i++) { nrs.Add(i); };
 
@@ -146,19 +146,21 @@ namespace Resonance.Demo
         private static void ConfigureRepoServices(IServiceCollection serviceCollection, IConfiguration config)
         {
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
-
+            var maxRetriesOnDeadlock = int.Parse(config["Resonance:Repo:Database:MaxRetriesOnDeadlock"]);
+            var commandTimeout = TimeSpan.FromSeconds(int.Parse(config["Resonance:Repo:Database:CommandTimeout"]));
+            
             // To use MSSQLServer:
             //var connectionString = config.GetConnectionString("Resonance.MsSql");
             //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
             //{
-            //    return new MsSqlEventingRepoFactory(connectionString);
+            //    return new MsSqlEventingRepoFactory(connectionString, commandTimeout); // Does not (yet) support MaxRetriesOnDeadlock
             //});
 
             // To use MySQL:
             var connectionString = config.GetConnectionString("Resonance.MySql");
             serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
             {
-                return new MySqlEventingRepoFactory(connectionString);
+                return new MySqlEventingRepoFactory(connectionString, commandTimeout, maxRetriesOnDeadlock);
             });
 
             // Configure EventPublisher and Consumer (their constructors require the above registered IEventingRepoFactory).

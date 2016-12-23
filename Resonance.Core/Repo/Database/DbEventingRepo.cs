@@ -33,9 +33,10 @@ namespace Resonance.Repo.Database
         /// Creates a new DbEventingRepo.
         /// </summary>
         /// <param name="conn">IDbConnection to use. If not yet opened, it will be opened here.</param>
-        public DbEventingRepo(IDbConnection conn)
+        public DbEventingRepo(IDbConnection conn, TimeSpan commandTimeout)
         {
             _conn = conn;
+            CommandTimeout = commandTimeout;
         }
 
         public void Dispose()
@@ -100,6 +101,11 @@ namespace Resonance.Repo.Database
         /// Indicates whether the repo supports running parallel queries on a single connection. Default=false.
         /// </summary>
         protected override bool ParallelQueriesSupport { get { return false; } }
+
+        /// <summary>
+        /// CommandTimeout to use. Set by constructor, but can be modified.
+        /// </summary>
+        public virtual TimeSpan CommandTimeout { get; set; }
 
         #endregion
 
@@ -196,7 +202,10 @@ namespace Resonance.Repo.Database
         {
             await EnsureConnectionReady().ConfigureAwait(false);
             var query = sql.ToLowerInvariant(); // MySql requires lower-case table names. This way the queries do not need to change, which is more readable.
-            return await _conn.ExecuteAsync(query, param: param, transaction: _runningTransaction, commandTimeout: commandTimeout).ConfigureAwait(false);
+            return await _conn.ExecuteAsync(query,
+                param: param,
+                transaction: _runningTransaction,
+                commandTimeout: commandTimeout.GetValueOrDefault((int)CommandTimeout.TotalSeconds)).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -211,7 +220,10 @@ namespace Resonance.Repo.Database
         {
             await EnsureConnectionReady().ConfigureAwait(false);
             var query = sql.ToLowerInvariant(); // MySql requires lower-case table names. This way the queries do not need to change, which is more readable.
-            return await _conn.QueryAsync<T>(query, param: param, transaction: _runningTransaction, commandTimeout: commandTimeout).ConfigureAwait(false);
+            return await _conn.QueryAsync<T>(query,
+                param: param,
+                transaction: _runningTransaction,
+                commandTimeout: commandTimeout.GetValueOrDefault((int)CommandTimeout.TotalSeconds)).ConfigureAwait(false);
         }
         #endregion
 

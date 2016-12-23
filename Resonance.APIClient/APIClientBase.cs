@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -9,47 +7,48 @@ namespace Resonance.APIClient
     public abstract class APIClientBase
     {
         protected readonly Uri _resonanceApiBaseAddress;
-        protected readonly HttpMessageHandler _messageHandler;
-        protected readonly TimeSpan _timeout;
+        protected readonly TimeSpan _housekeepingRequestTimeout;
+        protected readonly static HttpClient _httpClient;
 
-        public APIClientBase(Uri resonanceApiBaseAddress, HttpMessageHandler messageHandler, TimeSpan timeout)
+        static APIClientBase()
+        {
+            _httpClient = new HttpClient();
+        }
+
+        public APIClientBase(Uri resonanceApiBaseAddress, TimeSpan timeout, TimeSpan housekeepingRequestTimeout)
         {
             _resonanceApiBaseAddress = resonanceApiBaseAddress;
-            _messageHandler = messageHandler;
-            _timeout = timeout;
+
+            // Overwrite HttpClient-settings if nessecary (will only happen once)
+            if (_httpClient.BaseAddress == null || _httpClient.BaseAddress != resonanceApiBaseAddress)
+                _httpClient.BaseAddress = resonanceApiBaseAddress;
+
+            if (_httpClient.Timeout != timeout)
+                _httpClient.Timeout = timeout;
+
+            _housekeepingRequestTimeout = housekeepingRequestTimeout;
         }
 
         protected async Task CheckConnectionAsync()
         {
-            using (var httpClient = CreateHttpClient())
+            var response = await _httpClient.GetAsync("topics").ConfigureAwait(false); // Try to retrieve all topics
+            if (!response.IsSuccessStatusCode)
             {
-                var response = await httpClient.GetAsync("topics").ConfigureAwait(false); // Try to retrieve all topics
-                if (!response.IsSuccessStatusCode)
-                {
-                    throw new InvalidOperationException($"Failed to connect to Resonance API on {_resonanceApiBaseAddress}: Response: HTTP {(int)response.StatusCode}.");
-                }
+                throw new InvalidOperationException($"Failed to connect to Resonance API on {_resonanceApiBaseAddress}: Response: HTTP {(int)response.StatusCode}.");
             }
-        }
-
-        protected HttpClient CreateHttpClient()
-        {
-            var httpClient = new HttpClient(_messageHandler, false)
-            {
-                BaseAddress = _resonanceApiBaseAddress,
-                Timeout = _timeout,
-            };
-            return httpClient;
         }
 
         public virtual async Task PerformHouseKeepingTasksAsync()
         {
-            using (var httpClient = CreateHttpClient())
+            // Custom httpclient for housekeeping, since it needs a different timeout
+            using (var httpClient = new HttpClient())
             {
+                httpClient.BaseAddress = _resonanceApiBaseAddress;
+                httpClient.Timeout = _housekeepingRequestTimeout;
                 var response = await httpClient.GetAsync($"maintenance/housekeeping").ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode)
                     throw await HttpResponseException.Create(response);
             }
         }
-
     }
 }

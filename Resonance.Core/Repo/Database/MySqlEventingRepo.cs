@@ -1,17 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Data;
-using System.Data.SqlClient;
-using Dapper;
-using Resonance;
+﻿using MySql.Data.MySqlClient;
 using Resonance.Models;
-using Resonance.Repo.InternalModels;
-using Newtonsoft.Json;
-using MySql.Data.MySqlClient;
+using System;
+using System.Collections.Generic;
+using System.Data;
 using System.Data.Common;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Resonance.Repo.Database
 {
@@ -27,8 +21,9 @@ namespace Resonance.Repo.Database
         /// Defaults to a maximum of 1 retries on a deadlock
         /// </summary>
         /// <param name="conn"></param>
-        public MySqlEventingRepo(MySqlConnection conn)
-            : this(conn, 1)
+        /// <param name="commandTimeout">Commandtimeout to use</param>
+        public MySqlEventingRepo(MySqlConnection conn, TimeSpan commandTimeout)
+            : this(conn, commandTimeout, 1)
         {
         }
 
@@ -36,9 +31,10 @@ namespace Resonance.Repo.Database
         /// Creates a new MsSqlEventingRepo.
         /// </summary>
         /// <param name="conn">IDbConnection to use.</param>
+        /// <param name="commandTimeout">Commandtimeout to use</param>
         /// <param name="maxRetriesOnDeadlock">Maximum number of times to retry DB-calls when deadlocks occur.</param>
-        public MySqlEventingRepo(MySqlConnection conn, int maxRetriesOnDeadlock)
-            : base(conn)
+        public MySqlEventingRepo(MySqlConnection conn, TimeSpan commandTimeout, int maxRetriesOnDeadlock)
+            : base(conn, commandTimeout)
         {
             if (maxRetriesOnDeadlock < 0) throw new ArgumentOutOfRangeException("maxRetriesOnDeadlock");
 

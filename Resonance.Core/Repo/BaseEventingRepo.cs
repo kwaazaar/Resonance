@@ -8,7 +8,6 @@ namespace Resonance.Repo
 {
     public abstract class BaseEventingRepo
     {
-
         /// <summary>
         /// Min datetime to use (Sql Server does not support any lower value than this)
         /// </summary>

@@ -1,16 +1,10 @@
-﻿using System;
+﻿using Resonance.Models;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Data;
-using System.Data.SqlClient;
-using Dapper;
-using Resonance;
-using Resonance.Models;
-using Resonance.Repo.InternalModels;
-using Newtonsoft.Json;
 using System.Data.Common;
+using System.Data.SqlClient;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Resonance.Repo.Database
 {
@@ -28,8 +22,9 @@ namespace Resonance.Repo.Database
         /// Creates a new MsSqlEventingRepo.
         /// </summary>
         /// <param name="conn">IDbConnection to use.</param>
-        public MsSqlEventingRepo(SqlConnection conn)
-            : base(conn)
+        /// <param name="commandTimeout">Commandtimeout to use</param>
+        public MsSqlEventingRepo(SqlConnection conn, TimeSpan commandTimeout)
+            : base(conn, commandTimeout)
         {
             _connStringBuilder = new SqlConnectionStringBuilder(conn.ConnectionString);
         }
