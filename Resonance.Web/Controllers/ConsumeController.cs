@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Resonance.Models;
+using Resonance.Repo;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -50,6 +51,16 @@ namespace Resonance.Web.Controllers
             catch (ArgumentException argEx)
             {
                 return BadRequest(argEx.Message);
+            }
+            catch (RepoException repoEx)
+            {
+                if (repoEx.Error == RepoError.TooBusy) // TooBusy (usually because of deadlocks) is treated as warning
+                {
+                    _logger.LogWarning("Failed to get consumable event, because repository is too busy: {repoEx}", repoEx);
+                    return NotFound();
+                }
+                _logger.LogError(repoEx.ToString());
+                return StatusCode(500);
             }
             catch (Exception ex)
             {

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -281,13 +282,14 @@ namespace Resonance.Repo.Database
 
             try
             {
+                var reasonNr = ((int)ReasonType.Expired).ToString(CultureInfo.InvariantCulture);
                 var query = "INSERT IGNORE INTO FailedSubscriptionEvent"
                     + " ( Id, SubscriptionId"
                     + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
                     + " , FailedDateUtc, Reason, ReasonOther)"
                     + " SELECT Id, SubscriptionId"
                     + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
-                    + " , @utcNow, 1, null" // 1 = Expired
+                    + $" , @utcNow, {reasonNr}, null"
                     + " FROM SubscriptionEvent"
                     + " WHERE (SubscriptionEvent.ExpirationDateUtc IS NOT NULL AND SubscriptionEvent.ExpirationDateUtc < @utcNow);"
                     + " DELETE se"
@@ -311,13 +313,14 @@ namespace Resonance.Repo.Database
 
             try
             {
+                var reasonNr = ((int)ReasonType.MaxRetriesReached).ToString(CultureInfo.InvariantCulture);
                 var query = "INSERT IGNORE INTO FailedSubscriptionEvent"
                     + " (Id, SubscriptionId"
                     + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
                     + " , FailedDateUtc, Reason, ReasonOther)"
                     + " SELECT se.Id, se.SubscriptionId"
                     + " , se.EventName, se.PublicationDateUtc, se.FunctionalKey, se.Priority, se.PayloadId, se.DeliveryDateUtc"
-                    + " , @utcNow, 2, null" // 2 = MaxRetriesReached
+                    + $" , @utcNow, {reasonNr}, null"
                     + " FROM SubscriptionEvent se"
                     + " JOIN Subscription s ON s.Id = se.SubscriptionId"
                     + " WHERE (s.MaxDeliveries > 0 AND se.DeliveryCount >= s.MaxDeliveries);"
@@ -342,13 +345,14 @@ namespace Resonance.Repo.Database
 
             try
             {
+                var reasonNr = ((int)ReasonType.Overtaken).ToString(CultureInfo.InvariantCulture);
                 var query = "INSERT IGNORE INTO FailedSubscriptionEvent"
                     + " (Id, SubscriptionId"
                     + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
                     + " , FailedDateUtc, Reason, ReasonOther)"
                     + " SELECT se.Id, se.SubscriptionId"
                     + " , se.EventName, se.PublicationDateUtc, se.FunctionalKey, se.Priority, se.PayloadId, se.DeliveryDateUtc"
-                    + " , @utcNow, 3, null" // 3 = Overtaken
+                    + $" , @utcNow, {reasonNr}, null"
                     + " FROM SubscriptionEvent se"
                     + " JOIN LastConsumedSubscriptionEvent lc ON lc.SubscriptionId = se.SubscriptionId AND lc.FunctionalKey = se.FunctionalKey"
                     + " WHERE se.PublicationDateUtc < lc.PublicationDateUtc;"

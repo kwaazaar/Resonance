@@ -17,7 +17,7 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 2; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        private const int WORKER_COUNT = 200; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
         private static IServiceProvider serviceProvider;
 
         public static void Main(string[] args)
@@ -36,7 +36,7 @@ namespace Resonance.Demo
                 subscription1 = consumer.AddOrUpdateSubscriptionAsync(new Subscription
                 {
                     Name = "Demo Subscription 1",
-                    MaxDeliveries = 2,
+                    MaxDeliveries = 0,
                     Ordered = true,
                     TopicSubscriptions = new List<TopicSubscription>
                     {

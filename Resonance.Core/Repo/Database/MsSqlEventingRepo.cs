@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -173,10 +174,11 @@ namespace Resonance.Repo.Database
 
         private async Task<int> HouseKeeping_ExpiredSubscriptionEvents()
         {
+            var reasonNr = ((int)ReasonType.Expired).ToString(CultureInfo.InvariantCulture);
             var query = "DELETE	SubscriptionEvent"
                 + " OUTPUT deleted.Id, deleted.SubscriptionId"
                 + " , deleted.EventName, deleted.PublicationDateUtc, deleted.FunctionalKey, deleted.Priority, deleted.PayloadId, deleted.DeliveryDateUtc"
-                + "	, @utcNow, 1, null" // 1 = expired
+                + $", @utcNow, {reasonNr}, null"
                 + " INTO FailedSubscriptionEvent"
                 + " (Id, SubscriptionId"
                 + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
@@ -189,10 +191,11 @@ namespace Resonance.Repo.Database
 
         private async Task<int> HouseKeeping_MaxDeliveriesReachedSubscriptionEvents()
         {
+            var reasonNr = ((int)ReasonType.MaxRetriesReached).ToString(CultureInfo.InvariantCulture);
             var query = "DELETE	se"
                 + " OUTPUT deleted.Id, deleted.SubscriptionId"
                 + "	, deleted.EventName, deleted.PublicationDateUtc, deleted.FunctionalKey, deleted.Priority, deleted.PayloadId, deleted.DeliveryDateUtc"
-                + "	, @utcNow, 2, null" // 2 = MaxRetriesReached
+                + $", @utcNow, {reasonNr}, null"
                 + " INTO FailedSubscriptionEvent"
                 + " (Id, SubscriptionId"
                 + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
@@ -208,10 +211,11 @@ namespace Resonance.Repo.Database
 
         private async Task<int> HouseKeeping_OvertakenSubscriptionEvents()
         {
+            var reasonNr = ((int)ReasonType.Overtaken).ToString(CultureInfo.InvariantCulture);
             var query = "DELETE	se"
                 + " OUTPUT deleted.Id, deleted.SubscriptionId"
                 + "	, deleted.EventName, deleted.PublicationDateUtc, deleted.FunctionalKey, deleted.Priority, deleted.PayloadId, deleted.DeliveryDateUtc"
-                + "	, @utcNow, 3, null" // 3 = MaxRetriesReached
+                + $", @utcNow, {reasonNr}, null"
                 + " INTO FailedSubscriptionEvent"
                 + " (Id, SubscriptionId"
                 + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
