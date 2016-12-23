@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.PlatformAbstractions;
+using Resonance.APIClient;
 using Resonance.Models;
 using Resonance.Repo;
 using Resonance.Repo.Database;
@@ -109,11 +110,11 @@ namespace Resonance.Demo
                     //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     await Task.Delay(1); // Some processing delay
 
-                    if (DateTime.UtcNow.Millisecond < 50)
-                        throw new Exception("This exception was unhandled by the ConsumeAction.");
+                    //if (DateTime.UtcNow.Millisecond < 50)
+                    //    throw new Exception("This exception was unhandled by the ConsumeAction.");
 
-                    if (DateTime.UtcNow.Millisecond > 900)
-                        return ConsumeResult.MustRetry("ConsumeAction decided this event has to be retried.");
+                    //if (DateTime.UtcNow.Millisecond > 900)
+                    //    return ConsumeResult.MustRetry("ConsumeAction decided this event has to be retried.");
 
                     return ConsumeResult.Succeeded;
                 },
@@ -138,6 +139,12 @@ namespace Resonance.Demo
                 .AddDebug(LogLevel.Trace);
             serviceCollection.AddSingleton<ILoggerFactory>(loggerFactory);
 
+            //ConfigureRepoServices(serviceCollection, config);
+            ConfigureApiServices(serviceCollection, config);
+        }
+
+        private static void ConfigureRepoServices(IServiceCollection serviceCollection, IConfiguration config)
+        {
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
 
             // To use MSSQLServer:
@@ -154,11 +161,16 @@ namespace Resonance.Demo
                 return new MySqlEventingRepoFactory(connectionString);
             });
 
-            // Configure EventPublisher
+            // Configure EventPublisher and Consumer (their constructors require the above registered IEventingRepoFactory).
             serviceCollection.AddTransient<IEventPublisherAsync, EventPublisher>();
-
-            // Configure EventConsumer
             serviceCollection.AddTransient<IEventConsumerAsync, EventConsumer>();
+        }
+
+        private static void ConfigureApiServices(IServiceCollection serviceCollection, IConfiguration config)
+        {
+            var baseAddressUri = new Uri(config["Resonance:APIClient:BaseAddressUrl"], UriKind.Absolute); // When debugging, make sure Resonance.Web is running
+            serviceCollection.AddTransient<IEventPublisherAsync>(p => { return new APIEventPublisher(baseAddressUri); });
+            serviceCollection.AddTransient< IEventConsumerAsync>(p => { return new APIEventConsumer(baseAddressUri); });
         }
     }
 }

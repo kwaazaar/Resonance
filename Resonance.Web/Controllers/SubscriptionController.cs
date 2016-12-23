@@ -35,11 +35,11 @@ namespace Resonance.Web.Controllers
         /// <returns>List of subscriptions</returns>
         [HttpGet]
         [ProducesResponseType(typeof(IEnumerable<Subscription>), 200)]
-        public async Task<IActionResult> Get()
+        public async Task<IActionResult> Get(Int64? topicId = null)
         {
             try
             {
-                return Ok(await _consumer.GetSubscriptionsAsync());
+                return Ok(await _consumer.GetSubscriptionsAsync(topicId));
             }
             catch (Exception ex)
             {
@@ -79,7 +79,7 @@ namespace Resonance.Web.Controllers
         /// <param name="periodEndUtc">Optional: Until (UTC)</param>
         /// <returns>The subscription statistics</returns>
         [HttpGet("stats")]
-        [ProducesResponseType(typeof(SubscriptionSummary), 200)]
+        [ProducesResponseType(typeof(IEnumerable<SubscriptionSummary>), 200)]
         public async Task<IActionResult> GetStatistics(DateTime? periodStartUtc=null, DateTime? periodEndUtc = null)
         {
             try

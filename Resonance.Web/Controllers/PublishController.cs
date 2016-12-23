@@ -36,6 +36,7 @@ namespace Resonance.Web.Controllers
         /// <param name="functionalKey">Optional: functionalkey for the event.
         /// NB: Functionalkey is required if subscription need to process it in ordered fashion.
         /// Therefore, if a functional key exists, it's best to specify it here.</param>
+        /// <param name="eventName">Optional: Name of the event (eg: OrderCreated)</param>
         /// <param name="publicationDateUtc">Optional: Publicationdate (UTC) for the event (default: systemdate).</param>
         /// <param name="expirationDateUtc">Optional: Expirationdate (UTC) for the event (default: never expires).</param>
         /// <param name="priority">Optional: Priority for the event (default: 100, 1 means higher priority than 100).</param>
@@ -48,6 +49,7 @@ namespace Resonance.Web.Controllers
         [HttpPost("{name}/{functionalKey?}")]
         [ProducesResponseType(typeof(TopicEvent), 200)]
         public async Task<IActionResult> Publish([FromRoute]string name, [FromRoute]string functionalKey = null,
+            [FromQuery]string eventName = null,
             [FromQuery]DateTime? publicationDateUtc = null, [FromQuery]DateTime? expirationDateUtc = null, [FromQuery] int priority = 100, [FromQuery]string payload = null)
         {
             if (String.IsNullOrWhiteSpace(name))
@@ -70,6 +72,7 @@ namespace Resonance.Web.Controllers
 
                 // Now publish
                 var te = await _publisher.PublishAsync(topicName: name,
+                    eventName: eventName,
                     publicationDateUtc: publicationDateUtc, 
                     expirationDateUtc: expirationDateUtc, 
                     functionalKey: functionalKey, 

@@ -40,5 +40,16 @@ namespace Resonance.APIClient
             };
             return httpClient;
         }
+
+        public virtual async Task PerformHouseKeepingTasksAsync()
+        {
+            using (var httpClient = CreateHttpClient())
+            {
+                var response = await httpClient.PostAsync($"maintenance/housekeeping", null).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                    throw await HttpResponseException.Create(response);
+            }
+        }
+
     }
 }

@@ -125,7 +125,7 @@ namespace Resonance
             foreach (var ce in await ConsumeNextAsync(subscriptionName, visibilityTimeout, maxCount).ConfigureAwait(false))
             {
                 // Deserialize the payload
-                T payloadAsObject = JsonConvert.DeserializeObject<T>(ce.Payload);
+                T payloadAsObject = ce.Payload != null ? JsonConvert.DeserializeObject<T>(ce.Payload) : default(T);
 
                 ces.Add(new ConsumableEvent<T>
                 {
