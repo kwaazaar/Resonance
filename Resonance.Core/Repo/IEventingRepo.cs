@@ -31,6 +31,7 @@ namespace Resonance.Repo
 
         // Consumption
         Task<IEnumerable<ConsumableEvent>> ConsumeNextAsync(string subscriptionName, int visibilityTimeout, int maxCount = 1);
+        Task MarkConsumedAsync(IEnumerable<ConsumableEventId> consumableEventsIds);
         Task MarkConsumedAsync(Int64 id, string deliveryKey);
         Task MarkFailedAsync(Int64 id, string deliveryKey, Reason reason);
 

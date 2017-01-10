@@ -63,6 +63,32 @@ namespace Resonance.Web.Controllers
         }
 
         /// <summary>
+        /// Mark a set of events as consumed.
+        /// </summary>
+        /// <param name="consumableEventIds">Set of consumable events ids</param>
+        /// <returns></returns>
+        /// <remarks>Make sure to mark the events as consumed BEFORE their visibility timeout expires.
+        /// Otherwise another subscriber (or thread) may already be consuming the events again.</remarks>
+        [HttpPost]
+        [Route("consumed")]
+        public async Task<IActionResult> MarkConsumed(IEnumerable<ConsumableEventId> consumableEventIds)
+        {
+            if ((consumableEventIds == null) || (consumableEventIds.Count() == 0))
+                return BadRequest("no consumable events specified");
+
+            try
+            {
+                await _consumer.MarkConsumedAsync(consumableEventIds);
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(1), ex, "Failed to mark event(s) Consumed");
+                return StatusCode(500);
+            }
+        }
+
+        /// <summary>
         /// Mark the specified event as failed.
         /// </summary>
         /// <param name="id">The id of the event</param>

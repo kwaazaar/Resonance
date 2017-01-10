@@ -157,6 +157,15 @@ namespace Resonance.APIClient
             return responseContent.FromJson<IEnumerable<SubscriptionSummary>>().ToList();
         }
 
+        public async Task MarkConsumedAsync(IEnumerable<ConsumableEventId> consumableEventsIds)
+        {
+            if (consumableEventsIds == null) throw new ArgumentNullException("consumableEventIds");
+
+            var response = await _httpClient.PostAsync($"mark/consumed", consumableEventsIds.ToStringContent()).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+                throw await HttpResponseException.Create(response);
+        }
+
         public async Task MarkConsumedAsync(long id, string deliveryKey)
         {
             if (id <= 0) throw new ArgumentOutOfRangeException("id");

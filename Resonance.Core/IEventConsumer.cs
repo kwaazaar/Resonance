@@ -10,6 +10,7 @@ namespace Resonance
     {
         IEnumerable<ConsumableEvent> ConsumeNext(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1);
         IEnumerable<ConsumableEvent<T>> ConsumeNext<T>(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1);
+        void MarkConsumed(IEnumerable<ConsumableEventId> consumableEventsIds);
         void MarkConsumed(Int64 id, string deliveryKey);
         void MarkFailed(Int64 id, string deliveryKey, Reason reason);
         IEnumerable<Subscription> GetSubscriptions(Int64? topicId = null);

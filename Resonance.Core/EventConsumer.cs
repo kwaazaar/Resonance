@@ -29,6 +29,11 @@ namespace Resonance
             return ConsumeNextAsync<T>(subscriptionName, visibilityTimeout, maxCount).GetAwaiter().GetResult();
         }
 
+        public void MarkConsumed(IEnumerable<ConsumableEventId> consumableEventsIds)
+        {
+            MarkConsumedAsync(consumableEventsIds).GetAwaiter().GetResult();
+        }
+
         public void MarkConsumed(long id, string deliveryKey)
         {
             MarkConsumedAsync(id, deliveryKey).GetAwaiter().GetResult();
@@ -138,6 +143,12 @@ namespace Resonance
             }
 
             return ces;
+        }
+
+        public async Task MarkConsumedAsync(IEnumerable<ConsumableEventId> consumableEventsIds)
+        {
+            using (var repo = _repoFactory.CreateRepo())
+                await repo.MarkConsumedAsync(consumableEventsIds).ConfigureAwait(false);
         }
 
         public async Task MarkConsumedAsync(Int64 id, string deliveryKey)

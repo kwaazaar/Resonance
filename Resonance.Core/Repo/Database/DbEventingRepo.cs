@@ -773,6 +773,26 @@ namespace Resonance.Repo.Database
             return await ConsumeNextForSubscription(subscription, visibilityTimeout, maxCount).ConfigureAwait(false);
         }
 
+        public virtual async Task MarkConsumedAsync(IEnumerable<ConsumableEventId> consumableEventsIds)
+        {
+            await BeginTransactionAsync().ConfigureAwait(false);
+            try
+            {
+                // How smart is the usage of AsParallel here, in relation to deadlocks?
+                consumableEventsIds.AsParallel().ForAll(async (ceId) =>
+                {
+                    await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey).ConfigureAwait(false);
+                });
+
+                await CommitTransactionAsync().ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                await RollbackTransactionAsync().ConfigureAwait(false);
+                throw;
+            }
+        }
+
         public virtual async Task MarkConsumedAsync(Int64 id, string deliveryKey)
         {
             var se = await GetSubscriptionEvent(id).ConfigureAwait(false);

@@ -10,6 +10,7 @@ namespace Resonance
     {
         Task<IEnumerable<ConsumableEvent>> ConsumeNextAsync(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1);
         Task<IEnumerable<ConsumableEvent<T>>> ConsumeNextAsync<T>(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1);
+        Task MarkConsumedAsync(IEnumerable<ConsumableEventId> consumableEventsIds);
         Task MarkConsumedAsync(Int64 id, string deliveryKey);
         Task MarkFailedAsync(Int64 id, string deliveryKey, Reason reason);
 
