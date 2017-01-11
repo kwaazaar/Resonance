@@ -778,11 +778,21 @@ namespace Resonance.Repo.Database
             await BeginTransactionAsync().ConfigureAwait(false);
             try
             {
-                // How smart is the usage of AsParallel here, in relation to deadlocks?
-                consumableEventsIds.AsParallel().ForAll(async (ceId) =>
+                if (this.ParallelQueriesSupport)
                 {
-                    await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey).ConfigureAwait(false);
-                });
+                    // How smart is the usage of AsParallel here, in relation to deadlocks?
+                    consumableEventsIds.AsParallel().ForAll(async (ceId) =>
+                    {
+                        await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey).ConfigureAwait(false);
+                    });
+                }
+                else
+                {
+                    foreach (var ceId in consumableEventsIds)
+                    {
+                        await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey).ConfigureAwait(false);
+                    }
+                }
 
                 await CommitTransactionAsync().ConfigureAwait(false);
             }
