@@ -781,9 +781,12 @@ namespace Resonance.Repo.Database
                 if (this.ParallelQueriesSupport)
                 {
                     // How smart is the usage of AsParallel here, in relation to deadlocks?
-                    consumableEventsIds.AsParallel().ForAll(async (ceId) =>
+                    consumableEventsIds.AsParallel().ForAll((ceId) =>
                     {
-                        await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey).ConfigureAwait(false);
+                        Task.Run(async () => // Threadpool task to wait for async parts in inner task (ExecuteWork)
+                        {
+                            await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey).ConfigureAwait(false);
+                        }).GetAwaiter().GetResult(); // Need to block, because ForAll does not
                     });
                 }
                 else

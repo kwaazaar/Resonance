@@ -160,5 +160,44 @@ namespace Resonance.Tests.Consuming
             Assert.Equal(1, ces.Count());
             Assert.True(ces.Any(ce => ce.Payload == "3"));
         }
+
+        [Fact]
+        public void ConsumeBatch_NotAllConsumed()
+        {
+            // Arrange
+            var topicName = "ConsumeBatch_NotAllConsumed";
+            var subName = topicName + "_Sub1";
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = subName, // When ordered not set, delivery should still be ordered on publicationdateutc
+                TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
+            });
+
+            _publisher.Publish(topicName, payload: "1");
+            Thread.Sleep(100); // To make sure publicationdateutc is not equal for each item
+            _publisher.Publish(topicName, payload: "2");
+            Thread.Sleep(100);
+            _publisher.Publish(topicName, payload: "3");
+
+            // Consume a batch of 2 items
+            var batchSize = 2;
+            var visibilityTimeout = 2; // 2 secs
+            var ces = _consumer.ConsumeNext(subName, maxCount: batchSize);
+            Assert.Equal(batchSize, ces.Count());
+            Assert.True(ces.Any(ce => ce.Payload == "1"));
+            Assert.True(ces.Any(ce => ce.Payload == "2"));
+
+            // Mark only 2 consumed
+            var ce1 = ces.Single(ce => ce.Payload == "1");
+            _consumer.MarkFailed(ce1.Id, ce1.DeliveryKey, Reason.Other("Fail"));
+            _consumer.MarkConsumed(ces.Where(ce => ce.Payload == "2").Cast<ConsumableEventId>());
+
+            // Check if they are really marked consumed (can no longer be consumed)
+            Thread.Sleep(TimeSpan.FromSeconds(visibilityTimeout + 1)); // Wait until visibilitytimeout of all items (+1) has expired
+            ces = _consumer.ConsumeNext(subName, maxCount: batchSize); // Batchsize exceeds nr of events available
+            Assert.Equal(1, ces.Count());
+            Assert.True(ces.Any(ce => ce.Payload == "3"));
+        }
     }
 }
