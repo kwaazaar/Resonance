@@ -230,7 +230,7 @@ namespace Resonance.Tests.Consuming
             _consumer.MarkConsumed(ce2.Id, ce2.DeliveryKey);
 
             // Mark the whole batch consumed, including #2
-            Assert.Throws<AggregateException>(() => _consumer.MarkConsumed(ces.Cast<ConsumableEventId>()));
+            Assert.ThrowsAny<Exception>(() => _consumer.MarkConsumed(ces.Cast<ConsumableEventId>())); // Will throw either an ArgumentException or (when parallel is enabled for the repo (mssql)) AggregateException
 
             // Check if marking consumed failed for all
             Thread.Sleep(TimeSpan.FromSeconds(visibilityTimeout + 1)); // Wait until visibilitytimeout of all items (+1) has expired
