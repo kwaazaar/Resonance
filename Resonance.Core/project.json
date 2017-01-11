@@ -1,8 +1,8 @@
 {
   "title": "Resonance",
-  "copyright": "Copyright 2016 - Robert te Kaat",
+  "copyright": "Copyright 2017 - Robert te Kaat",
   "description": "Eventing library, with support for MsSql and MySql. Ideal for implementing, eventdriven architectures, pub-sub, microservices, etc.",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "authors": [ "Robert te Kaat" ],
 
   "buildOptions": {
@@ -25,8 +25,8 @@
     "netstandard1.6": {
       "dependencies": {
         "NETStandard.Library": "1.6.1",
-        "MySqlConnector": "0.7.2",
-        "System.Linq.Parallel": "4.0.1"
+        "MySqlConnector": "0.10.0",
+        "System.Linq.Parallel": "4.3.0"
       }
     },
     "net452": {
@@ -40,7 +40,7 @@
     "summary": "Eventing library, with support for MsSql and MySql. Ideal for implementing eventdriven architectures, pub-sub, microservices, etc. To get a quick idea, check the repo on GitHub for documentation and code samples: https://github.com/kwaazaar/Resonance",
     "tags": [ "pub", "sub", "esb", "queue", "topic", "subscription", "microservice", "messaging", "event", "publish", "subscribe", "servicebus", "mssql", "mysql", "mariadb", "netcore" ],
     "owners": [ "Robert te Kaat" ],
-    "releaseNotes": "Commandtimeout support added, max-retries on deadlock configurable, new APIClient-project for webbased Resonance-clients (will be split-off soon). Upgraded to .NET Core 1.1.",
+    "releaseNotes": "MarkConsumed can now mark a set of events as consumed.",
     "iconUrl": "https://raw.githubusercontent.com/kwaazaar/Resonance/master/Resonance-Icon-64x64.png",
     "projectUrl": "https://github.com/kwaazaar/Resonance",
     "licenseUrl": "https://opensource.org/licenses/MIT",
