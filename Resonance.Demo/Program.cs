@@ -18,6 +18,9 @@ namespace Resonance.Demo
     public class Program
     {
         private const int WORKER_COUNT = 2; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        private const bool BATCHED = true;
+        private const bool GENERATE_DATA = true; // Change to enable/disable the adding of data to the subscription
+
         private static IServiceProvider serviceProvider;
 
         public static void Main(string[] args)
@@ -32,22 +35,22 @@ namespace Resonance.Demo
             // Make sure the topic exists
             var topic1 = publisher.GetTopicByNameAsync("Demo Topic 1").GetAwaiter().GetResult() ?? publisher.AddOrUpdateTopicAsync(new Topic { Name = "Demo Topic 1" }).GetAwaiter().GetResult();
             var subscription1 = consumer.GetSubscriptionByNameAsync("Demo Subscription 1").GetAwaiter().GetResult();
-            if (subscription1 == null)
-                subscription1 = consumer.AddOrUpdateSubscriptionAsync(new Subscription
+            subscription1 = consumer.AddOrUpdateSubscriptionAsync(new Subscription
+            {
+                Id = subscription1 != null ? subscription1.Id.Value : default(Int64?),
+                Name = "Demo Subscription 1",
+                MaxDeliveries = 2,
+                Ordered = !BATCHED, // Batched processing of ordered subscription is usually not very usefull
+                TopicSubscriptions = new List<TopicSubscription>
                 {
-                    Name = "Demo Subscription 1",
-                    MaxDeliveries = 2,
-                    Ordered = true,
-                    TopicSubscriptions = new List<TopicSubscription>
+                    new TopicSubscription
                     {
-                        new TopicSubscription
-                        {
-                            TopicId = topic1.Id.Value, Enabled = true,
-                        },
+                        TopicId = topic1.Id.Value, Enabled = true,
                     },
-                }).GetAwaiter().GetResult();
+                },
+            }).GetAwaiter().GetResult();
 
-            if (1 == 1) // Change to enable/disable the adding of data to the subscription
+            if (GENERATE_DATA)
             {
                 var sw = new Stopwatch();
                 sw.Start();
@@ -82,7 +85,7 @@ namespace Resonance.Demo
             var workers = new EventConsumptionWorker[WORKER_COUNT];
             for (int i = 0; i < WORKER_COUNT; i++)
             {
-                workers[i] = CreateWorker(consumer, "Demo Subscription 1");
+                workers[i] = CreateWorker(consumer, "Demo Subscription 1", BATCHED);
                 workers[i].Start();
             }
 
@@ -100,12 +103,16 @@ namespace Resonance.Demo
 
         }
 
-        public static EventConsumptionWorker CreateWorker(IEventConsumerAsync consumer, string subscriptionName)
+        public static EventConsumptionWorker CreateWorker(IEventConsumerAsync consumer, string subscriptionName, bool batched)
         {
             var worker = new EventConsumptionWorker(
                 eventConsumer: consumer,
                 subscriptionName: subscriptionName,
-                consumeAction: async (ceW) =>
+                logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>(),
+                batchSize: batched ? 50 : 1,
+                consumeModel: batched ? ConsumeModel.Batch : ConsumeModel.Single,
+
+                consumeAction: !batched ? async (ceW) =>
                 {
                     //Console.WriteLine($"Consumed {ceW.Id} from thread {System.Threading.Thread.CurrentThread.ManagedThreadId}.");
                     await Task.Delay(1); // Some processing delay
@@ -117,9 +124,19 @@ namespace Resonance.Demo
                     //    return ConsumeResult.MustRetry("ConsumeAction decided this event has to be retried.");
 
                     return ConsumeResult.Succeeded;
-                },
-                logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>()
+                } : default(Func<ConsumableEvent, Task<ConsumeResult>>),
+
+                consumeBatchAction: batched ? async (ces) =>
+                {
+                    await Task.Delay(ces.Count());
+
+                    return ces
+                        .Select(ce => new KeyValuePair<Int64, ConsumeResult>(ce.Id, ConsumeResult.Succeeded)) // Return success for all
+                        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+                    
+                } : default(Func<IEnumerable<ConsumableEvent>, Task<IDictionary<Int64, ConsumeResult>>>)
                 );
+
             return worker;
         }
 
@@ -140,8 +157,8 @@ namespace Resonance.Demo
             serviceCollection.AddSingleton<ILoggerFactory>(loggerFactory);
 
 
-            //ConfigureRepoServices(serviceCollection, config); // Using the db-repo's doesn't have any api/web dependencies
-            ConfigureApiServices(serviceCollection, config); // When using the ApiClient, make sure Resonance.Web is also running
+            ConfigureRepoServices(serviceCollection, config); // Using the db-repo's doesn't have any api/web dependencies
+            //ConfigureApiServices(serviceCollection, config); // When using the ApiClient, make sure Resonance.Web is also running
         }
 
         private static void ConfigureRepoServices(IServiceCollection serviceCollection, IConfiguration config)

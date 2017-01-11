@@ -117,33 +117,19 @@ namespace Resonance.Repo.Database
 
         private async Task<IEnumerable<Int64>> LockNextSubscriptionEventsAsync(Int64 subscriptionId, bool ordered, int visibilityTimeout, int maxCount)
         {
-            var maxCountToUse = ordered ? 1 : maxCount; // Fix to one, when using functional ordering
+            var maxCountToUse = maxCount; // Warning: large batches with functional ordering may not work
 
             var lockedIds = new List<Int64>();
 
-            if (!ordered)
+            for (int i = 0; i < maxCountToUse; i++)
             {
-                for (int i = 0; i < maxCountToUse; i++)
-                {
-                    var sId = await TryLockNextSubscriptionEventAsync(subscriptionId, visibilityTimeout, ordered);
-                    if (sId.HasValue)
-                        lockedIds.Add(sId.Value);
-                    else
-                        break; // Break out of for-loop
-                }
+                var sId = await TryLockNextSubscriptionEventAsync(subscriptionId, visibilityTimeout, ordered);
+                if (sId.HasValue)
+                    lockedIds.Add(sId.Value);
+                else
+                    break; // Break out of for-loop, since no more events are found or repo is too busy
             }
-            else
-            {
 
-                for (int i = 0; i < maxCountToUse; i++)
-                {
-                    var sId = await TryLockNextSubscriptionEventAsync(subscriptionId, visibilityTimeout, ordered);
-                    if (sId.HasValue)
-                        lockedIds.Add(sId.Value);
-                    else
-                        break; // Break out of for-loop
-                }
-            }
             return lockedIds;
         }
 

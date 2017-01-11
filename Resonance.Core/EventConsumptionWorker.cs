@@ -11,6 +11,22 @@ using Resonance.Repo;
 namespace Resonance
 {
     /// <summary>
+    /// Type of consumption
+    /// </summary>
+    public enum ConsumeModel : int
+    {
+        /// <summary>
+        /// Consume per event
+        /// </summary>
+        Single = 1,
+
+        /// <summary>
+        /// Consume a whole batch at once
+        /// </summary>
+        Batch = 2,
+    }
+
+    /// <summary>
     /// Base-class for polling and processing workitems
     /// </summary>
     public class EventConsumptionWorker : IDisposable
@@ -30,6 +46,8 @@ namespace Resonance
         private readonly ILogger _logger;
         private readonly string _subscriptionName;
         private readonly Func<ConsumableEvent, Task<ConsumeResult>> _consumeAction;
+        private readonly Func<IEnumerable<ConsumableEvent>, Task<IDictionary<Int64, ConsumeResult>>> _consumeBatchAction;
+        private readonly ConsumeModel _consumeModel;
         private readonly int _visibilityTimeout;
 
         /// <summary>
@@ -43,13 +61,31 @@ namespace Resonance
         /// <param name="eventConsumer">EventConsumer instance to use</param>
         /// <param name="logger">ILogger to use for logging purposes</param>
         /// <param name="housekeepingIntervalMin">Interval between housekeeping intervals. Set to 0 to disable housekeeping.</param>
-        /// <param name="consumeAction">Action that must be invoked for each event. Make sure it is thread-safe when parallelExecution is enabled!</param>
+        /// <param name="consumeAction">Action that must be invoked for each event.</param>
+        /// <param name="consumeBatchAction">Action that must be invoked for a batch of events.</param>
         public EventConsumptionWorker(IEventConsumerAsync eventConsumer, string subscriptionName,
-            Func<ConsumableEvent, Task<ConsumeResult>> consumeAction, int visibilityTimeout = 60,
+            Func<ConsumableEvent, Task<ConsumeResult>> consumeAction = null,
+            Func<IEnumerable<ConsumableEvent>, Task<IDictionary<Int64, ConsumeResult>>> consumeBatchAction = null,
+            ConsumeModel consumeModel = ConsumeModel.Single,
+            int visibilityTimeout = 60,
             ILogger logger = null,
             int minBackOffDelayInMs = 1, int maxBackOffDelayInMs = 60000, int batchSize = 1, int housekeepingIntervalMin = 5)
         {
             if (maxBackOffDelayInMs < minBackOffDelayInMs) throw new ArgumentOutOfRangeException("maxBackOffDelayInSeconds", "maxBackOffDelayInSeconds must be greater than minBackOffDelay");
+
+            switch (consumeModel)
+            {
+                case ConsumeModel.Single:
+                    if (consumeAction == null) throw new ArgumentNullException("consumeAction");
+                    if (consumeBatchAction != null) throw new ArgumentException("consumeBatchAction must be null when consumeModel is not set to Batch");
+                    break;
+                case ConsumeModel.Batch:
+                    if (consumeBatchAction == null) throw new ArgumentNullException("consumeBatchAction");
+                    if (consumeAction != null) throw new ArgumentException("consumeAction must be null when consumeModel is not set to Single");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException("consumeModel");
+            }
 
             this._minDelayInMs = minBackOffDelayInMs;
             this._maxDelayInMs = maxBackOffDelayInMs;
@@ -61,6 +97,8 @@ namespace Resonance
             this._logger = logger;
             this._subscriptionName = subscriptionName;
             this._consumeAction = consumeAction;
+            this._consumeBatchAction = consumeBatchAction;
+            this._consumeModel = consumeModel;
             this._visibilityTimeout = visibilityTimeout;
         }
 
@@ -155,11 +193,30 @@ namespace Resonance
                 success = false;
                 execEx = ex;
             }
+        }
 
-            if (success)
-                this.Completed(workItem, w.Elapsed);
-            else
-                this.Failed(workItem, execEx);
+        /// <summary>
+        /// Executes a batch of workitems and calls Complete on success (no exception and true returned by Execute) or Failed otherwise.
+        /// </summary>
+        /// <param name="workItem"></param>
+        private async Task ExecuteWork(IEnumerable<ConsumableEvent> workItems)
+        {
+            bool success = false;
+            Exception execEx = null;
+
+            Stopwatch w = new Stopwatch();
+            w.Start();
+            try
+            {
+                success = await this.Execute(workItems).ConfigureAwait(false);
+                w.Stop();
+            }
+            catch (Exception ex)
+            {
+                w.Stop();
+                success = false;
+                execEx = ex;
+            }
         }
 
         /// <summary>
@@ -223,7 +280,7 @@ namespace Resonance
             try
             {
                 var workitems = await this.TryGetWork(this._batchSize).ConfigureAwait(false);
-                if (workitems == null || (!workitems.Any<ConsumableEvent>())) // No result or empty list
+                if (workitems == null || (workitems.Count() == 0)) // No result or empty list
                 {
                     this._attempts++;
                     if (this._attempts == 1) // First time no events were found
@@ -236,18 +293,25 @@ namespace Resonance
                 {
                     this._attempts = 0;
 
-                    if (workitems.Count() > 1)
+                    if (this._consumeModel == ConsumeModel.Single)
                     {
-                        LogTrace("Processing {items} events in parallel.", workitems.Count());
-                        workitems.AsParallel().ForAll(ce => // AsParallel takes care of partitioning, resulting in using less threads than Parallal.ForEach, but still fast enough.
-                            Task.Run(async () => // Threadpool task to wait for async parts in inner task (ExecuteWork)
-                            {
-                                await this.ExecuteWork(ce).ConfigureAwait(false);
-                            }).GetAwaiter().GetResult() // Need to block, because ForAll does not
-                        );
+                        if (workitems.Count() > 1)
+                        {
+                            LogTrace("Processing {items} events in parallel.", workitems.Count());
+                            workitems.AsParallel().ForAll(ce => // AsParallel takes care of partitioning, resulting in using less threads than Parallal.ForEach, but still fast enough.
+                                Task.Run(async () => // Threadpool task to wait for async parts in inner task (ExecuteWork)
+                                {
+                                    await this.ExecuteWork(ce).ConfigureAwait(false);
+                                }).GetAwaiter().GetResult() // Need to block, because ForAll does not
+                            );
+                        }
+                        else
+                            await this.ExecuteWork(workitems.First()).ConfigureAwait(false); // Executed on single (current) thread, but theoretically the TryGetWork could have returned more than one workitem
                     }
-                    else
-                        await this.ExecuteWork(workitems.First()).ConfigureAwait(false); // Executed on single (current) thread, but theoretically the TryGetWork could have returned more than one workitem
+                    else // ConsumeModel.Batch
+                    {
+                        await this.ExecuteWork(workitems); // Execute all work in a batch
+                    }
 
                     this.BackOff(); // Using backoff here as well to pause for minBackoffDelay between batches
                 }
@@ -359,6 +423,108 @@ namespace Resonance
             }
         }
 
+        /// <summary>
+        /// Invoked to actually execute a batch of workitems
+        /// </summary>
+        /// <param name="workItems"></param>
+        protected virtual async Task<bool> Execute(IEnumerable<ConsumableEvent> workItems)
+        {
+            // Only process if still invisible (serial processing of a list of workitems may cause workitems to expire before being processed)
+            var utcNow = DateTime.UtcNow;
+            var validWorkitems = workItems.Where(ce => ce.InvisibleUntilUtc > utcNow);
+            var expiredEventCount = workItems.Count() - validWorkitems.Count();
+            if (expiredEventCount > 0)
+            {
+                LogWarning("Batch contains {expiredEventCount} ConsumableEvents that have already expired.", expiredEventCount);
+            }
+
+            return await ExecuteConcrete(validWorkitems).ConfigureAwait(false);
+        }
+
+        private async Task<bool> ExecuteConcrete(IEnumerable<ConsumableEvent> ces)
+        {
+            IDictionary<Int64, ConsumeResult> result = null;
+
+            try
+            {
+                LogTrace("Processing batch of {batchSize} events", ces.Count());
+                result = await _consumeBatchAction(ces).ConfigureAwait(false);
+                if (result == null)
+                    throw new InvalidOperationException("consumeBatchAction returned invalid result (null)");
+            }
+            catch (Exception procEx)
+            {
+                // Unhandled exception is translated to Failed for the whole batch
+                result = ces.ToDictionary(ce => ce.Id, ce => ConsumeResult.Failed(procEx.ToString()));
+            }
+
+            var succeededResults = result
+                .Where(r => r.Value.ResultType == ConsumeResultType.Succeeded)
+                .Select(r => ces.Single(ce => ce.Id == r.Key))
+                .Cast<ConsumableEventId>();
+
+            if (succeededResults.Count() > 0)
+            {
+                LogTrace("Event consumption succeeded for {succeededCount} event(s) in the batch of {totalCount}.",
+                    succeededResults.Count(), ces.Count());
+
+                try
+                {
+                    await _eventConsumer.MarkConsumedAsync(succeededResults).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    LogError("Failed to mark set of {succeededCount} consumed, cause event(s) to be processes again! Details: {Exception}.",
+                        succeededResults.Count(), ex);
+                }
+            }
+
+            var failedResults = result
+                .Where(r => r.Value.ResultType == ConsumeResultType.Failed)
+                .Select(r => new
+                {
+                    ConsumableEvent = ces.Single(ce => ce.Id == r.Key),
+                    ConsumeResult = r.Value,
+                });
+
+            if (failedResults.Count() > 0)
+            {
+                foreach (var failedResult in failedResults)
+                {
+                    LogError("Exception occurred while processing event with id {Id} and functional key {FunctionalKey}: {Reason}.",
+                        failedResult.ConsumableEvent.Id, failedResult.ConsumableEvent.FunctionalKey != null ? failedResult.ConsumableEvent.FunctionalKey : "n/a", failedResult.ConsumeResult.Reason);
+                    try
+                    { 
+                        await _eventConsumer.MarkFailedAsync(failedResult.ConsumableEvent.Id, failedResult.ConsumableEvent.DeliveryKey, Reason.Other(failedResult.ConsumeResult.Reason));
+                    }
+                    catch (Exception) { } // Swallow, since it's not a disaster if this gets processed again
+                }
+            }
+
+            var suspendResultsCount = result
+                .Where(r => r.Value.ResultType == ConsumeResultType.MustSuspend)
+                .Count();
+            if (suspendResultsCount > 0)
+            {
+                var firstSuspendResult = result.First(r => r.Value.ResultType == ConsumeResultType.MustSuspend);
+                var suspendedUntilUtc = this.Suspend(firstSuspendResult.Value.SuspendDuration.GetValueOrDefault(TimeSpan.FromSeconds(60)));
+                LogError("Event consumption failed for {suspendResultsCount} event(s). Processing should (continue to) suspend. Details: {Reason}.",
+                    suspendResultsCount, firstSuspendResult.Value.Reason);
+            }
+
+            var retryResultsCount = result
+                .Where(r => r.Value.ResultType == ConsumeResultType.MustRetry)
+                .Count();
+            if (retryResultsCount > 0)
+            {
+                var firstRetryResult = result.First(r => r.Value.ResultType == ConsumeResultType.MustRetry);
+                LogWarning("Retry requested for {retryResultsCount} event(s). Reason for first event: {Reason}.",
+                    retryResultsCount, firstRetryResult.Value.Reason); // Logged as warning, since a requested retry is not (yet) an error
+            }
+
+            return (succeededResults.Count() < ces.Count()); // False when not all have succeeded
+        }
+
         private async Task<bool> ExecuteConcrete(ConsumableEvent ce)
         {
             ConsumeResult result = null;
@@ -440,21 +606,6 @@ namespace Resonance
 
             return (result.ResultType == ConsumeResultType.Succeeded && !mustRollback);
         }
-
-        /// <summary>
-        /// Optional: Invoked when a workitem has been successfully executed
-        /// </summary>
-        /// <param name="workItem"></param>
-        protected virtual void Completed(ConsumableEvent workItem, TimeSpan elapsed)
-        { }
-
-        /// <summary>
-        /// Optional: Invoked when a workitem failed to execute successfully
-        /// </summary>
-        /// <param name="workItem"></param>
-        /// <param name="execEx"></param>
-        protected virtual void Failed(ConsumableEvent workItem, Exception execEx)
-        { }
 
         /// <summary>
         /// Optional: Invoked when the TryGetWork or ExecuteWork throw an exception
