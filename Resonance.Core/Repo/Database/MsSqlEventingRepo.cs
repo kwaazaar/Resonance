@@ -183,7 +183,7 @@ namespace Resonance.Repo.Database
                 + " (Id, SubscriptionId"
                 + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
                 + " , FailedDateUtc, Reason, ReasonOther)"
-                + " WHERE (SubscriptionEvent.ExpirationDateUtc IS NOT NULL AND SubscriptionEvent.ExpirationDateUtc < @utcNow)";
+                + " WHERE (SubscriptionEvent.ExpirationDateUtc IS NOT NULL AND SubscriptionEvent.ExpirationDateUtc < @utcNow AND SubscriptionEvent.InvisibleUntilUtc < @utcNow)";
             var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
 
             return rowsAffected;
@@ -202,7 +202,7 @@ namespace Resonance.Repo.Database
                 + " , FailedDateUtc, Reason, ReasonOther)"
                 + " FROM     SubscriptionEvent se"
                 + " JOIN    Subscription s ON s.Id = se.SubscriptionId"
-                + " WHERE (s.MaxDeliveries > 0 AND se.DeliveryCount >= s.MaxDeliveries)";
+                + " WHERE (s.MaxDeliveries > 0 AND se.DeliveryCount >= s.MaxDeliveries AND se.InvisibleUntilUtc < @utcNow)";
             var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
 
             return rowsAffected;

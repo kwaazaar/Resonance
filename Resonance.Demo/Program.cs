@@ -17,8 +17,8 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 2; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
-        private const bool BATCHED = true;
+        private const int WORKER_COUNT = 20; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        private const bool BATCHED = false;
         private const bool GENERATE_DATA = true; // Change to enable/disable the adding of data to the subscription
 
         private static IServiceProvider serviceProvider;
@@ -55,7 +55,7 @@ namespace Resonance.Demo
                 var sw = new Stopwatch();
                 sw.Start();
 
-                var arrLen = 50;
+                var arrLen = 5000;
                 var nrs = new List<int>(arrLen);
                 for (int i = 0; i < arrLen; i++) { nrs.Add(i); };
 
@@ -63,10 +63,10 @@ namespace Resonance.Demo
                     Task.Run(async () => // Threadpool task to wait for async parts in inner task
                         {
                             Console.WriteLine($"Run {i:D4} - Start  [{Thread.CurrentThread.ManagedThreadId}]");
-                            for (int fk = 1; fk <= 100; fk++) // 1000 different functional keys, 4 TopicEvents per fk
+                            for (int fk = 1; fk <= 10; fk++) // 1000 different functional keys, 4 TopicEvents per fk
                             {
                                 //await Task.Delay(1).ConfigureAwait(false);
-                                var fkAsString = fk.ToString();
+                                var fkAsString = i.ToString();
                                 await publisher.PublishAsync(topic1.Name, functionalKey: fkAsString, payload: "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"); // 100 bytes
                             }
                             Console.WriteLine($"Run {i:D4} - Finish [{Thread.CurrentThread.ManagedThreadId}]");

@@ -36,13 +36,16 @@ namespace Resonance.Tests.Housekeeping
 
             var utcNow = DateTime.UtcNow;
             _publisher.Publish(topicName, eventName: topicName + "1", expirationDateUtc: utcNow.AddSeconds(5), payload: "1");
-            _publisher.Publish(topicName, eventName: topicName + "2", expirationDateUtc: utcNow.AddMinutes(15), payload: "2");
+            _publisher.Publish(topicName, eventName: topicName + "2", expirationDateUtc: utcNow.AddSeconds(5), payload: "2");
+            _publisher.Publish(topicName, eventName: topicName + "3", expirationDateUtc: utcNow.AddMinutes(15), payload: "3");
 
             var visibilityTimeout = 1; // Must expire asap
             var ce1 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
-            var ce2 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
+            var ce2 = _consumer.ConsumeNext(subName, visibilityTimeout: 10).SingleOrDefault(); // Still invisible after expiration
+            var ce3 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
             Assert.Equal("1", ce1.Payload); // Not yet expired
             Assert.Equal("2", ce2.Payload);
+            Assert.Equal("3", ce3.Payload);
             Thread.Sleep(TimeSpan.FromSeconds(5+1));
 
             _consumer.PerformHouseKeepingTasks();
@@ -51,7 +54,7 @@ namespace Resonance.Tests.Housekeeping
             var eventNames = _fixture.GetEventNamesForFailedEvents(sub1.Id.Value);
             Assert.Equal(1, eventNames.Count);
             Assert.Equal(topicName + "1", eventNames.First());
-
+            // 2 has expired, but is still invisible, so may still be processed
         }
 
         [Fact]
@@ -71,17 +74,21 @@ namespace Resonance.Tests.Housekeeping
             var utcNow = DateTime.UtcNow;
             _publisher.Publish(topicName, eventName: topicName + "1", publicationDateUtc: utcNow, payload: "1");
             _publisher.Publish(topicName, eventName: topicName + "2", publicationDateUtc: utcNow.AddSeconds(1), payload: "2");
+            _publisher.Publish(topicName, eventName: topicName + "3", publicationDateUtc: utcNow.AddSeconds(2), payload: "3");
 
             var visibilityTimeout = 1; // Must expire asap
             var ce1 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
+            var ce2 = _consumer.ConsumeNext(subName, visibilityTimeout: 10).SingleOrDefault();
             Assert.Equal("1", ce1.Payload); // Not yet maxDeliveriesReached
-
+            Assert.Equal("2", ce2.Payload); // Not yet maxDeliveriesReached
+            Thread.Sleep(TimeSpan.FromSeconds(1+1)); // ce1 has become visible again, ce2 has not!
             _consumer.PerformHouseKeepingTasks();
 
             // Check that only 1 se in table
             var eventNames = _fixture.GetEventNamesForFailedEvents(sub1.Id.Value);
             Assert.Equal(1, eventNames.Count);
             Assert.Equal(topicName + "1", eventNames.First());
+            // ce2 is still invisible
         }
 
         [Fact]

@@ -277,7 +277,7 @@ namespace Resonance.Repo.Database
                     + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
                     + $" , @utcNow, {reasonNr}, null"
                     + " FROM SubscriptionEvent"
-                    + " WHERE (SubscriptionEvent.ExpirationDateUtc IS NOT NULL AND SubscriptionEvent.ExpirationDateUtc < @utcNow);"
+                    + " WHERE (SubscriptionEvent.ExpirationDateUtc IS NOT NULL AND SubscriptionEvent.ExpirationDateUtc < @utcNow AND se.InvisibleUntilUtc < @utcNow);"
                     + " DELETE se"
                     + " FROM SubscriptionEvent se"
                     + " JOIN FailedSubscriptionEvent fse ON fse.Id = se.Id;";
@@ -309,7 +309,7 @@ namespace Resonance.Repo.Database
                     + $" , @utcNow, {reasonNr}, null"
                     + " FROM SubscriptionEvent se"
                     + " JOIN Subscription s ON s.Id = se.SubscriptionId"
-                    + " WHERE (s.MaxDeliveries > 0 AND se.DeliveryCount >= s.MaxDeliveries);"
+                    + " WHERE (s.MaxDeliveries > 0 AND se.DeliveryCount >= s.MaxDeliveries AND se.InvisibleUntilUtc < @utcNow);"
                     + " DELETE se"
                     + " FROM SubscriptionEvent se"
                     + " JOIN FailedSubscriptionEvent fse ON fse.Id = se.Id;";
