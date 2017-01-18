@@ -2,7 +2,7 @@
   "title": "Resonance",
   "copyright": "Copyright 2017 - Robert te Kaat",
   "description": "Eventing library, with support for MsSql and MySql. Ideal for implementing, eventdriven architectures, pub-sub, microservices, etc.",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "authors": [ "Robert te Kaat" ],
 
   "buildOptions": {
