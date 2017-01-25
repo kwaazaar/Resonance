@@ -2,7 +2,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.PlatformAbstractions;
-using Resonance.APIClient;
 using Resonance.Models;
 using Resonance.Repo;
 using Resonance.Repo.Database;
@@ -78,9 +77,10 @@ namespace Resonance.Demo
                 Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
             }
 
-            //var ce = consumer.ConsumeNext(subscription1.Name).FirstOrDefault();
-            //if (ce != null)
-            //    consumer.MarkConsumed(ce.Id, ce.DeliveryKey);
+            var te = publisher.PublishAsync(topic1.Name, payload: "ŻŹŶŴŲŰŮŬŪŨŦŤŢŠŞŜŚŘŖŔŐŎŌŊŇŅŃŁĿĽĻĹĶĴĮĬĪĨĦĤĢĠĞĜĚĘĖĔĒĐĎČĊĈĆĄĂĀŸÝÜÛÚÙØÖÕÔÓÒÑÏÎÍÌËÊÉÈÇÅÄÃÂ").GetAwaiter().GetResult();
+            var ce = consumer.ConsumeNextAsync(subscription1.Name).GetAwaiter().GetResult().FirstOrDefault();
+            if (ce != null)
+                consumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey).GetAwaiter().GetResult();
 
             var workers = new EventConsumptionWorker[WORKER_COUNT];
             for (int i = 0; i < WORKER_COUNT; i++)
@@ -158,7 +158,6 @@ namespace Resonance.Demo
 
 
             ConfigureRepoServices(serviceCollection, config); // Using the db-repo's doesn't have any api/web dependencies
-            //ConfigureApiServices(serviceCollection, config); // When using the ApiClient, make sure Resonance.Web is also running
         }
 
         private static void ConfigureRepoServices(IServiceCollection serviceCollection, IConfiguration config)
@@ -184,13 +183,6 @@ namespace Resonance.Demo
             // Configure EventPublisher and Consumer (their constructors require the above registered IEventingRepoFactory).
             serviceCollection.AddTransient<IEventPublisherAsync, EventPublisher>();
             serviceCollection.AddTransient<IEventConsumerAsync, EventConsumer>();
-        }
-
-        private static void ConfigureApiServices(IServiceCollection serviceCollection, IConfiguration config)
-        {
-            var baseAddressUri = new Uri(config["Resonance:APIClient:BaseAddressUrl"], UriKind.Absolute); // When debugging, make sure Resonance.Web is running
-            serviceCollection.AddTransient<IEventPublisherAsync>(p => { return new APIEventPublisher(baseAddressUri); });
-            serviceCollection.AddTransient< IEventConsumerAsync>(p => { return new APIEventConsumer(baseAddressUri); });
         }
     }
 }
