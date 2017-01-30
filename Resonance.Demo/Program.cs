@@ -16,8 +16,8 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 20; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
-        private const bool BATCHED = false;
+        private const int WORKER_COUNT = 2; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        private const bool BATCHED = true;
         private const bool GENERATE_DATA = true; // Change to enable/disable the adding of data to the subscription
 
         private static IServiceProvider serviceProvider;
@@ -77,10 +77,10 @@ namespace Resonance.Demo
                 Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
             }
 
-            var te = publisher.PublishAsync(topic1.Name, payload: "ŻŹŶŴŲŰŮŬŪŨŦŤŢŠŞŜŚŘŖŔŐŎŌŊŇŅŃŁĿĽĻĹĶĴĮĬĪĨĦĤĢĠĞĜĚĘĖĔĒĐĎČĊĈĆĄĂĀŸÝÜÛÚÙØÖÕÔÓÒÑÏÎÍÌËÊÉÈÇÅÄÃÂ").GetAwaiter().GetResult();
-            var ce = consumer.ConsumeNextAsync(subscription1.Name).GetAwaiter().GetResult().FirstOrDefault();
-            if (ce != null)
-                consumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey).GetAwaiter().GetResult();
+            //var te = publisher.PublishAsync(topic1.Name, payload: "ŻŹŶŴŲŰŮŬŪŨŦŤŢŠŞŜŚŘŖŔŐŎŌŊŇŅŃŁĿĽĻĹĶĴĮĬĪĨĦĤĢĠĞĜĚĘĖĔĒĐĎČĊĈĆĄĂĀŸÝÜÛÚÙØÖÕÔÓÒÑÏÎÍÌËÊÉÈÇÅÄÃÂ").GetAwaiter().GetResult();
+            //var ce = consumer.ConsumeNextAsync(subscription1.Name).GetAwaiter().GetResult().FirstOrDefault();
+            //if (ce != null)
+            //    consumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey).GetAwaiter().GetResult();
 
             var workers = new EventConsumptionWorker[WORKER_COUNT];
             for (int i = 0; i < WORKER_COUNT; i++)

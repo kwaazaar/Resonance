@@ -123,11 +123,21 @@ namespace Resonance.Repo.Database
 
             for (int i = 0; i < maxCountToUse; i++)
             {
-                var sId = await TryLockNextSubscriptionEventAsync(subscriptionId, visibilityTimeout, ordered);
-                if (sId.HasValue)
-                    lockedIds.Add(sId.Value);
-                else
-                    break; // Break out of for-loop, since no more events are found or repo is too busy
+                try
+                {
+                    var sId = await TryLockNextSubscriptionEventAsync(subscriptionId, visibilityTimeout, ordered);
+                    if (sId.HasValue)
+                        lockedIds.Add(sId.Value);
+                    else
+                        break; // Break out of for-loop, since no more events are found
+                }
+                catch (RepoException repoEx)
+                {
+                    if (repoEx.Error == RepoError.TooBusy)
+                        break; // Break out of for-loop, since repo is too busy
+                    else
+                        throw;
+                }
             }
 
             return lockedIds;
