@@ -133,7 +133,7 @@ namespace Resonance.Repo.Database
                 }
                 catch (RepoException repoEx)
                 {
-                    if (repoEx.Error == RepoError.TooBusy)
+                    if ((repoEx.Error == RepoError.TooBusy) && (maxCountToUse > 1)) // When retrieving a batch, the already locked items must be returned instead of throwing an exception
                         break; // Break out of for-loop, since repo is too busy
                     else
                         throw;

@@ -16,8 +16,8 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 2; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
-        private const bool BATCHED = true;
+        private const int WORKER_COUNT = 40; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        private const bool BATCHED = false;
         private const bool GENERATE_DATA = true; // Change to enable/disable the adding of data to the subscription
 
         private static IServiceProvider serviceProvider;
@@ -39,6 +39,7 @@ namespace Resonance.Demo
                 Id = subscription1 != null ? subscription1.Id.Value : default(Int64?),
                 Name = "Demo Subscription 1",
                 MaxDeliveries = 2,
+                DeliveryDelay = 3, // Deliverydelay, so that events cannot overtake eachother while publishing (because of IO latency of the DB)
                 Ordered = !BATCHED, // Batched processing of ordered subscription is usually not very usefull
                 TopicSubscriptions = new List<TopicSubscription>
                 {
@@ -49,12 +50,20 @@ namespace Resonance.Demo
                 },
             }).GetAwaiter().GetResult();
 
+            var workers = new EventConsumptionWorker[WORKER_COUNT];
+            for (int i = 0; i < WORKER_COUNT; i++)
+            {
+                workers[i] = CreateWorker(consumer, "Demo Subscription 1", BATCHED);
+                workers[i].Start();
+            }
+
+            // Generate data WHILE also consuming (just like the real world)
             if (GENERATE_DATA)
             {
                 var sw = new Stopwatch();
                 sw.Start();
 
-                var arrLen = 5000;
+                var arrLen = 500;
                 var nrs = new List<int>(arrLen);
                 for (int i = 0; i < arrLen; i++) { nrs.Add(i); };
 
@@ -64,7 +73,7 @@ namespace Resonance.Demo
                             Console.WriteLine($"Run {i:D4} - Start  [{Thread.CurrentThread.ManagedThreadId}]");
                             for (int fk = 1; fk <= 10; fk++) // 1000 different functional keys, 4 TopicEvents per fk
                             {
-                                //await Task.Delay(1).ConfigureAwait(false);
+                                await Task.Delay(1).ConfigureAwait(false);
                                 var fkAsString = i.ToString();
                                 await publisher.PublishAsync(topic1.Name, functionalKey: fkAsString, payload: "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"); // 100 bytes
                             }
@@ -82,13 +91,6 @@ namespace Resonance.Demo
             //if (ce != null)
             //    consumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey).GetAwaiter().GetResult();
 
-            var workers = new EventConsumptionWorker[WORKER_COUNT];
-            for (int i = 0; i < WORKER_COUNT; i++)
-            {
-                workers[i] = CreateWorker(consumer, "Demo Subscription 1", BATCHED);
-                workers[i].Start();
-            }
-
             // Wait for a user to press Ctrl+C or when windows sends the stop process signal
             Console.WriteLine("Press Ctrl+C to stop the worker(s)...");
             var handle = new ManualResetEvent(false);
@@ -101,6 +103,8 @@ namespace Resonance.Demo
                     workers[i].Stop();
             }
 
+            // Some housekeeping to clean up overtaken events etc.
+            publisher.PerformHouseKeepingTasksAsync().GetAwaiter().GetResult();
         }
 
         public static EventConsumptionWorker CreateWorker(IEventConsumerAsync consumer, string subscriptionName, bool batched)
@@ -165,7 +169,7 @@ namespace Resonance.Demo
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
             var maxRetriesOnDeadlock = int.Parse(config["Resonance:Repo:Database:MaxRetriesOnDeadlock"]);
             var commandTimeout = TimeSpan.FromSeconds(int.Parse(config["Resonance:Repo:Database:CommandTimeout"]));
-            
+
             // To use MSSQLServer:
             //var connectionString = config.GetConnectionString("Resonance.MsSql");
             //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>

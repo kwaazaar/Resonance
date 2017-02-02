@@ -121,7 +121,7 @@ namespace Resonance.Repo.Database
             {
                 if (_runningTransaction == null)
                 {
-                    _runningTransaction = _conn.BeginTransaction(IsolationLevel.ReadCommitted);
+                    _runningTransaction = _conn.BeginTransaction(IsolationLevel.RepeatableRead); // Prevents deadlocks and, in case of MsSql, skipping/overtaking of events
                     _tranState = TranState.Unchanged;
                 }
                 _tranCount++;
