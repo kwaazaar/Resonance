@@ -43,7 +43,7 @@
     "releaseNotes": "Fixed ordering issue (overtaking) for MsSql that may occur under extreme load.",
     "iconUrl": "https://raw.githubusercontent.com/kwaazaar/Resonance/master/Resonance-Icon-64x64.png",
     "projectUrl": "https://github.com/kwaazaar/Resonance",
-    "licenseUrl": "https://opensource.org/licenses/MIT",
+    "licenseUrl": "https://raw.githubusercontent.com/kwaazaar/Resonance/master/LICENSE",
     "requireLicenseAcceptance": false,
     "repository": {
       "type": "git",
