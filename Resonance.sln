@@ -12,7 +12,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{DC37AEDF-337B-4596-A9B1-7F5BB50AFCBB}"
 	ProjectSection(SolutionItems) = preProject
 		appveyor.yml = appveyor.yml
-		License.txt = License.txt
 	EndProjectSection
 EndProject
 Global
