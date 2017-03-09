@@ -40,7 +40,7 @@ namespace Resonance.Demo
                 Name = "Demo Subscription 1",
                 MaxDeliveries = 2,
                 DeliveryDelay = 3, // Deliverydelay, so that events cannot overtake eachother while publishing (because of IO latency of the DB)
-                Ordered = !BATCHED, // Batched processing of ordered subscription is usually not very usefull
+                Ordered = false,//!BATCHED, // Batched processing of ordered subscription is usually not very usefull
                 TopicSubscriptions = new List<TopicSubscription>
                 {
                     new TopicSubscription
@@ -49,6 +49,12 @@ namespace Resonance.Demo
                     },
                 },
             }).GetAwaiter().GetResult();
+
+            //var te = publisher.PublishAsync(topic1.Name, payload: "ŻŹŶŴŲŰŮŬŪŨŦŤŢŠŞŜŚŘŖŔŐŎŌŊŇŅŃŁĿĽĻĹĶĴĮĬĪĨĦĤĢĠĞĜĚĘĖĔĒĐĎČĊĈĆĄĂĀŸÝÜÛÚÙØÖÕÔÓÒÑÏÎÍÌËÊÉÈÇÅÄÃÂ").GetAwaiter().GetResult();
+            //Thread.Sleep(TimeSpan.FromSeconds(3)); // Must be equal or more than the delivery delay!
+            //var ce = consumer.ConsumeNextAsync(subscription1.Name).GetAwaiter().GetResult().FirstOrDefault();
+            //if (ce != null)
+            //    consumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey).GetAwaiter().GetResult();
 
             var workers = new EventConsumptionWorker[WORKER_COUNT];
             for (int i = 0; i < WORKER_COUNT; i++)
@@ -85,11 +91,6 @@ namespace Resonance.Demo
                 sw.Stop();
                 Console.WriteLine($"Total time for publishing: {sw.Elapsed.TotalSeconds} sec");
             }
-
-            //var te = publisher.PublishAsync(topic1.Name, payload: "ŻŹŶŴŲŰŮŬŪŨŦŤŢŠŞŜŚŘŖŔŐŎŌŊŇŅŃŁĿĽĻĹĶĴĮĬĪĨĦĤĢĠĞĜĚĘĖĔĒĐĎČĊĈĆĄĂĀŸÝÜÛÚÙØÖÕÔÓÒÑÏÎÍÌËÊÉÈÇÅÄÃÂ").GetAwaiter().GetResult();
-            //var ce = consumer.ConsumeNextAsync(subscription1.Name).GetAwaiter().GetResult().FirstOrDefault();
-            //if (ce != null)
-            //    consumer.MarkConsumedAsync(ce.Id, ce.DeliveryKey).GetAwaiter().GetResult();
 
             // Wait for a user to press Ctrl+C or when windows sends the stop process signal
             Console.WriteLine("Press Ctrl+C to stop the worker(s)...");

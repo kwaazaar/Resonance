@@ -13,6 +13,12 @@ namespace Resonance.Repo.Database
 {
     public abstract class DbEventingRepo : BaseEventingRepo, IDisposable
     {
+        static DbEventingRepo()
+        {
+            // Add custom type handler to treat all DateTimes as UTC
+            SqlMapper.AddTypeHandler(new DateTimeUtcTypeHandler());
+        }
+
         #region Inner types
         public enum TranState : byte
         {
