@@ -6,7 +6,7 @@ nuget:
   project_feed: true
   disable_publish_on_pr: true
 before_build:
-- cmd: dotnet msbuild /t:Restore
+- cmd: dotnet msbuild /t:Restore Resonance.sln
 before_test:
 - cmd: |-
     sqlcmd -S "(local)\SQL2016" -U "sa" -P "Password12!" -i "Resonance.Core\content\ResonanceDB.MsSql.sql"
@@ -18,4 +18,4 @@ test_script:
 - cmd: |-
     dotnet test Resonance.Tests -c Release
     SET useMySql=true
-    dotnet msbuild /t:VSTest Resonance.Tests /p:Configuration=Release
+    dotnet test Resonance.Tests -c Release
