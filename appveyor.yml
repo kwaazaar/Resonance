@@ -6,16 +6,16 @@ nuget:
   project_feed: true
   disable_publish_on_pr: true
 before_build:
-- cmd: nuget restore
+- cmd: dotnet msbuild /t:Restore
 before_test:
 - cmd: |-
     sqlcmd -S "(local)\SQL2016" -U "sa" -P "Password12!" -i "Resonance.Core\content\ResonanceDB.MsSql.sql"
     "C:\Program Files\MySQL\MySQL Server 5.7\bin\mysql.exe" -u root --password=Password12! -e "CREATE USER resonance IDENTIFIED BY 'Password12!'; GRANT ALL ON *.* TO resonance;"
     "C:\Program Files\MySQL\MySQL Server 5.7\bin\mysql.exe" -u root --password=Password12! < Resonance.Core\content\ResonanceDB.MySql.sql
 build_script:
-- cmd: dotnet build Resonance.Core -c Release
+- cmd: dotnet msbuild /t:Build Resonance.Core /p:Configuration=Release
 test_script:
 - cmd: |-
     dotnet test Resonance.Tests -c Release
     SET useMySql=true
-    dotnet test Resonance.Tests -c Release
+    dotnet msbuild /t:VSTest Resonance.Tests /p:Configuration=Release
