@@ -7,9 +7,9 @@ nuget:
   disable_publish_on_pr: true
 before_build:
 - cmd: |-
-    dotnet restore ~/Resonance.Core
-    dotnet restore ~/Resonance.Tests
-    dotnet restore ~/Resonance.Demo
+    dotnet restore ~/Resonance.Core/Resonance.core.csproj
+    dotnet restore ~/Resonance.Tests/Resonance.Tests.csproj
+    dotnet restore ~/Resonance.Demo/Resonance.Demo.csproj
 before_test:
 - cmd: |-
     sqlcmd -S "(local)\SQL2016" -U "sa" -P "Password12!" -i "Resonance.Core\content\ResonanceDB.MsSql.sql"
