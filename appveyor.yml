@@ -20,6 +20,6 @@ build_script:
 - cmd: dotnet build Resonance.Core -c Release
 test_script:
 - cmd: |-
-    dotnet test Resonance.Tests -c Release
+    dotnet test Resonance.Tests/Resonance.Tests.csproj -c Release
     SET useMySql=true
-    dotnet test Resonance.Tests -c Release
+    dotnet test Resonance.Tests/Resonance.Tests.csproj -c Release
