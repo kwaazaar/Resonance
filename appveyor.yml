@@ -1,3 +1,4 @@
+image: Visual Studio 2017
 version: 0.7.2.{build}
 services:
 - mssql2016
@@ -16,7 +17,7 @@ before_test:
     "C:\Program Files\MySQL\MySQL Server 5.7\bin\mysql.exe" -u root --password=Password12! -e "CREATE USER resonance IDENTIFIED BY 'Password12!'; GRANT ALL ON *.* TO resonance;"
     "C:\Program Files\MySQL\MySQL Server 5.7\bin\mysql.exe" -u root --password=Password12! < Resonance.Core\content\ResonanceDB.MySql.sql
 build_script:
-- cmd: dotnet msbuild /t:Build Resonance.Core /p:Configuration=Release
+- cmd: dotnet build Resonance.Core -c Release
 test_script:
 - cmd: |-
     dotnet test Resonance.Tests -c Release
