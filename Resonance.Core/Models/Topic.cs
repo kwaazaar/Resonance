@@ -22,5 +22,10 @@ namespace Resonance.Models
         /// Optional notes.
         /// </summary>
         public string Notes { get; set; }
+
+        /// <summary>
+        /// When set to true (default), published events will be logged to the TopicEvent-table
+        /// </summary>
+        public bool Log { get; set; } = true;
     }
 }

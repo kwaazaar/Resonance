@@ -272,8 +272,10 @@ namespace Resonance.Repo.Database
                         { "@maxDeliveries", subscription.MaxDeliveries },
                         { "@ordered", subscription.Ordered },
                         { "@timeToLive", subscription.TimeToLive },
+                        { "@logConsumed", subscription.LogConsumed },
+                        { "@logFailed", subscription.LogFailed }
                     };
-                    await TranExecuteAsync("update Subscription set Name = @name, DeliveryDelay = @deliveryDelay, MaxDeliveries = @maxDeliveries, Ordered = @ordered, TimeToLive = @timeToLive where Id = @id", parameters).ConfigureAwait(false);
+                    await TranExecuteAsync("update Subscription set Name = @name, DeliveryDelay = @deliveryDelay, MaxDeliveries = @maxDeliveries, Ordered = @ordered, TimeToLive = @timeToLive, LogFailed = @logFailed, LogConsumed = @logConsumed where Id = @id", parameters).ConfigureAwait(false);
 
                     // Update TopicSubscriptions (by removing them and rebuilding them again)
                     await RemoveTopicSubscriptions(subscription.Id.Value).ConfigureAwait(false);
@@ -305,8 +307,10 @@ namespace Resonance.Repo.Database
                             { "@maxDeliveries", subscription.MaxDeliveries },
                             { "@ordered", subscription.Ordered },
                             { "@timeToLive", subscription.TimeToLive },
+                            { "@logConsumed", subscription.LogConsumed },
+                            { "@logFailed", subscription.LogFailed }
                         };
-                    var subscriptionIds = await TranQueryAsync<Int64>("insert into Subscription (Name, DeliveryDelay, MaxDeliveries, Ordered, TimeToLive) values (@name, @deliveryDelay, @maxDeliveries, @ordered, @timeToLive)"
+                    var subscriptionIds = await TranQueryAsync<Int64>("insert into Subscription (Name, DeliveryDelay, MaxDeliveries, Ordered, TimeToLive, LogConsumed, LogFailed) values (@name, @deliveryDelay, @maxDeliveries, @ordered, @timeToLive, @logConsumed, @logFailed)"
                         + $";select {GetLastAutoIncrementValue} as 'Id'",
                         parameters).ConfigureAwait(false);
                     subscriptionId = subscriptionIds.Single();
@@ -406,8 +410,9 @@ namespace Resonance.Repo.Database
                     { "@id", topic.Id.Value },
                     { "@name", topic.Name },
                     { "@notes", topic.Notes },
+                    { "@log", topic.Log }
                 };
-                await TranExecuteAsync("update Topic set Name = @name, Notes = @notes where Id = @id", parameters).ConfigureAwait(false);
+                await TranExecuteAsync("update Topic set Name = @name, Notes = @notes, Log = @log where Id = @id", parameters).ConfigureAwait(false);
                 return await GetTopicAsync(topic.Id.Value).ConfigureAwait(false);
             }
             else
@@ -416,8 +421,9 @@ namespace Resonance.Repo.Database
                 {
                     { "@name", topic.Name },
                     { "@notes", topic.Notes },
+                    { "@log", topic.Log }
                 };
-                var topicIds = await TranQueryAsync<Int64>("insert into Topic (Name, Notes) values (@name, @notes)"
+                var topicIds = await TranQueryAsync<Int64>("insert into Topic (Name, Notes, Log) values (@name, @notes, @log)"
                     + $";select {GetLastAutoIncrementValue} as 'Id'",
                     parameters).ConfigureAwait(false);
                 var topicId = topicIds.Single();
@@ -728,8 +734,8 @@ namespace Resonance.Repo.Database
 
         private async Task<int> AddConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
-            return await TranExecuteAsync("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, ConsumedDateUtc)" +
-                " values (@id, @subscriptionId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @consumedDateUtc)",
+            return await TranExecuteAsync("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, DeliveryCount, ConsumedDateUtc)" +
+                " values (@id, @subscriptionId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @deliveryCount, @consumedDateUtc)",
                 new Dictionary<string, object>
                 {
                 { "@id", subscriptionEvent.Id },
@@ -740,6 +746,7 @@ namespace Resonance.Repo.Database
                 { "@priority", subscriptionEvent.Priority },
                 { "@payloadId", subscriptionEvent.PayloadId },
                 { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
+                { "@deliveryCount", subscriptionEvent.DeliveryCount },
                 { "@consumedDateUtc", DateTime.UtcNow },
                 }).ConfigureAwait(false);
         }
@@ -748,8 +755,8 @@ namespace Resonance.Repo.Database
 
         private async Task<int> AddFailedSubscriptionEvent(SubscriptionEvent subscriptionEvent, Reason reason)
         {
-            return await TranExecuteAsync("insert into FailedSubscriptionEvent (Id, SubscriptionId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, FailedDateUtc, Reason, ReasonOther)" +
-                " values (@id, @subscriptionId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @failedDateUtc, @reason, @reasonOther)",
+            return await TranExecuteAsync("insert into FailedSubscriptionEvent (Id, SubscriptionId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, DeliveryCount, FailedDateUtc, Reason, ReasonOther)" +
+                " values (@id, @subscriptionId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @deliveryCount, @failedDateUtc, @reason, @reasonOther)",
                 new Dictionary<string, object>
                 {
                     { "@id", subscriptionEvent.Id },
@@ -760,6 +767,7 @@ namespace Resonance.Repo.Database
                     { "@priority", subscriptionEvent.Priority },
                     { "@payloadId", subscriptionEvent.PayloadId },
                     { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
+                    { "@deliveryCount", subscriptionEvent.DeliveryCount },
                     { "@failedDateUtc", DateTime.UtcNow },
                     { "@reason", (int)reason.Type },
                     { "@reasonOther", reason.ReasonText },
@@ -821,6 +829,8 @@ namespace Resonance.Repo.Database
                 || (se.InvisibleUntilUtc < DateTime.UtcNow)) // expired
                 throw new ArgumentException($"Subscription-event with id {id} has expired and/or it has already been locked again.");
 
+            var sub = await GetSubscriptionAsync(se.SubscriptionId).ConfigureAwait(false);
+
             int attempt = 0;
             bool success = false;
             bool allowRetry = false;
@@ -846,9 +856,12 @@ namespace Resonance.Repo.Database
                         throw new ArgumentException($"Subscription-event with id {id} has expired while attempting to mark it complete. Maybe use higher a visibility timeout?");
 
                     // 2. Insert into ConsumedEvent
-                    rowsUpdated = await AddConsumedSubscriptionEvent(se).ConfigureAwait(false);
-                    if (rowsUpdated == 0)
-                        throw new InvalidOperationException($"Failed to add ConsumedSubscriptionEvent for SubscriptionEvent with id {id}.");
+                    if (sub.LogConsumed)
+                    {
+                        rowsUpdated = await AddConsumedSubscriptionEvent(se).ConfigureAwait(false);
+                        if (rowsUpdated == 0)
+                            throw new InvalidOperationException($"Failed to add ConsumedSubscriptionEvent for SubscriptionEvent with id {id}.");
+                    }
 
                     // 3. Upsert LastConsumedSubscriptionEvent (only for ordered subscription)
                     if (se.Ordered && se.FunctionalKey != null) // Only makes sense with a functional key
@@ -894,6 +907,8 @@ namespace Resonance.Repo.Database
                 || (se.InvisibleUntilUtc < DateTime.UtcNow)) // expired
                 throw new ArgumentException($"Subscription-event with id {id} has expired and/or it has already been locked again.");
 
+            var sub = await GetSubscriptionAsync(se.SubscriptionId).ConfigureAwait(false);
+
             await BeginTransactionAsync().ConfigureAwait(false);
             try
             {
@@ -908,10 +923,13 @@ namespace Resonance.Repo.Database
                 if (rowsUpdated == 0)
                     throw new ArgumentException($"Subscription-event with id {id} has expired while attempting to mark it complete. Maybe use higher a visibility timeout?");
 
-                // 2. Insert into ConsumedEvent
-                rowsUpdated = await AddFailedSubscriptionEvent(se, reason).ConfigureAwait(false);
-                if (rowsUpdated == 0)
-                    throw new InvalidOperationException($"Failed to add FailedSubscriptionEvent for SubscriptionEvent with id {id} and reason {reason}.");
+                // 2. Insert into FailedEvent
+                if (sub.LogFailed)
+                {
+                    rowsUpdated = await AddFailedSubscriptionEvent(se, reason).ConfigureAwait(false);
+                    if (rowsUpdated == 0)
+                        throw new InvalidOperationException($"Failed to add FailedSubscriptionEvent for SubscriptionEvent with id {id} and reason {reason}.");
+                }
 
                 await CommitTransactionAsync().ConfigureAwait(false);
             }

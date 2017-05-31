@@ -18,7 +18,7 @@ namespace Resonance.Repo
         /// </summary>
         public static DateTime MaxDateTime { get { return new DateTime(9999, 12, 31); } }
 
-        public async Task<TopicEvent> PublishTopicEventAsync(TopicEvent newTopicEvent, IEnumerable<Subscription> subscriptionsMatching, DateTime? deliveryDelayedUntilUtc)
+        public async Task<TopicEvent> PublishTopicEventAsync(TopicEvent newTopicEvent, bool logTopicEvent, IEnumerable<Subscription> subscriptionsMatching, DateTime? deliveryDelayedUntilUtc)
         {
             await BeginTransactionAsync().ConfigureAwait(false);
 
@@ -26,8 +26,11 @@ namespace Resonance.Repo
             {
                 PrepareTopicEvent(newTopicEvent);
 
-                var topicEventId = await AddTopicEventAsync(newTopicEvent).ConfigureAwait(false);
-                newTopicEvent.Id = topicEventId;
+                if (logTopicEvent)
+                {
+                    var topicEventId = await AddTopicEventAsync(newTopicEvent).ConfigureAwait(false);
+                    newTopicEvent.Id = topicEventId;
+                }
 
                 // Create tasks for each subscription
                 var subTasks = new List<Task<Int64>>();

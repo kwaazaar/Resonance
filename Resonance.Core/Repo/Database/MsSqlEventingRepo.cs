@@ -251,11 +251,11 @@ namespace Resonance.Repo.Database
             var reasonNr = ((int)ReasonType.Expired).ToString(CultureInfo.InvariantCulture);
             var query = "DELETE	SubscriptionEvent"
                 + " OUTPUT deleted.Id, deleted.SubscriptionId"
-                + " , deleted.EventName, deleted.PublicationDateUtc, deleted.FunctionalKey, deleted.Priority, deleted.PayloadId, deleted.DeliveryDateUtc"
+                + " , deleted.EventName, deleted.PublicationDateUtc, deleted.FunctionalKey, deleted.Priority, deleted.PayloadId, deleted.DeliveryDateUtc, deleted.DeliveryCount"
                 + $", @utcNow, {reasonNr}, null"
                 + " INTO FailedSubscriptionEvent"
                 + " (Id, SubscriptionId"
-                + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
+                + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, DeliveryCount"
                 + " , FailedDateUtc, Reason, ReasonOther)"
                 + " WHERE (SubscriptionEvent.ExpirationDateUtc IS NOT NULL AND SubscriptionEvent.ExpirationDateUtc < @utcNow AND SubscriptionEvent.InvisibleUntilUtc < @utcNow)";
             var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
@@ -268,11 +268,11 @@ namespace Resonance.Repo.Database
             var reasonNr = ((int)ReasonType.MaxRetriesReached).ToString(CultureInfo.InvariantCulture);
             var query = "DELETE	se"
                 + " OUTPUT deleted.Id, deleted.SubscriptionId"
-                + "	, deleted.EventName, deleted.PublicationDateUtc, deleted.FunctionalKey, deleted.Priority, deleted.PayloadId, deleted.DeliveryDateUtc"
+                + "	, deleted.EventName, deleted.PublicationDateUtc, deleted.FunctionalKey, deleted.Priority, deleted.PayloadId, deleted.DeliveryDateUtc, deleted.DeliveryCount"
                 + $", @utcNow, {reasonNr}, null"
                 + " INTO FailedSubscriptionEvent"
                 + " (Id, SubscriptionId"
-                + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
+                + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, DeliveryCount"
                 + " , FailedDateUtc, Reason, ReasonOther)"
                 + " FROM     SubscriptionEvent se"
                 + " JOIN    Subscription s ON s.Id = se.SubscriptionId"
@@ -288,11 +288,11 @@ namespace Resonance.Repo.Database
             var reasonNr = ((int)ReasonType.Overtaken).ToString(CultureInfo.InvariantCulture);
             var query = "DELETE	se"
                 + " OUTPUT deleted.Id, deleted.SubscriptionId"
-                + "	, deleted.EventName, deleted.PublicationDateUtc, deleted.FunctionalKey, deleted.Priority, deleted.PayloadId, deleted.DeliveryDateUtc"
+                + "	, deleted.EventName, deleted.PublicationDateUtc, deleted.FunctionalKey, deleted.Priority, deleted.PayloadId, deleted.DeliveryDateUtc, deleted.DeliveryCount"
                 + $", @utcNow, {reasonNr}, null"
                 + " INTO FailedSubscriptionEvent"
                 + " (Id, SubscriptionId"
-                + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc"
+                + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, DeliveryCount"
                 + " , FailedDateUtc, Reason, ReasonOther)"
                 + " FROM     SubscriptionEvent se"
                 + " JOIN LastConsumedSubscriptionEvent lc ON  lc.SubscriptionId = se.SubscriptionId AND lc.FunctionalKey = se.FunctionalKey"

@@ -42,6 +42,16 @@ namespace Resonance.Models
         /// Delivery delay (seconds)
         /// </summary>
         public int? DeliveryDelay { get; set; }
+
+        /// <summary>
+        /// When set to true (default), consumed events will be logged to the ConsumedSubscriptionEvent-table
+        /// </summary>
+        public bool LogConsumed { get; set; } = true;
+
+        /// <summary>
+        /// When set to true (default), failed events will be logged to the FailedSubscriptionEvent-table
+        /// </summary>
+        public bool LogFailed { get; set; } = true;
     }
 
     public class TopicSubscription
@@ -49,11 +59,13 @@ namespace Resonance.Models
         public Int64? Id { get; set; }
         public Int64 TopicId { get; set; }
         public bool Enabled { get; set; } = true;
+
         /// <summary>
         /// Indicates wheter this subscriptions is filtered, meaning not all messages of the topic will be propagated, but only the ones that match the specified filter.
         /// Make sure filters are specified, otherwise no messages will match.
         /// </summary>
         public bool Filtered { get; set; }
+
         /// <summary>
         /// Topic-filters. Make sure Filtered is set to true, otherwise the filters are ignored.
         /// </summary>

@@ -27,7 +27,7 @@ namespace Resonance.Repo
         Task<Int64> StorePayloadAsync(string payload);
         Task<string> GetPayloadAsync(Int64 id);
         Task<int> DeletePayloadAsync(Int64 id);
-        Task<TopicEvent> PublishTopicEventAsync(TopicEvent newTopicEvent, IEnumerable<Subscription> subscriptionsMatching, DateTime? deliveryDelayedUntilUtc);
+        Task<TopicEvent> PublishTopicEventAsync(TopicEvent newTopicEvent, bool logTopicEvent, IEnumerable<Subscription> subscriptionsMatching, DateTime? deliveryDelayedUntilUtc);
 
         // Consumption
         Task<IEnumerable<ConsumableEvent>> ConsumeNextAsync(string subscriptionName, int visibilityTimeout, int maxCount = 1);

@@ -131,7 +131,7 @@ namespace Resonance
 
                 try
                 {
-                    var topicEvent = await repo.PublishTopicEventAsync(newTopicEvent, subscriptionsMatching, deliveryDelayedUntilUtc).ConfigureAwait(false);
+                    var topicEvent = await repo.PublishTopicEventAsync(newTopicEvent, topic.Log, subscriptionsMatching, deliveryDelayedUntilUtc).ConfigureAwait(false);
                     return topicEvent;
                 }
                 catch (Exception)
