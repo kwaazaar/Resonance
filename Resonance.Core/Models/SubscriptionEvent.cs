@@ -10,7 +10,10 @@ namespace Resonance.Models
         public Int64? Id { get; set; }
         public Int64 SubscriptionId { get; set; }
         public bool Ordered { get; set; }
-        public Int64 TopicEventId { get; set; }
+        /// <summary>
+        /// Id of the topicevent (only available if the topicevent was actually logged)
+        /// </summary>
+        public Int64? TopicEventId { get; set; }
         public string EventName { get; set; }
         public DateTime PublicationDateUtc { get; set; }
         public string FunctionalKey { get; set; }

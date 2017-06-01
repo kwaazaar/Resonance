@@ -124,6 +124,50 @@ namespace Resonance.Tests.Publishing
         }
 
         [Fact]
+        public void PublishNoLog()
+        {
+            // Arrange
+            var topicName = "Publishing.PublishTests.PublishNoLog";
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName, Log = false });
+            var sub = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = Guid.NewGuid().ToString(),
+                TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true, } }
+            });
+
+            // Act
+            var topicEvent = _publisher.Publish(topicName);
+            Thread.Sleep(TimeSpan.FromMilliseconds(200)); // To make sure that DateTime.UtcNow returns a later datetime than during the Publish-call
+
+            // Assert
+            Assert.Null(topicEvent.Id);
+            Assert.Null(topicEvent.EventName);
+            Assert.Equal(topic.Id.Value, topicEvent.TopicId);
+            Assert.NotNull(topicEvent.PublicationDateUtc);
+            Assert.True(topicEvent.PublicationDateUtc < DateTime.UtcNow); // Older than now
+            Assert.True(topicEvent.PublicationDateUtc > DateTime.UtcNow.AddMinutes(-1)); // Less than a minute old
+            Assert.Equal(MaxDateTime, topicEvent.ExpirationDateUtc);
+            Assert.Equal(string.Empty, topicEvent.FunctionalKey);
+            Assert.Equal(100, topicEvent.Priority);
+            Assert.Null(topicEvent.Headers);
+            Assert.Null(topicEvent.PayloadId);
+
+            // Act
+            var consumableEvent = _consumer.ConsumeNext(sub.Name).SingleOrDefault();
+
+            // Assert
+            Assert.NotNull(consumableEvent);
+            Assert.NotNull(consumableEvent.Id);
+            Assert.Null(consumableEvent.EventName);
+            Assert.Equal(string.Empty, consumableEvent.FunctionalKey);
+            Assert.Null(consumableEvent.Payload);
+            // Other properties do not exist on an consumable event
+
+            // Consume it, to make sure the missing topicEvent is not a problem
+            _consumer.MarkConsumed(consumableEvent.Id, consumableEvent.DeliveryKey);
+        }
+
+        [Fact]
         public void PublishTakeEventNameFromHeaders()
         {
             // Arrange

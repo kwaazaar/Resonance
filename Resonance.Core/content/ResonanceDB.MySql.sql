@@ -34,6 +34,7 @@ CREATE TABLE `consumedsubscriptionevent` (
   `PayloadId` bigint(20) unsigned DEFAULT NULL,
   `DeliveryDateUtc` datetime(6) NOT NULL,
   `ConsumedDateUtc` datetime(6) NOT NULL,
+  `DeliveryCount` int(11) NOT NULL,
   PRIMARY KEY (`SubscriptionId`,`PublicationDateUtc`,`DeliveryDateUtc`,`Id`),
   KEY `FK_ConsumedSubscriptionEvent_EventPayload` (`PayloadId`),
   CONSTRAINT `FK_ConsumedSubscriptionEvent_EventPayload` FOREIGN KEY (`PayloadId`) REFERENCES `eventpayload` (`Id`) ON DELETE NO ACTION ON UPDATE NO ACTION
@@ -73,6 +74,7 @@ CREATE TABLE `failedsubscriptionevent` (
   `FailedDateUtc` datetime(6) NOT NULL,
   `Reason` int(11) NOT NULL COMMENT '0=Unknown, 1=Expired, 2=MaxRetriesReached, 3=Other',
   `ReasonOther` varchar(1000) CHARACTER SET utf8mb4 DEFAULT NULL,
+  `DeliveryCount` int(11) NOT NULL,
   PRIMARY KEY (`SubscriptionId`,`PublicationDateUtc`,`FailedDateUtc`,`Reason`,`Id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -106,6 +108,8 @@ CREATE TABLE `subscription` (
   `TimeToLive` int(11) DEFAULT NULL COMMENT 'Time to live in seconds',
   `MaxDeliveries` int(11) NOT NULL,
   `DeliveryDelay` int(11) DEFAULT NULL COMMENT 'Delay the delivery by number of seconds',
+  `LogConsumed` tinyint(1) NOT NULL,
+  `LogFailed` tinyint(1) NOT NULL,
   PRIMARY KEY (`Id`,`MaxDeliveries`),
   UNIQUE KEY `UK_Subscription_Name` (`Name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -121,7 +125,7 @@ DROP TABLE IF EXISTS `subscriptionevent`;
 CREATE TABLE `subscriptionevent` (
   `Id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `SubscriptionId` bigint(20) unsigned NOT NULL,
-  `TopicEventId` bigint(20) unsigned NOT NULL,
+  `TopicEventId` bigint(20) unsigned NULL,
   `EventName` varchar(50) CHARACTER SET utf8mb4 DEFAULT NULL,
   `PublicationDateUtc` datetime(6) NOT NULL,
   `FunctionalKey` varchar(50) CHARACTER SET utf8mb4 NOT NULL,
@@ -156,6 +160,7 @@ CREATE TABLE `topic` (
   `Id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `Name` varchar(50) CHARACTER SET utf8mb4 NOT NULL,
   `Notes` varchar(500) CHARACTER SET utf8mb4 DEFAULT NULL,
+  `Log` tinyint(1) NOT NULL,
   PRIMARY KEY (`Id`),
   UNIQUE KEY `UK_Topic_Name` (`Name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
