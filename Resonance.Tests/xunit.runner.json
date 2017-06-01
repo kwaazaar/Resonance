@@ -3,5 +3,5 @@
     "Resonance.MsSql": "Server=(local)\\SQL2016;Database=ResonanceDB;User ID=sa;Password=Password12!;MultipleActiveResultSets=true;",
     "Resonance.MySql": "Server=localhost;Database=resonancedb;UserId=resonance;Password=Password12!;"
   },
-  "UseMySql": "true"
+  "_UseMySql": "true"
 }
