@@ -57,7 +57,7 @@ namespace Resonance.Repo
                     var newSubscriptionEvent = new SubscriptionEvent
                     {
                         SubscriptionId = subscription.Id.Value,
-                        TopicEventId = newTopicEvent.Id.Value,
+                        TopicEventId = newTopicEvent.Id,
                         EventName = newTopicEvent.EventName,
                         PublicationDateUtc = newTopicEvent.PublicationDateUtc.Value,
                         FunctionalKey = newTopicEvent.FunctionalKey,

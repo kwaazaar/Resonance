@@ -41,9 +41,36 @@ namespace Resonance.Tests.Consuming
             var ce2 = _consumer.ConsumeNext(subName).SingleOrDefault();
             Assert.Null(ce2); // Locked, so should not be returned.
 
-            Thread.Sleep(TimeSpan.FromSeconds(visibilityTimeout+1)); // Wait until visibilitytimeout has expired
+            Thread.Sleep(TimeSpan.FromSeconds(visibilityTimeout + 1)); // Wait until visibilitytimeout has expired
             ce2 = _consumer.ConsumeNext(subName).SingleOrDefault();
             Assert.NotNull(ce2); // Should be unlocked again
+        }
+
+        [Fact]
+        public void NoLog()
+        {
+            // Arrange
+            var topicName = "Consuming.BasicTests.NoLog";
+            var subName = topicName + "_Sub1";
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName, Log = false }); // Log-flag should not matter, but just for sure
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = subName,
+                LogConsumed = false,
+                LogFailed = false,
+                TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
+            });
+
+            _publisher.Publish(topicName);
+            _publisher.Publish(topicName);
+
+            var ce1 = _consumer.ConsumeNext(subName).SingleOrDefault();
+            Assert.NotNull(ce1);
+            _consumer.MarkConsumed(ce1.Id, ce1.DeliveryKey);
+
+            var ce2 = _consumer.ConsumeNext(subName).SingleOrDefault();
+            Assert.NotNull(ce2);
+            _consumer.MarkFailed(ce2.Id, ce2.DeliveryKey, Reason.Other("Whatever reason"));
         }
 
         [Fact]
