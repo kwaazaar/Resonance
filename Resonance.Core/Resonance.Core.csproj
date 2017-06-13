@@ -10,7 +10,7 @@
     <AssemblyName>Resonance.Core</AssemblyName>
     <PackageId>Resonance.Core</PackageId>
     <PackageTags>pub;sub;esb;queue;topic;subscription;microservice;messaging;event;publish;subscribe;servicebus;mssql;mysql;mariadb;netcore</PackageTags>
-    <PackageReleaseNotes>Transaction error fixed when marking batch consumed.</PackageReleaseNotes>
+    <PackageReleaseNotes>Transaction error fixed when marking batch consumed. Batches can now be marked consumed non-transactional (if it fails, just continue with the next). Performance/locking fixes for MySQL when using batch-consumption (you should really be using MsSql in this scenario!).</PackageReleaseNotes>
     <PackageIconUrl>https://raw.githubusercontent.com/kwaazaar/Resonance/master/Resonance-Icon-64x64.png</PackageIconUrl>
     <PackageProjectUrl>https://github.com/kwaazaar/Resonance</PackageProjectUrl>
     <PackageLicenseUrl>https://raw.githubusercontent.com/kwaazaar/Resonance/master/LICENSE</PackageLicenseUrl>
@@ -23,6 +23,7 @@
     <GenerateAssemblyDescriptionAttribute>false</GenerateAssemblyDescriptionAttribute>
     <GenerateAssemblyCopyrightAttribute>false</GenerateAssemblyCopyrightAttribute>
     <Version>0.8.1</Version>
+    <AssemblyVersion>0.8.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
