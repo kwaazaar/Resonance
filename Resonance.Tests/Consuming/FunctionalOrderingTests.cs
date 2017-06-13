@@ -75,45 +75,8 @@ namespace Resonance.Tests.Consuming
             Assert.Equal("5", p5.Payload); // p3 has reached maxDeliveries, so p5 should now be delivered
         }
 
-
-        [Fact]
-        public void SerialDelivery_WithPriority()
-        {
-            // Arrange
-            var topicName = "SerialDelivery_WithPriority";
-            var subName = topicName + "_Sub1"; // Substring to prevent too long sub-names
-            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
-            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
-            {
-                Name = subName,
-                Ordered = true,
-                TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
-            });
-
-            var publishedDateUtcBaseLine = DateTime.UtcNow.AddSeconds(-60); // Explicitly setting publicationdates to make sure none are the same!
-            _publisher.Publish(topicName, payload: "1", functionalKey: "f1", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(1));
-            _publisher.Publish(topicName, payload: "2", functionalKey: "f1", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(2), priority: 10);
-            _publisher.Publish(topicName, payload: "3", functionalKey: "f2", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(3));
-            _publisher.Publish(topicName, payload: "4", functionalKey: "f1", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(4));
-            _publisher.Publish(topicName, payload: "5", functionalKey: "f2", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(5));
-
-            var visibilityTimeout = 5;
-            var p2 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault(); // p1 stands for payload "1"
-            var p3 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
-            var pNext = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
-            Assert.Equal("2", p2.Payload); // Higher prio, so comes first
-            Assert.Equal("3", p3.Payload);
-            Assert.Null(pNext); // No other should be delivered yet
-
-            _consumer.MarkConsumed(p2.Id, p2.DeliveryKey);
-            _consumer.MarkConsumed(p3.Id, p3.DeliveryKey);
-            var p4 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
-            var p5 = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
-            pNext = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
-            Assert.Equal("4", p4.Payload); // p1 should NOT BE delivered: its too old, the higher prio of p2 delivered it first, but also caused p1 to be skipped
-            Assert.Equal("5", p5.Payload);
-            Assert.Null(pNext); // Nothing more to deliver
-        }
+        // SerialDelivery_WithPriority was removed for 0.8.1, since taking priority into account while also using ordered delivery simply makes no sense.
+        // For now only the MsSql-queries still support it, but this may be removed in the future as well.
 
         [Fact]
         public void SerialDelivery_SamePublicationDate()
