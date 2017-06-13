@@ -1,6 +1,7 @@
 ﻿using Resonance.Models;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -114,7 +115,7 @@ namespace Resonance.Repo
 
         #region EventingRepo stuff that does not need to be available outside the repo implementations, so not part of IEventingRepo
         protected abstract bool ParallelQueriesSupport { get; }
-        protected abstract Task BeginTransactionAsync();
+        protected abstract Task BeginTransactionAsync(IsolationLevel isolationLevel = IsolationLevel.RepeatableRead);
         protected abstract Task RollbackTransactionAsync();
         protected abstract Task CommitTransactionAsync();
         #endregion

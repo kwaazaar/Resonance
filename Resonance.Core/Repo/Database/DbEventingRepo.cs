@@ -120,14 +120,14 @@ namespace Resonance.Repo.Database
         /// Starts a new transaction.
         /// NB: Transactions can be nested.
         /// </summary>
-        protected async override Task BeginTransactionAsync()
+        protected async override Task BeginTransactionAsync(IsolationLevel isolationLevel = IsolationLevel.RepeatableRead) // RepeatableReads prevents deadlocks and, in case of MsSql, skipping/overtaking of events
         {
             await EnsureConnectionReady().ConfigureAwait(false);
             lock (_tranLock)
             {
                 if (_runningTransaction == null)
                 {
-                    _runningTransaction = _conn.BeginTransaction(IsolationLevel.RepeatableRead); // Prevents deadlocks and, in case of MsSql, skipping/overtaking of events
+                    _runningTransaction = _conn.BeginTransaction(isolationLevel);
                     _tranState = TranState.Unchanged;
                 }
                 _tranCount++;
@@ -789,7 +789,11 @@ namespace Resonance.Repo.Database
 
         public virtual async Task MarkConsumedAsync(IEnumerable<ConsumableEventId> consumableEventsIds)
         {
-            await BeginTransactionAsync().ConfigureAwait(false);
+            var multiple = consumableEventsIds.Count() > 1;
+
+            if (multiple)
+                await BeginTransactionAsync().ConfigureAwait(false);
+
             try
             {
                 if (this.ParallelQueriesSupport)
@@ -799,7 +803,7 @@ namespace Resonance.Repo.Database
                     {
                         Task.Run(async () => // Threadpool task to wait for async parts in inner task (ExecuteWork)
                         {
-                            await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey).ConfigureAwait(false);
+                            await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey, multiple).ConfigureAwait(false);
                         }).GetAwaiter().GetResult(); // Need to block, because ForAll does not
                     });
                 }
@@ -807,20 +811,28 @@ namespace Resonance.Repo.Database
                 {
                     foreach (var ceId in consumableEventsIds)
                     {
-                        await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey).ConfigureAwait(false);
+                        await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey, multiple).ConfigureAwait(false);
                     }
                 }
 
-                await CommitTransactionAsync().ConfigureAwait(false);
+                if (multiple)
+                    await CommitTransactionAsync().ConfigureAwait(false);
             }
             catch (Exception)
             {
-                await RollbackTransactionAsync().ConfigureAwait(false);
+                if (multiple)
+                    await RollbackTransactionAsync().ConfigureAwait(false);
+
                 throw;
             }
         }
 
         public virtual async Task MarkConsumedAsync(Int64 id, string deliveryKey)
+        {
+            await MarkConsumedAsync(id, deliveryKey, false).ConfigureAwait(false);
+        }
+
+        public virtual async Task MarkConsumedAsync(Int64 id, string deliveryKey, bool hasSurroundingTran)
         {
             var se = await GetSubscriptionEvent(id).ConfigureAwait(false);
             if (se == null) throw new ArgumentException($"No subscription-event found with id {id}. Maybe it has already been consumed (by another). Using a higher visibility timeout may help.");
@@ -879,7 +891,10 @@ namespace Resonance.Repo.Database
                 catch (DbException dbEx)
                 {
                     await RollbackTransactionAsync().ConfigureAwait(false);
-                    allowRetry = CanRetry(dbEx, attempt);
+
+                    allowRetry = !hasSurroundingTran // It's impossible to retry because of the surrounding transaction; it cannot complete anymore because of the above rollback
+                        && CanRetry(dbEx, attempt);
+
                     if (!allowRetry)
                     {
                         if (attempt > 1)
@@ -899,6 +914,11 @@ namespace Resonance.Repo.Database
         }
 
         public virtual async Task MarkFailedAsync(Int64 id, string deliveryKey, Reason reason)
+        {
+            await MarkFailedAsync(id, deliveryKey, reason, false).ConfigureAwait(false);
+        }
+
+        public virtual async Task MarkFailedAsync(Int64 id, string deliveryKey, Reason reason, bool hasSurroundingTran)
         {
             var se = await GetSubscriptionEvent(id).ConfigureAwait(false);
             if (se == null) throw new ArgumentException($"No subscription-event found with id {id}.");

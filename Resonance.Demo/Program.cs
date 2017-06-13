@@ -16,8 +16,8 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 40; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
-        private const bool BATCHED = false;
+        private const int WORKER_COUNT = 2; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        private const bool BATCHED = true;
         private const bool GENERATE_DATA = true; // Change to enable/disable the adding of data to the subscription
 
         private static IServiceProvider serviceProvider;
@@ -40,7 +40,7 @@ namespace Resonance.Demo
                 Name = "Demo Subscription 1",
                 MaxDeliveries = 2,
                 DeliveryDelay = 3, // Deliverydelay, so that events cannot overtake eachother while publishing (because of IO latency of the DB)
-                Ordered = false,//!BATCHED, // Batched processing of ordered subscription is usually not very usefull
+                Ordered = true,//!BATCHED, // Batched processing of ordered subscription is usually not very usefull
                 TopicSubscriptions = new List<TopicSubscription>
                 {
                     new TopicSubscription
@@ -114,7 +114,7 @@ namespace Resonance.Demo
                 eventConsumer: consumer,
                 subscriptionName: subscriptionName,
                 logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>(),
-                batchSize: batched ? 50 : 1,
+                batchSize: batched ? 500 : 1,
                 consumeModel: batched ? ConsumeModel.Batch : ConsumeModel.Single,
 
                 consumeAction: !batched ? async (ceW) =>
@@ -168,23 +168,28 @@ namespace Resonance.Demo
         private static void ConfigureRepoServices(IServiceCollection serviceCollection, IConfiguration config)
         {
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
+            var dbType = config["Resonance:Repo:Database:Type"];
+            var useMySql = (dbType == null || dbType.Equals("MySql", StringComparison.OrdinalIgnoreCase)); // Anything else than MySql is considered MsSql
             var maxRetriesOnDeadlock = int.Parse(config["Resonance:Repo:Database:MaxRetriesOnDeadlock"]);
             var commandTimeout = TimeSpan.FromSeconds(int.Parse(config["Resonance:Repo:Database:CommandTimeout"]));
 
-            // To use MSSQLServer:
-            //var connectionString = config.GetConnectionString("Resonance.MsSql");
-            //serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
-            //{
-            //    return new MsSqlEventingRepoFactory(connectionString, commandTimeout); // Does not (yet) support MaxRetriesOnDeadlock
-            //});
-
-            // To use MySQL:
-            var connectionString = config.GetConnectionString("Resonance.MySql");
-            serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
+            if (useMySql)
             {
-                return new MySqlEventingRepoFactory(connectionString, commandTimeout, maxRetriesOnDeadlock);
-            });
-
+                var connectionString = config.GetConnectionString("Resonance.MySql");
+                serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
+                {
+                    return new MySqlEventingRepoFactory(connectionString, commandTimeout, maxRetriesOnDeadlock);
+                });
+            }
+            else // MsSql
+            {
+                var connectionString = config.GetConnectionString("Resonance.MsSql");
+                serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
+                {
+                    return new MsSqlEventingRepoFactory(connectionString, commandTimeout); // Does not (yet) support MaxRetriesOnDeadlock
+                });
+            }
+            
             // Configure EventPublisher and Consumer (their constructors require the above registered IEventingRepoFactory).
             serviceCollection.AddTransient<IEventPublisherAsync, EventPublisher>();
             serviceCollection.AddTransient<IEventConsumerAsync, EventConsumer>();

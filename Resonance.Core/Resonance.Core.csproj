@@ -10,7 +10,7 @@
     <AssemblyName>Resonance.Core</AssemblyName>
     <PackageId>Resonance.Core</PackageId>
     <PackageTags>pub;sub;esb;queue;topic;subscription;microservice;messaging;event;publish;subscribe;servicebus;mssql;mysql;mariadb;netcore</PackageTags>
-    <PackageReleaseNotes>Logging of events can now be disabled for higher throughput (TopicEvent, Consumed/Failed-SubscriptionEvent). Last DeliveryCount is now logged to Consumed/Failed-SubscriptionEvent.</PackageReleaseNotes>
+    <PackageReleaseNotes>Transaction error fixed when marking batch consumed.</PackageReleaseNotes>
     <PackageIconUrl>https://raw.githubusercontent.com/kwaazaar/Resonance/master/Resonance-Icon-64x64.png</PackageIconUrl>
     <PackageProjectUrl>https://github.com/kwaazaar/Resonance</PackageProjectUrl>
     <PackageLicenseUrl>https://raw.githubusercontent.com/kwaazaar/Resonance/master/LICENSE</PackageLicenseUrl>
@@ -22,7 +22,7 @@
     <GenerateAssemblyTitleAttribute>false</GenerateAssemblyTitleAttribute>
     <GenerateAssemblyDescriptionAttribute>false</GenerateAssemblyDescriptionAttribute>
     <GenerateAssemblyCopyrightAttribute>false</GenerateAssemblyCopyrightAttribute>
-    <Version>0.8.0</Version>
+    <Version>0.8.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
