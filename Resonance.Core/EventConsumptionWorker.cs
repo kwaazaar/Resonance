@@ -37,6 +37,8 @@ namespace Resonance
         private DateTime? _suspendedUntilUtc = null;
         private DateTime? _lastHouseKeepingRun = null;
         private object _suspendTimeoutLock = new object();
+        private Subscription _subscription = null;
+
         private readonly int _minDelayInMs;
         private readonly int _maxDelayInMs;
         private readonly int _batchSize;
@@ -243,6 +245,10 @@ namespace Resonance
             if (this._internalTask != null)
                 throw new InvalidOperationException("Task is already running or has not yet finished stopping");
 
+            _subscription = _eventConsumer.GetSubscriptionByNameAsync(_subscriptionName).GetAwaiter().GetResult();
+            if (_subscription == null)
+                throw new InvalidOperationException($"Subscription with the name '{_subscriptionName}' does not exist. Start aborted.");
+
             this._cancellationToken = new CancellationTokenSource();
             this._internalTask = Task.Factory.StartNew(() =>
             {
@@ -338,6 +344,7 @@ namespace Resonance
             this._internalTask = null;
             this._cancellationToken.Dispose();
             this._cancellationToken = null;
+            this._subscription = null;
         }
 
         /// <summary>
@@ -470,7 +477,7 @@ namespace Resonance
 
                 try
                 {
-                    await _eventConsumer.MarkConsumedAsync(succeededResults).ConfigureAwait(false);
+                    await _eventConsumer.MarkConsumedAsync(succeededResults, transactional: !_subscription.Ordered).ConfigureAwait(false); // Transactional is not required when processing is ordered: the events will be retried and cannot be overtaken.
                 }
                 catch (Exception ex)
                 {

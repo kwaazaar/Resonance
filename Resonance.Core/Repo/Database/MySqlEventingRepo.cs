@@ -121,29 +121,56 @@ namespace Resonance.Repo.Database
 
             var lockedIds = new List<Int64>();
 
-            for (int i = 0; i < maxCountToUse; i++)
+            var multiple = maxCountToUse > 1;
+
+            if (multiple)
+                await BeginTransactionAsync(IsolationLevel.Serializable).ConfigureAwait(false); // Serializable gets a higher throughput
+
+            // If waiting for locks takes too long, enable this line:
+            //await TranExecuteAsync("set innodb_lock_wait_timeout=30;").ConfigureAwait(false); // make sure we don't wait too long for locks, to prevent deadlocks
+
+            try
             {
-                try
+                for (int i = 0; i < maxCountToUse; i++)
                 {
-                    var sId = await TryLockNextSubscriptionEventAsync(subscriptionId, visibilityTimeout, ordered);
-                    if (sId.HasValue)
-                        lockedIds.Add(sId.Value);
-                    else
-                        break; // Break out of for-loop, since no more events are found
+                    var deadlocksOccurred = 0;
+                    try
+                    {
+                        var sId = await TryLockNextSubscriptionEventAsync(subscriptionId, visibilityTimeout, ordered, multiple);
+                        if (sId.HasValue)
+                            lockedIds.Add(sId.Value);
+                        else
+                            break; // Break out of for-loop, since no more events are found
+                    }
+                    catch (RepoException repoEx)
+                    {
+                        if ((repoEx.Error == RepoError.TooBusy) && (maxCountToUse > 1)) // When retrieving a batch, the already locked items must be returned instead of throwing an exception
+                        {
+                            deadlocksOccurred++;
+                            if (deadlocksOccurred <= 5)
+                                await Task.Delay(deadlocksOccurred).ConfigureAwait(false); // Ease off if number of deadlocks increases
+                            else
+                                break; // Break out of for-loop, since repo is too busy
+                        }
+                        else
+                            throw;
+                    }
                 }
-                catch (RepoException repoEx)
-                {
-                    if ((repoEx.Error == RepoError.TooBusy) && (maxCountToUse > 1)) // When retrieving a batch, the already locked items must be returned instead of throwing an exception
-                        break; // Break out of for-loop, since repo is too busy
-                    else
-                        throw;
-                }
+
+                if (multiple)
+                    await CommitTransactionAsync().ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                if (multiple)
+                    await RollbackTransactionAsync().ConfigureAwait(false);
+                throw;
             }
 
             return lockedIds;
         }
 
-        private async Task<Int64?> TryLockNextSubscriptionEventAsync(Int64 subscriptionId, int visibilityTimeout, bool ordered)
+        private async Task<Int64?> TryLockNextSubscriptionEventAsync(Int64 subscriptionId, int visibilityTimeout, bool ordered, bool hasSurroundingTran)
         {
             int attempt = 0;
             bool canRetry = false;
@@ -220,7 +247,7 @@ namespace Resonance.Repo.Database
                                 "             OR	se.DeliveryCount < s.MaxDeliveries)" +
                                 "     and		(	(se.PublicationDateUtc >= lc.PublicationDateUtc)" +
                                 "              OR	lc.SubscriptionId IS NULL)" +
-                                " order by 	se.Priority ASC, se.PublicationDateUtc ASC" + // Warning: prio must be stored inverted!
+                                " order by 	se.PublicationDateUtc ASC" + // Prio is ignored, since it makes no sense for ordered delivery (once a higher prio event is consumed, lower prio events with a earlier publicationdate are no longer processed)
                                 " limit 1" + // FOR UPDATE" + // FOR UPDATE locks all matching records, not restricted by the LIMIT 1
                             " ) tmp on tmp.Id = seOuter.Id and tmp.DeliveryKey = seOuter.DeliveryKey" +
                             " set seOuter.InvisibleUntilUtc = @invisibleUntilUtc," +
@@ -251,7 +278,9 @@ namespace Resonance.Repo.Database
                 }
                 catch (DbException dbEx)
                 {
-                    canRetry = CanRetry(dbEx, attempt);
+                    canRetry = !hasSurroundingTran // If in a surrounding transaction, this failed call cannot be retried
+                        && CanRetry(dbEx, attempt);
+
                     if (!canRetry)
                     {
                         if (attempt > 1) // Retries only occur when repo is busy and since retries happened, this is the cause

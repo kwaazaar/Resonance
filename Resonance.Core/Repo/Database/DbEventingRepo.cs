@@ -787,11 +787,11 @@ namespace Resonance.Repo.Database
             return await ConsumeNextForSubscription(subscription, visibilityTimeout, maxCount).ConfigureAwait(false);
         }
 
-        public virtual async Task MarkConsumedAsync(IEnumerable<ConsumableEventId> consumableEventsIds)
+        public virtual async Task MarkConsumedAsync(IEnumerable<ConsumableEventId> consumableEventsIds, bool transactional = true)
         {
             var multiple = consumableEventsIds.Count() > 1;
 
-            if (multiple)
+            if (multiple && transactional)
                 await BeginTransactionAsync().ConfigureAwait(false);
 
             try
@@ -803,7 +803,16 @@ namespace Resonance.Repo.Database
                     {
                         Task.Run(async () => // Threadpool task to wait for async parts in inner task (ExecuteWork)
                         {
-                            await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey, multiple).ConfigureAwait(false);
+                            try
+                            {
+                                await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey, multiple && transactional).ConfigureAwait(false);
+                            }
+                            catch (Exception)
+                            {
+                                if (transactional)
+                                    throw;
+                                // Otherwise ignore (event will be retried and we continue to mark the other events in the set as consumed)
+                            }
                         }).GetAwaiter().GetResult(); // Need to block, because ForAll does not
                     });
                 }
@@ -811,16 +820,25 @@ namespace Resonance.Repo.Database
                 {
                     foreach (var ceId in consumableEventsIds)
                     {
-                        await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey, multiple).ConfigureAwait(false);
+                        try
+                        {
+                            await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey, multiple).ConfigureAwait(false);
+                        }
+                        catch (Exception)
+                        {
+                            if (transactional)
+                                throw;
+                            // Otherwise ignore (event will be retried and we continue to mark the other events in the set as consumed)
+                        }
                     }
                 }
 
-                if (multiple)
+                if (multiple && transactional)
                     await CommitTransactionAsync().ConfigureAwait(false);
             }
             catch (Exception)
             {
-                if (multiple)
+                if (multiple && transactional)
                     await RollbackTransactionAsync().ConfigureAwait(false);
 
                 throw;

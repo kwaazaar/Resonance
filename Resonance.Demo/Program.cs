@@ -114,7 +114,7 @@ namespace Resonance.Demo
                 eventConsumer: consumer,
                 subscriptionName: subscriptionName,
                 logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>(),
-                batchSize: batched ? 500 : 1,
+                batchSize: batched ? 100 : 1,
                 consumeModel: batched ? ConsumeModel.Batch : ConsumeModel.Single,
 
                 consumeAction: !batched ? async (ceW) =>
