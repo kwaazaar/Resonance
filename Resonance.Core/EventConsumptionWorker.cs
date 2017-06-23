@@ -418,7 +418,7 @@ namespace Resonance
         protected virtual async Task<bool> Execute(ConsumableEvent workItem)
         {
             // Only process if still invisible (serial processing of a list of workitems may cause workitems to expire before being processed)
-            if (workItem.InvisibleUntilUtc > DateTime.UtcNow)
+            if (workItem.InvisibleUntilUtc > DateTime.UtcNow) // DateTime not queried on repo, because of excessive load
             {
                 return await ExecuteConcrete(workItem).ConfigureAwait(false);
             }

@@ -10,11 +10,18 @@ namespace Resonance
 {
     public class EventPublisher : IEventPublisher, IEventPublisherAsync
     {
-        private IEventingRepoFactory _repoFactory;
+        private readonly IEventingRepoFactory _repoFactory;
+        private readonly DateTimeProvider _dtProvider;
 
         public EventPublisher(IEventingRepoFactory repoFactory)
+            : this(repoFactory, DateTimeProvider.Repository)
+        {
+        }
+
+        public EventPublisher(IEventingRepoFactory repoFactory, DateTimeProvider dtProvider)
         {
             _repoFactory = repoFactory;
+            _dtProvider = dtProvider;
         }
 
         #region Sync
@@ -111,12 +118,14 @@ namespace Resonance
                         eventNameToUse = eventNameHeader.Value;
                 }
 
+                var utcNow = _dtProvider == DateTimeProvider.Repository ? await repo.GetNowUtcAsync().ConfigureAwait(false) : DateTime.UtcNow;
+
                 // Store topic event
                 var newTopicEvent = new TopicEvent
                 {
                     TopicId = topic.Id.Value,
                     EventName = eventNameToUse,
-                    PublicationDateUtc = publicationDateUtc.GetValueOrDefault(DateTime.UtcNow),
+                    PublicationDateUtc = publicationDateUtc.GetValueOrDefault(utcNow),
                     FunctionalKey = functionalKey ?? string.Empty,
                     Priority = priority,
                     ExpirationDateUtc = expirationDateUtc.GetValueOrDefault(BaseEventingRepo.MaxDateTime),

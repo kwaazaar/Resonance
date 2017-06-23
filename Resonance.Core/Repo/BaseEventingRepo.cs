@@ -19,6 +19,15 @@ namespace Resonance.Repo
         /// </summary>
         public static DateTime MaxDateTime { get { return new DateTime(9999, 12, 31); } }
 
+        /// <summary>
+        /// Default implementation to get the current DateTime in UTC-format. Repository should implement this itself when possible.
+        /// </summary>
+        /// <returns></returns>
+        public virtual Task<DateTime> GetNowUtcAsync()
+        {
+            return Task.FromResult(DateTime.UtcNow);
+        }
+
         public async Task<TopicEvent> PublishTopicEventAsync(TopicEvent newTopicEvent, bool logTopicEvent, IEnumerable<Subscription> subscriptionsMatching, DateTime? deliveryDelayedUntilUtc)
         {
             await BeginTransactionAsync().ConfigureAwait(false);
@@ -105,7 +114,10 @@ namespace Resonance.Repo
         private void PrepareTopicEvent(TopicEvent newTopicEvent)
         {
             if (!newTopicEvent.PublicationDateUtc.HasValue)
-                newTopicEvent.PublicationDateUtc = DateTime.UtcNow;
+            {
+                var utcNow = GetNowUtcAsync().GetAwaiter().GetResult();
+                newTopicEvent.PublicationDateUtc = utcNow;
+            }
             if (newTopicEvent.FunctionalKey == null)
                 newTopicEvent.FunctionalKey = string.Empty;
         }

@@ -734,6 +734,7 @@ namespace Resonance.Repo.Database
 
         private async Task<int> AddConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
+            var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
             return await TranExecuteAsync("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, DeliveryCount, ConsumedDateUtc)" +
                 " values (@id, @subscriptionId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @deliveryCount, @consumedDateUtc)",
                 new Dictionary<string, object>
@@ -747,7 +748,7 @@ namespace Resonance.Repo.Database
                 { "@payloadId", subscriptionEvent.PayloadId },
                 { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
                 { "@deliveryCount", subscriptionEvent.DeliveryCount },
-                { "@consumedDateUtc", DateTime.UtcNow },
+                { "@consumedDateUtc", utcNow },
                 }).ConfigureAwait(false);
         }
 
@@ -755,6 +756,7 @@ namespace Resonance.Repo.Database
 
         private async Task<int> AddFailedSubscriptionEvent(SubscriptionEvent subscriptionEvent, Reason reason)
         {
+            var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
             return await TranExecuteAsync("insert into FailedSubscriptionEvent (Id, SubscriptionId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, DeliveryCount, FailedDateUtc, Reason, ReasonOther)" +
                 " values (@id, @subscriptionId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @deliveryCount, @failedDateUtc, @reason, @reasonOther)",
                 new Dictionary<string, object>
@@ -768,7 +770,7 @@ namespace Resonance.Repo.Database
                     { "@payloadId", subscriptionEvent.PayloadId },
                     { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
                     { "@deliveryCount", subscriptionEvent.DeliveryCount },
-                    { "@failedDateUtc", DateTime.UtcNow },
+                    { "@failedDateUtc", utcNow },
                     { "@reason", (int)reason.Type },
                     { "@reasonOther", reason.ReasonText },
                 }).ConfigureAwait(false);
@@ -855,8 +857,9 @@ namespace Resonance.Repo.Database
             var se = await GetSubscriptionEvent(id).ConfigureAwait(false);
             if (se == null) throw new ArgumentException($"No subscription-event found with id {id}. Maybe it has already been consumed (by another). Using a higher visibility timeout may help.");
 
+            var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
             if ((!se.DeliveryKey.Equals(deliveryKey, StringComparison.OrdinalIgnoreCase)) // Locked by another
-                || (se.InvisibleUntilUtc < DateTime.UtcNow)) // expired
+                || (se.InvisibleUntilUtc < utcNow)) // expired
                 throw new ArgumentException($"Subscription-event with id {id} has expired and/or it has already been locked again.");
 
             var sub = await GetSubscriptionAsync(se.SubscriptionId).ConfigureAwait(false);
@@ -941,8 +944,9 @@ namespace Resonance.Repo.Database
             var se = await GetSubscriptionEvent(id).ConfigureAwait(false);
             if (se == null) throw new ArgumentException($"No subscription-event found with id {id}.");
 
+            var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
             if ((!se.DeliveryKey.Equals(deliveryKey, StringComparison.OrdinalIgnoreCase)) // Locked by another
-                || (se.InvisibleUntilUtc < DateTime.UtcNow)) // expired
+                || (se.InvisibleUntilUtc < utcNow)) // expired
                 throw new ArgumentException($"Subscription-event with id {id} has expired and/or it has already been locked again.");
 
             var sub = await GetSubscriptionAsync(se.SubscriptionId).ConfigureAwait(false);

@@ -58,6 +58,14 @@ namespace Resonance.Repo.Database
             get { return "LAST_INSERT_ID()"; }
         }
 
+        public override async Task<DateTime> GetNowUtcAsync()
+        {
+            var query = "select utc_timestamp(6);";
+            var dateTimes = await TranQueryAsync<DateTime>(query).ConfigureAwait(false);
+            return dateTimes.First();
+
+        }
+
         protected override bool CanRetry(DbException dbEx, int attempts)
         {
             var mysqlEx = dbEx as MySqlException;
@@ -181,7 +189,8 @@ namespace Resonance.Repo.Database
                 canRetry = false;
 
                 var deliveryKey = Guid.NewGuid().ToString();
-                var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout);
+                var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
+                var invisibleUntilUtc = utcNow.AddSeconds(visibilityTimeout);
 
                 try
                 {
@@ -213,7 +222,7 @@ namespace Resonance.Repo.Database
                             new Dictionary<string, object>
                             {
                         { "@subscriptionId", subscriptionId },
-                        { "@utcNow", DateTime.UtcNow },
+                        { "@utcNow", utcNow },
                         { "@deliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },
                             }).ConfigureAwait(false);
@@ -262,7 +271,7 @@ namespace Resonance.Repo.Database
                             new Dictionary<string, object>
                             {
                         { "@subscriptionId", subscriptionId },
-                        { "@utcNow", DateTime.UtcNow },
+                        { "@utcNow", utcNow },
                         { "@deliveryKey", deliveryKey },
                         { "@invisibleUntilUtc", invisibleUntilUtc },
                             }).ConfigureAwait(false);
@@ -307,6 +316,7 @@ namespace Resonance.Repo.Database
 
             try
             {
+                var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
                 var reasonNr = ((int)ReasonType.Expired).ToString(CultureInfo.InvariantCulture);
                 var query = "INSERT IGNORE INTO FailedSubscriptionEvent"
                     + " ( Id, SubscriptionId"
@@ -320,7 +330,7 @@ namespace Resonance.Repo.Database
                     + " DELETE se"
                     + " FROM SubscriptionEvent se"
                     + " JOIN FailedSubscriptionEvent fse ON fse.Id = se.Id;";
-                var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
+                var rowsAffected = await TranExecuteAsync(query, new { utcNow = utcNow }).ConfigureAwait(false);
                 await CommitTransactionAsync().ConfigureAwait(false);
 
                 return rowsAffected;
@@ -338,6 +348,7 @@ namespace Resonance.Repo.Database
 
             try
             {
+                var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
                 var reasonNr = ((int)ReasonType.MaxRetriesReached).ToString(CultureInfo.InvariantCulture);
                 var query = "INSERT IGNORE INTO FailedSubscriptionEvent"
                     + " (Id, SubscriptionId"
@@ -352,7 +363,7 @@ namespace Resonance.Repo.Database
                     + " DELETE se"
                     + " FROM SubscriptionEvent se"
                     + " JOIN FailedSubscriptionEvent fse ON fse.Id = se.Id;";
-                var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
+                var rowsAffected = await TranExecuteAsync(query, new { utcNow = utcNow }).ConfigureAwait(false);
                 await CommitTransactionAsync().ConfigureAwait(false);
 
                 return rowsAffected;
@@ -370,6 +381,7 @@ namespace Resonance.Repo.Database
 
             try
             {
+                var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
                 var reasonNr = ((int)ReasonType.Overtaken).ToString(CultureInfo.InvariantCulture);
                 var query = "INSERT IGNORE INTO FailedSubscriptionEvent"
                     + " (Id, SubscriptionId"
@@ -384,7 +396,7 @@ namespace Resonance.Repo.Database
                     + " DELETE se"
                     + " FROM SubscriptionEvent se"
                     + " JOIN FailedSubscriptionEvent fse ON fse.Id = se.Id;";
-                var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
+                var rowsAffected = await TranExecuteAsync(query, new { utcNow = utcNow }).ConfigureAwait(false);
                 await CommitTransactionAsync().ConfigureAwait(false);
 
                 return rowsAffected;

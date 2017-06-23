@@ -46,6 +46,13 @@ namespace Resonance.Repo.Database
             get { return "SCOPE_IDENTITY()"; }
         }
 
+        public override async Task<DateTime> GetNowUtcAsync()
+        {
+            var query = "select SYSUTCDATETIME();";
+            var dateTimes = await TranQueryAsync<DateTime>(query).ConfigureAwait(false);
+            return dateTimes.First();
+        }
+
         public override async Task<int> UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
             var query = "MERGE LastConsumedSubscriptionEvent AS target" +
@@ -78,9 +85,11 @@ namespace Resonance.Repo.Database
                     canRetry = false;
 
                     await BeginTransactionAsync();
+                    var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
+
                     try
                     {
-                        var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout);
+                        var invisibleUntilUtc = utcNow.AddSeconds(visibilityTimeout);
 
                         var query = "DECLARE @l_PBEIds TABLE(ID bigint)\n"
                             + ";WITH DE AS ("
@@ -107,7 +116,7 @@ namespace Resonance.Repo.Database
                                 new Dictionary<string, object>
                                 {
                                         { "@subscriptionId", subscription.Id.Value },
-                                        { "@utcNow", DateTime.UtcNow },
+                                        { "@utcNow", utcNow },
                                         { "@invisibleUntilUtc", invisibleUntilUtc },
                                 }).ConfigureAwait(false));
 
@@ -146,10 +155,12 @@ namespace Resonance.Repo.Database
                         canRetry = false;
 
                         await BeginTransactionAsync(); // Transaction is required, because tests show that under heavy load reads are not repeatable (which is weird since CTE's should be atomic)
+                        var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
+
                         try
                         {
                             var deliveryKey = Guid.NewGuid().ToString();
-                            var invisibleUntilUtc = DateTime.UtcNow.AddSeconds(visibilityTimeout);
+                            var invisibleUntilUtc = utcNow.AddSeconds(visibilityTimeout);
 
                             var query = "DECLARE @l_PBEIds TABLE(ID bigint)\n"
                                 + ";WITH DE AS ("
@@ -185,7 +196,7 @@ namespace Resonance.Repo.Database
                                                 new Dictionary<string, object>
                                                 {
                                                     { "@subscriptionId", subscription.Id.Value },
-                                                    { "@utcNow", DateTime.UtcNow },
+                                                    { "@utcNow", utcNow },
                                                     { "@deliveryKey", deliveryKey },
                                                     { "@invisibleUntilUtc", invisibleUntilUtc },
                                                 }).ConfigureAwait(false);
@@ -258,7 +269,8 @@ namespace Resonance.Repo.Database
                 + " , EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, DeliveryCount"
                 + " , FailedDateUtc, Reason, ReasonOther)"
                 + " WHERE (SubscriptionEvent.ExpirationDateUtc IS NOT NULL AND SubscriptionEvent.ExpirationDateUtc < @utcNow AND SubscriptionEvent.InvisibleUntilUtc < @utcNow)";
-            var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
+            var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
+            var rowsAffected = await TranExecuteAsync(query, new { utcNow = utcNow }).ConfigureAwait(false);
 
             return rowsAffected;
         }
@@ -277,7 +289,8 @@ namespace Resonance.Repo.Database
                 + " FROM     SubscriptionEvent se"
                 + " JOIN    Subscription s ON s.Id = se.SubscriptionId"
                 + " WHERE (s.MaxDeliveries > 0 AND se.DeliveryCount >= s.MaxDeliveries AND se.InvisibleUntilUtc < @utcNow)";
-            var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
+            var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
+            var rowsAffected = await TranExecuteAsync(query, new { utcNow = utcNow }).ConfigureAwait(false);
 
             return rowsAffected;
         }
@@ -297,7 +310,8 @@ namespace Resonance.Repo.Database
                 + " FROM     SubscriptionEvent se"
                 + " JOIN LastConsumedSubscriptionEvent lc ON  lc.SubscriptionId = se.SubscriptionId AND lc.FunctionalKey = se.FunctionalKey"
                 + " WHERE se.PublicationDateUtc < lc.PublicationDateUtc";
-            var rowsAffected = await TranExecuteAsync(query, new { utcNow = DateTime.UtcNow }).ConfigureAwait(false);
+            var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
+            var rowsAffected = await TranExecuteAsync(query, new { utcNow = utcNow }).ConfigureAwait(false);
 
             return rowsAffected;
         }
