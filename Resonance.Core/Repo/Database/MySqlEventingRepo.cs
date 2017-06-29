@@ -61,9 +61,16 @@ namespace Resonance.Repo.Database
         public override async Task<DateTime> GetNowUtcAsync()
         {
             var query = "select utc_timestamp(6);";
-            var dateTimes = await TranQueryAsync<DateTime>(query).ConfigureAwait(false);
-            return dateTimes.First();
 
+            try
+            {
+                var dateTimes = await TranQueryAsync<DateTime>(query).ConfigureAwait(false);
+                return dateTimes.First();
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         protected override bool CanRetry(DbException dbEx, int attempts)
@@ -81,12 +88,19 @@ namespace Resonance.Repo.Database
                 " VALUES(@subscriptionId, @functionalKey, @publicationDateUtc)" +
                 " ON DUPLICATE KEY UPDATE PublicationDateUtc = @publicationDateUtc";
 
-            return await TranExecuteAsync(query, new Dictionary<string, object>
+            try
             {
-                { "@subscriptionId", subscriptionEvent.SubscriptionId },
-                { "@functionalKey", subscriptionEvent.FunctionalKey },
-                { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
-            }).ConfigureAwait(false);
+                return await TranExecuteAsync(query, new Dictionary<string, object>
+                {
+                    { "@subscriptionId", subscriptionEvent.SubscriptionId },
+                    { "@functionalKey", subscriptionEvent.FunctionalKey },
+                    { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
+                }).ConfigureAwait(false);
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         protected override async Task<IEnumerable<ConsumableEvent>> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
@@ -113,7 +127,18 @@ namespace Resonance.Repo.Database
         {
             var query = $"select se.Id, se.DeliveryKey, se.EventName, se.FunctionalKey, se.InvisibleUntilUtc, se.PayloadId" + // Get the minimal amount of data
                 " from SubscriptionEvent se where se.Id = @sId";
-            var ces = await TranQueryAsync<ConsumableEvent>(query, new { sId = sId }).ConfigureAwait(false);
+
+            IEnumerable<ConsumableEvent> ces = null;
+
+            try
+            {
+                ces = await TranQueryAsync<ConsumableEvent>(query, new { sId = sId }).ConfigureAwait(false);
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
+
             var ce = ces.SingleOrDefault();
             if (ce != null && ce.PayloadId.HasValue)
             {
@@ -167,6 +192,12 @@ namespace Resonance.Repo.Database
 
                 if (multiple)
                     await CommitTransactionAsync().ConfigureAwait(false);
+            }
+            catch (DbException dbEx)
+            {
+                if (multiple)
+                    await RollbackTransactionAsync().ConfigureAwait(false);
+                throw new RepoException(dbEx);
             }
             catch (Exception)
             {
@@ -335,6 +366,11 @@ namespace Resonance.Repo.Database
 
                 return rowsAffected;
             }
+            catch (DbException dbEx)
+            {
+                await RollbackTransactionAsync().ConfigureAwait(false);
+                throw new RepoException(dbEx);
+            }
             catch (Exception)
             {
                 await RollbackTransactionAsync().ConfigureAwait(false);
@@ -368,6 +404,11 @@ namespace Resonance.Repo.Database
 
                 return rowsAffected;
             }
+            catch (DbException dbEx)
+            {
+                await RollbackTransactionAsync().ConfigureAwait(false);
+                throw new RepoException(dbEx);
+            }
             catch (Exception)
             {
                 await RollbackTransactionAsync().ConfigureAwait(false);
@@ -400,6 +441,11 @@ namespace Resonance.Repo.Database
                 await CommitTransactionAsync().ConfigureAwait(false);
 
                 return rowsAffected;
+            }
+            catch (DbException dbEx)
+            {
+                await RollbackTransactionAsync().ConfigureAwait(false);
+                throw new RepoException(dbEx);
             }
             catch (Exception)
             {

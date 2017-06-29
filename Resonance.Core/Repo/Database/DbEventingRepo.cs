@@ -285,6 +285,11 @@ namespace Resonance.Repo.Database
 
                     await CommitTransactionAsync().ConfigureAwait(false);
                 }
+                catch (DbException dbEx)
+                {
+                    await RollbackTransactionAsync().ConfigureAwait(false);
+                    throw new RepoException(dbEx);
+                }
                 catch (Exception)
                 {
                     await RollbackTransactionAsync().ConfigureAwait(false);
@@ -316,6 +321,11 @@ namespace Resonance.Repo.Database
                     subscriptionId = subscriptionIds.Single();
                     await AddTopicSubscriptions(subscriptionId, subscription.TopicSubscriptions).ConfigureAwait(false);
                     await CommitTransactionAsync().ConfigureAwait(false);
+                }
+                catch (DbException dbEx)
+                {
+                    await RollbackTransactionAsync().ConfigureAwait(false);
+                    throw new RepoException(dbEx);
                 }
                 catch (Exception)
                 {
@@ -363,6 +373,11 @@ namespace Resonance.Repo.Database
                 }
                 await CommitTransactionAsync().ConfigureAwait(false);
             }
+            catch (DbException dbEx)
+            {
+                await RollbackTransactionAsync().ConfigureAwait(false);
+                throw new RepoException(dbEx);
+            }
             catch (Exception)
             {
                 await RollbackTransactionAsync().ConfigureAwait(false);
@@ -390,6 +405,11 @@ namespace Resonance.Repo.Database
 
                 await CommitTransactionAsync().ConfigureAwait(false);
             }
+            catch (DbException dbEx)
+            {
+                await RollbackTransactionAsync().ConfigureAwait(false);
+                throw new RepoException(dbEx);
+            }
             catch (Exception)
             {
                 await RollbackTransactionAsync().ConfigureAwait(false);
@@ -403,31 +423,38 @@ namespace Resonance.Repo.Database
                 ? existingTopic = await GetTopicAsync(topic.Id.Value).ConfigureAwait(false)
                 : null;
 
-            if (existingTopic != null) // update
+            try
             {
-                var parameters = new Dictionary<string, object>
+                if (existingTopic != null) // update
+                {
+                    var parameters = new Dictionary<string, object>
                 {
                     { "@id", topic.Id.Value },
                     { "@name", topic.Name },
                     { "@notes", topic.Notes },
                     { "@log", topic.Log }
                 };
-                await TranExecuteAsync("update Topic set Name = @name, Notes = @notes, Log = @log where Id = @id", parameters).ConfigureAwait(false);
-                return await GetTopicAsync(topic.Id.Value).ConfigureAwait(false);
-            }
-            else
-            {
-                var parameters = new Dictionary<string, object>
+                    await TranExecuteAsync("update Topic set Name = @name, Notes = @notes, Log = @log where Id = @id", parameters).ConfigureAwait(false);
+                    return await GetTopicAsync(topic.Id.Value).ConfigureAwait(false);
+                }
+                else
+                {
+                    var parameters = new Dictionary<string, object>
                 {
                     { "@name", topic.Name },
                     { "@notes", topic.Notes },
                     { "@log", topic.Log }
                 };
-                var topicIds = await TranQueryAsync<Int64>("insert into Topic (Name, Notes, Log) values (@name, @notes, @log)"
-                    + $";select {GetLastAutoIncrementValue} as 'Id'",
-                    parameters).ConfigureAwait(false);
-                var topicId = topicIds.Single();
-                return await GetTopicAsync(topicId).ConfigureAwait(false);
+                    var topicIds = await TranQueryAsync<Int64>("insert into Topic (Name, Notes, Log) values (@name, @notes, @log)"
+                        + $";select {GetLastAutoIncrementValue} as 'Id'",
+                        parameters).ConfigureAwait(false);
+                    var topicId = topicIds.Single();
+                    return await GetTopicAsync(topicId).ConfigureAwait(false);
+                }
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
             }
         }
 
@@ -448,6 +475,11 @@ namespace Resonance.Repo.Database
                         { "@id", id },
                     }).ConfigureAwait(false);
                 await CommitTransactionAsync().ConfigureAwait(false);
+            }
+            catch (DbException dbEx)
+            {
+                await RollbackTransactionAsync().ConfigureAwait(false);
+                throw new RepoException(dbEx);
             }
             catch (Exception)
             {
@@ -494,6 +526,11 @@ namespace Resonance.Repo.Database
 
                 await CommitTransactionAsync().ConfigureAwait(false);
             }
+            catch (DbException dbEx)
+            {
+                await RollbackTransactionAsync().ConfigureAwait(false);
+                throw new RepoException(dbEx);
+            }
             catch (Exception)
             {
                 await RollbackTransactionAsync().ConfigureAwait(false);
@@ -521,58 +558,79 @@ namespace Resonance.Repo.Database
                     + " group by s.Id, ts.TopicId having count(*) > 0"; // Matching at least once
             }
 
-            var matchedSubscriptions = await TranQueryAsync<Identifier>(query, parameters).ConfigureAwait(false);
-            var subs = new List<Subscription>();
-            foreach (var id in matchedSubscriptions.Select(ms => ms.Id))
+            try
             {
-                subs.Add(await GetSubscriptionAsync(id).ConfigureAwait(false)); // Todo: run in parallel
-            }
+                var matchedSubscriptions = await TranQueryAsync<Identifier>(query, parameters).ConfigureAwait(false);
+                var subs = new List<Subscription>();
+                foreach (var id in matchedSubscriptions.Select(ms => ms.Id))
+                {
+                    subs.Add(await GetSubscriptionAsync(id).ConfigureAwait(false)); // Todo: run in parallel
+                }
 
-            return subs;
+                return subs;
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         public async Task<Subscription> GetSubscriptionAsync(Int64 id)
         {
-            var subscriptions = await TranQueryAsync<Subscription>("select * from Subscription where id = @id",
-                new Dictionary<string, object> { { "@id", id } }).ConfigureAwait(false);
-            var subscription = subscriptions.SingleOrDefault();
-            if (subscription == null)
-                return null;
-
-            // Add topic-subscriptions
-            var topicSubscriptions = await TranQueryAsync<TopicSubscription>("select * from TopicSubscription where SubscriptionId = @id",
-                new Dictionary<string, object> { { "@id", id } }).ConfigureAwait(false);
-            foreach (var topicSubscription in topicSubscriptions)
+            try
             {
-                var topicSubscriptionFilters = await TranQueryAsync<TopicSubscriptionFilter>("select * from TopicSubscriptionFilter where TopicSubscriptionId = @topicSubscriptionId",
-                    new Dictionary<string, object> { { "@topicSubscriptionId", topicSubscription.Id } }).ConfigureAwait(false);
-                topicSubscription.Filters = topicSubscriptionFilters.ToList();
-            }
-            subscription.TopicSubscriptions = topicSubscriptions.ToList();
+                var subscriptions = await TranQueryAsync<Subscription>("select * from Subscription where id = @id",
+                    new Dictionary<string, object> { { "@id", id } }).ConfigureAwait(false);
+                var subscription = subscriptions.SingleOrDefault();
+                if (subscription == null)
+                    return null;
 
-            return subscription;
+                // Add topic-subscriptions
+                var topicSubscriptions = await TranQueryAsync<TopicSubscription>("select * from TopicSubscription where SubscriptionId = @id",
+                    new Dictionary<string, object> { { "@id", id } }).ConfigureAwait(false);
+                foreach (var topicSubscription in topicSubscriptions)
+                {
+                    var topicSubscriptionFilters = await TranQueryAsync<TopicSubscriptionFilter>("select * from TopicSubscriptionFilter where TopicSubscriptionId = @topicSubscriptionId",
+                        new Dictionary<string, object> { { "@topicSubscriptionId", topicSubscription.Id } }).ConfigureAwait(false);
+                    topicSubscription.Filters = topicSubscriptionFilters.ToList();
+                }
+                subscription.TopicSubscriptions = topicSubscriptions.ToList();
+
+                return subscription;
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         public async Task<Subscription> GetSubscriptionByNameAsync(string name)
         {
-            var subscriptions = await TranQueryAsync<Subscription>("select * from Subscription where name = @name",
-                new Dictionary<string, object> { { "@name", name } }).ConfigureAwait(false);
-            var subscription = subscriptions.SingleOrDefault();
-            if (subscription == null)
-                return null;
-
-            // Add topic-subscriptions
-            var topicSubscriptions = await TranQueryAsync<TopicSubscription>("select * from TopicSubscription where SubscriptionId = @id",
-                new Dictionary<string, object> { { "@id", subscription.Id } }).ConfigureAwait(false);
-            foreach (var topicSubscription in topicSubscriptions)
+            try
             {
-                var topicSubscriptionFilters = await TranQueryAsync<TopicSubscriptionFilter>("select * from TopicSubscriptionFilter where TopicSubscriptionId = @topicSubscriptionId",
-                    new Dictionary<string, object> { { "@topicSubscriptionId", topicSubscription.Id } }).ConfigureAwait(false);
-                topicSubscription.Filters = topicSubscriptionFilters.ToList();
-            }
-            subscription.TopicSubscriptions = topicSubscriptions.ToList();
+                var subscriptions = await TranQueryAsync<Subscription>("select * from Subscription where name = @name",
+                    new Dictionary<string, object> { { "@name", name } }).ConfigureAwait(false);
+                var subscription = subscriptions.SingleOrDefault();
+                if (subscription == null)
+                    return null;
 
-            return subscription;
+                // Add topic-subscriptions
+                var topicSubscriptions = await TranQueryAsync<TopicSubscription>("select * from TopicSubscription where SubscriptionId = @id",
+                    new Dictionary<string, object> { { "@id", subscription.Id } }).ConfigureAwait(false);
+                foreach (var topicSubscription in topicSubscriptions)
+                {
+                    var topicSubscriptionFilters = await TranQueryAsync<TopicSubscriptionFilter>("select * from TopicSubscriptionFilter where TopicSubscriptionId = @topicSubscriptionId",
+                        new Dictionary<string, object> { { "@topicSubscriptionId", topicSubscription.Id } }).ConfigureAwait(false);
+                    topicSubscription.Filters = topicSubscriptionFilters.ToList();
+                }
+                subscription.TopicSubscriptions = topicSubscriptions.ToList();
+
+                return subscription;
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         public async Task<IEnumerable<SubscriptionSummary>> GetSubscriptionStatisticsAsync(DateTime periodStartUtc, DateTime periodEndUtc)
@@ -592,13 +650,21 @@ namespace Resonance.Repo.Database
                 + "	,(select count(*) from FailedSubscriptionEvent fse where fse.SubscriptionId = s.Id and fse.PublicationDateUtc >= @start and fse.FailedDateUtc <= @end and fse.Reason = 4) as 'FailedOther'"
                 + " from Subscription s"
                 + " group by s.Id";
-            var stats = await TranQueryAsync<SubscriptionSummary>(query, parameters).ConfigureAwait(false);
 
-            // Get subscriptions and enrich the statistics
-            var subscriptions = await GetSubscriptionsAsync().ConfigureAwait(false);
-            stats.ToList().ForEach(stat => stat.Subscription = subscriptions.Single(s => s.Id == stat.Id));
+            try
+            {
+                var stats = await TranQueryAsync<SubscriptionSummary>(query, parameters).ConfigureAwait(false);
 
-            return stats;
+                // Get subscriptions and enrich the statistics
+                var subscriptions = await GetSubscriptionsAsync().ConfigureAwait(false);
+                stats.ToList().ForEach(stat => stat.Subscription = subscriptions.Single(s => s.Id == stat.Id));
+
+                return stats;
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         public async Task<Topic> GetTopicAsync(Int64 id)
@@ -608,8 +674,15 @@ namespace Resonance.Repo.Database
                     { "@id", id },
                 };
 
-            var topics = await TranQueryAsync<Topic>("select * from Topic where id = @id", parameters).ConfigureAwait(false);
-            return topics.SingleOrDefault();
+            try
+            {
+                var topics = await TranQueryAsync<Topic>("select * from Topic where id = @id", parameters).ConfigureAwait(false);
+                return topics.SingleOrDefault();
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         public async Task<Topic> GetTopicByNameAsync(string name)
@@ -619,22 +692,36 @@ namespace Resonance.Repo.Database
                     { "@name", name },
                 };
 
-            var topics = await TranQueryAsync<Topic>("select * from Topic where name = @name", parameters).ConfigureAwait(false);
-            return topics.SingleOrDefault();
+            try
+            {
+                var topics = await TranQueryAsync<Topic>("select * from Topic where name = @name", parameters).ConfigureAwait(false);
+                return topics.SingleOrDefault();
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         public async Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null)
         {
-            if (partOfName != null)
+            try
             {
-                var parameters = new Dictionary<string, object>
+                if (partOfName != null)
+                {
+                    var parameters = new Dictionary<string, object>
                 {
                     { "@partOfName", $"%{partOfName}%"},
                 };
-                return await TranQueryAsync<Topic>("select * from Topic where Name like @partOfName", parameters).ConfigureAwait(false);
+                    return await TranQueryAsync<Topic>("select * from Topic where Name like @partOfName", parameters).ConfigureAwait(false);
+                }
+                else
+                    return await TranQueryAsync<Topic>("select * from Topic").ConfigureAwait(false);
             }
-            else
-                return await TranQueryAsync<Topic>("select * from Topic").ConfigureAwait(false);
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
         #endregion
 
@@ -645,26 +732,48 @@ namespace Resonance.Repo.Database
                 {
                     { "@payload", payload },
                 };
-            var ids = await TranQueryAsync<Int64>("insert into EventPayload (Payload) values (@payload)" +
-                $";select {GetLastAutoIncrementValue} as 'Id'",
-                parameters).ConfigureAwait(false);
-            return ids.SingleOrDefault();
+
+            try
+            {
+                var ids = await TranQueryAsync<Int64>("insert into EventPayload (Payload) values (@payload)" +
+                    $";select {GetLastAutoIncrementValue} as 'Id'",
+                    parameters).ConfigureAwait(false);
+                return ids.SingleOrDefault();
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         public async Task<string> GetPayloadAsync(Int64 id)
         {
-            var payloads = await TranQueryAsync<string>("select Payload from EventPayload where Id = @id",
-                new Dictionary<string, object>
-                {
+            try
+            {
+                var payloads = await TranQueryAsync<string>("select Payload from EventPayload where Id = @id",
+                    new Dictionary<string, object>
+                    {
                     { "@id", id },
-                }).ConfigureAwait(false);
-            return payloads.SingleOrDefault();
+                    }).ConfigureAwait(false);
+                return payloads.SingleOrDefault();
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         public async Task<int> DeletePayloadAsync(Int64 id)
         {
-            return await TranExecuteAsync("delete EventPayload where Id = @id",
-                new Dictionary<string, object> { { "@id", id } }).ConfigureAwait(false);
+            try
+            {
+                return await TranExecuteAsync("delete EventPayload where Id = @id",
+                    new Dictionary<string, object> { { "@id", id } }).ConfigureAwait(false);
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         protected async override Task<Int64> AddTopicEventAsync(TopicEvent topicEvent)
@@ -684,11 +793,19 @@ namespace Resonance.Repo.Database
                     { "@priority", topicEvent.Priority },
                     { "@payloadId", topicEvent.PayloadId },
                 };
-            var ids = await TranQueryAsync<Int64>("insert into TopicEvent (TopicId, EventName, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, Headers, Priority, PayloadId) values (@topicId, @eventName, @functionalKey, @publicationDateUtc, @expirationDateUtc, @headers, @priority, @payloadId)" +
-                $";select {GetLastAutoIncrementValue} as 'Id'",
-                parameters).ConfigureAwait(false);
 
-            return ids.Single();
+            try
+            {
+                var ids = await TranQueryAsync<Int64>("insert into TopicEvent (TopicId, EventName, FunctionalKey, PublicationDateUtc, ExpirationDateUtc, Headers, Priority, PayloadId) values (@topicId, @eventName, @functionalKey, @publicationDateUtc, @expirationDateUtc, @headers, @priority, @payloadId)" +
+                    $";select {GetLastAutoIncrementValue} as 'Id'",
+                    parameters).ConfigureAwait(false);
+
+                return ids.Single();
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         protected async override Task<Int64> AddSubscriptionEventAsync(SubscriptionEvent subscriptionEvent)
@@ -712,33 +829,50 @@ namespace Resonance.Repo.Database
                     { "@deliveryKey", subscriptionEvent.DeliveryKey },
                     { "@invisibleUntilUtc", subscriptionEvent.InvisibleUntilUtc },
                 };
-            var ids = await TranQueryAsync<Int64>("insert into SubscriptionEvent (SubscriptionId, TopicEventId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryDateUtc, DeliveryKey, InvisibleUntilUtc)"
-                + " values (@subscriptionId, @topicEventId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryDateUtc, @deliveryKey, @invisibleUntilUtc)"
-                + $";select {GetLastAutoIncrementValue} as 'Id'",
-                parameters).ConfigureAwait(false);
 
-            return ids.Single();
+            try
+            {
+                var ids = await TranQueryAsync<Int64>("insert into SubscriptionEvent (SubscriptionId, TopicEventId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, ExpirationDateUtc, DeliveryDelayedUntilUtc, DeliveryCount, DeliveryDateUtc, DeliveryKey, InvisibleUntilUtc)"
+                    + " values (@subscriptionId, @topicEventId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @expirationDateUtc, @deliveryDelayedUntilUtc, @deliveryCount, @deliveryDateUtc, @deliveryKey, @invisibleUntilUtc)"
+                    + $";select {GetLastAutoIncrementValue} as 'Id'",
+                    parameters).ConfigureAwait(false);
+
+                return ids.Single();
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         private async Task<SubscriptionEvent> GetSubscriptionEvent(Int64 id)
         {
-            var subs = await TranQueryAsync<SubscriptionEvent>("select se.*, s.Ordered from SubscriptionEvent se" + // Ordered flag included for efficiency
-                " join Subscription s on s.Id = se.SubscriptionId" +
-                " where se.Id = @id",
-                new Dictionary<string, object>
-                {
+            try
+            {
+                var subs = await TranQueryAsync<SubscriptionEvent>("select se.*, s.Ordered from SubscriptionEvent se" + // Ordered flag included for efficiency
+                    " join Subscription s on s.Id = se.SubscriptionId" +
+                    " where se.Id = @id",
+                    new Dictionary<string, object>
+                    {
                     { "@id", id },
-                }).ConfigureAwait(false);
-            return subs.SingleOrDefault();
+                    }).ConfigureAwait(false);
+                return subs.SingleOrDefault();
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         private async Task<int> AddConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
         {
-            var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
-            return await TranExecuteAsync("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, DeliveryCount, ConsumedDateUtc)" +
-                " values (@id, @subscriptionId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @deliveryCount, @consumedDateUtc)",
-                new Dictionary<string, object>
-                {
+            try
+            {
+                var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
+                return await TranExecuteAsync("insert into ConsumedSubscriptionEvent (Id, SubscriptionId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, DeliveryCount, ConsumedDateUtc)" +
+                    " values (@id, @subscriptionId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @deliveryCount, @consumedDateUtc)",
+                    new Dictionary<string, object>
+                    {
                 { "@id", subscriptionEvent.Id },
                 { "@subscriptionId", subscriptionEvent.SubscriptionId },
                 { "@eventName", subscriptionEvent.EventName },
@@ -749,18 +883,25 @@ namespace Resonance.Repo.Database
                 { "@deliveryDateUtc", subscriptionEvent.DeliveryDateUtc },
                 { "@deliveryCount", subscriptionEvent.DeliveryCount },
                 { "@consumedDateUtc", utcNow },
-                }).ConfigureAwait(false);
+                    }).ConfigureAwait(false);
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         public abstract Task<int> UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent);
 
         private async Task<int> AddFailedSubscriptionEvent(SubscriptionEvent subscriptionEvent, Reason reason)
         {
-            var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
-            return await TranExecuteAsync("insert into FailedSubscriptionEvent (Id, SubscriptionId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, DeliveryCount, FailedDateUtc, Reason, ReasonOther)" +
-                " values (@id, @subscriptionId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @deliveryCount, @failedDateUtc, @reason, @reasonOther)",
-                new Dictionary<string, object>
-                {
+            try
+            {
+                var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
+                return await TranExecuteAsync("insert into FailedSubscriptionEvent (Id, SubscriptionId, EventName, PublicationDateUtc, FunctionalKey, Priority, PayloadId, DeliveryDateUtc, DeliveryCount, FailedDateUtc, Reason, ReasonOther)" +
+                    " values (@id, @subscriptionId, @eventName, @publicationDateUtc, @functionalKey, @priority, @payloadId, @deliveryDateUtc, @deliveryCount, @failedDateUtc, @reason, @reasonOther)",
+                    new Dictionary<string, object>
+                    {
                     { "@id", subscriptionEvent.Id },
                     { "@subscriptionId", subscriptionEvent.SubscriptionId },
                     { "@eventName", subscriptionEvent.EventName },
@@ -773,7 +914,12 @@ namespace Resonance.Repo.Database
                     { "@failedDateUtc", utcNow },
                     { "@reason", (int)reason.Type },
                     { "@reasonOther", reason.ReasonText },
-                }).ConfigureAwait(false);
+                    }).ConfigureAwait(false);
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
         #endregion
 
@@ -793,7 +939,7 @@ namespace Resonance.Repo.Database
         {
             var multiple = consumableEventsIds.Count() > 1;
 
-            if (multiple && transactional)
+            if (transactional)
                 await BeginTransactionAsync().ConfigureAwait(false);
 
             try
@@ -807,7 +953,7 @@ namespace Resonance.Repo.Database
                         {
                             try
                             {
-                                await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey, multiple && transactional).ConfigureAwait(false);
+                                await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey, transactional).ConfigureAwait(false);
                             }
                             catch (Exception)
                             {
@@ -824,7 +970,7 @@ namespace Resonance.Repo.Database
                     {
                         try
                         {
-                            await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey, multiple).ConfigureAwait(false);
+                            await MarkConsumedAsync(ceId.Id, ceId.DeliveryKey, transactional).ConfigureAwait(false);
                         }
                         catch (Exception)
                         {
@@ -835,12 +981,19 @@ namespace Resonance.Repo.Database
                     }
                 }
 
-                if (multiple && transactional)
+                if (transactional)
                     await CommitTransactionAsync().ConfigureAwait(false);
+            }
+            catch (DbException dbEx)
+            {
+                if (transactional)
+                    await RollbackTransactionAsync().ConfigureAwait(false);
+
+                throw new RepoException(dbEx);
             }
             catch (Exception)
             {
-                if (multiple && transactional)
+                if (transactional)
                     await RollbackTransactionAsync().ConfigureAwait(false);
 
                 throw;
@@ -974,6 +1127,11 @@ namespace Resonance.Repo.Database
                 }
 
                 await CommitTransactionAsync().ConfigureAwait(false);
+            }
+            catch (DbException dbEx)
+            {
+                await RollbackTransactionAsync().ConfigureAwait(false);
+                throw new RepoException(dbEx);
             }
             catch (Exception)
             {

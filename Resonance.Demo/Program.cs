@@ -16,7 +16,7 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 2; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        private const int WORKER_COUNT = 5; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
         private const bool BATCHED = true;
         private const bool GENERATE_DATA = true; // Change to enable/disable the adding of data to the subscription
 
@@ -38,7 +38,7 @@ namespace Resonance.Demo
             {
                 Id = subscription1 != null ? subscription1.Id.Value : default(Int64?),
                 Name = "Demo Subscription 1",
-                MaxDeliveries = 2,
+                MaxDeliveries = 1,
                 DeliveryDelay = 3, // Deliverydelay, so that events cannot overtake eachother while publishing (because of IO latency of the DB)
                 Ordered = true,//!BATCHED, // Batched processing of ordered subscription is usually not very usefull
                 TopicSubscriptions = new List<TopicSubscription>
@@ -81,7 +81,11 @@ namespace Resonance.Demo
                             {
                                 await Task.Delay(1).ConfigureAwait(false);
                                 var fkAsString = i.ToString();
-                                await publisher.PublishAsync(topic1.Name, functionalKey: fkAsString, payload: "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"); // 100 bytes
+                                try
+                                {
+                                    await publisher.PublishAsync(topic1.Name, functionalKey: fkAsString, payload: "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"); // 100 bytes
+                                }
+                                catch (Exception) { } // Ignore repo-exceptions (probably deadlocks)
                             }
                             Console.WriteLine($"Run {i:D4} - Finish [{Thread.CurrentThread.ManagedThreadId}]");
                         }

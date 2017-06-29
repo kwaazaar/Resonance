@@ -10,7 +10,7 @@
     <AssemblyName>Resonance.Core</AssemblyName>
     <PackageId>Resonance.Core</PackageId>
     <PackageTags>pub;sub;esb;queue;topic;subscription;microservice;messaging;event;publish;subscribe;servicebus;mssql;mysql;mariadb;netcore</PackageTags>
-    <PackageReleaseNotes>PublicationDateUtc will now be determined by the database, when not set. This is done because of possible large (&gt;5sec) time differences on virtual machines, causing events to be processed in the wrong order.</PackageReleaseNotes>
+    <PackageReleaseNotes>Exception translation (RepoException is now used in most places instead of DbException).</PackageReleaseNotes>
     <PackageIconUrl>https://raw.githubusercontent.com/kwaazaar/Resonance/master/Resonance-Icon-64x64.png</PackageIconUrl>
     <PackageProjectUrl>https://github.com/kwaazaar/Resonance</PackageProjectUrl>
     <PackageLicenseUrl>https://raw.githubusercontent.com/kwaazaar/Resonance/master/LICENSE</PackageLicenseUrl>
@@ -24,6 +24,7 @@
     <GenerateAssemblyCopyrightAttribute>false</GenerateAssemblyCopyrightAttribute>
     <Version>0.8.2</Version>
     <AssemblyVersion>0.8.0.0</AssemblyVersion>
+    <FileVersion>0.8.3.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -39,11 +40,11 @@
   <ItemGroup>
     <PackageReference Include="Dapper" Version="1.50.2" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="1.1.2" />
-    <PackageReference Include="Newtonsoft.Json" Version="10.0.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard1.6' ">
-    <PackageReference Include="MySqlConnector" Version="0.20.0" />
+    <PackageReference Include="MySqlConnector" Version="0.21.0" />
     <PackageReference Include="System.Linq.Parallel" Version="4.3.0" />
   </ItemGroup>
 

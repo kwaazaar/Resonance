@@ -39,7 +39,8 @@ namespace Resonance.Repo.Database
                 return base.CanRetry(dbEx, attempts);
         }
 
-        protected override bool ParallelQueriesSupport { get { return _connStringBuilder.MultipleActiveResultSets; } } // 'MARS' must be enabled in the connectionstring
+        //protected override bool ParallelQueriesSupport { get { return _connStringBuilder.MultipleActiveResultSets; } } // 'MARS' must be enabled in the connectionstring
+        protected override bool ParallelQueriesSupport { get { return false; } } // Causes issues when using transactions
 
         public override string GetLastAutoIncrementValue
         {
@@ -48,9 +49,16 @@ namespace Resonance.Repo.Database
 
         public override async Task<DateTime> GetNowUtcAsync()
         {
-            var query = "select SYSUTCDATETIME();";
-            var dateTimes = await TranQueryAsync<DateTime>(query).ConfigureAwait(false);
-            return dateTimes.First();
+            try
+            {
+                var query = "select SYSUTCDATETIME();";
+                var dateTimes = await TranQueryAsync<DateTime>(query).ConfigureAwait(false);
+                return dateTimes.First();
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         public override async Task<int> UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
@@ -61,12 +69,19 @@ namespace Resonance.Repo.Database
                             " WHEN MATCHED THEN UPDATE SET PublicationDateUtc = @publicationDateUtc" +
                             " WHEN NOT MATCHED THEN INSERT(SubscriptionId, FunctionalKey, PublicationDateUtc) VALUES(source.SubscriptionId, source.FunctionalKey, @publicationDateUtc);";
 
-            return await TranExecuteAsync(query, new Dictionary<string, object>
+            try
             {
-                { "@subscriptionId", subscriptionEvent.SubscriptionId },
-                { "@functionalKey", subscriptionEvent.FunctionalKey },
-                { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
-            }).ConfigureAwait(false);
+                return await TranExecuteAsync(query, new Dictionary<string, object>
+                {
+                    { "@subscriptionId", subscriptionEvent.SubscriptionId },
+                    { "@functionalKey", subscriptionEvent.FunctionalKey },
+                    { "@publicationDateUtc", subscriptionEvent.PublicationDateUtc },
+                }).ConfigureAwait(false);
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         protected override async Task<IEnumerable<ConsumableEvent>> ConsumeNextForSubscription(Subscription subscription, int visibilityTimeout, int maxCount)
@@ -270,9 +285,16 @@ namespace Resonance.Repo.Database
                 + " , FailedDateUtc, Reason, ReasonOther)"
                 + " WHERE (SubscriptionEvent.ExpirationDateUtc IS NOT NULL AND SubscriptionEvent.ExpirationDateUtc < @utcNow AND SubscriptionEvent.InvisibleUntilUtc < @utcNow)";
             var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
-            var rowsAffected = await TranExecuteAsync(query, new { utcNow = utcNow }).ConfigureAwait(false);
 
-            return rowsAffected;
+            try
+            {
+                var rowsAffected = await TranExecuteAsync(query, new { utcNow = utcNow }).ConfigureAwait(false);
+                return rowsAffected;
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         private async Task<int> HouseKeeping_MaxDeliveriesReachedSubscriptionEvents()
@@ -290,11 +312,17 @@ namespace Resonance.Repo.Database
                 + " JOIN    Subscription s ON s.Id = se.SubscriptionId"
                 + " WHERE (s.MaxDeliveries > 0 AND se.DeliveryCount >= s.MaxDeliveries AND se.InvisibleUntilUtc < @utcNow)";
             var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
-            var rowsAffected = await TranExecuteAsync(query, new { utcNow = utcNow }).ConfigureAwait(false);
 
-            return rowsAffected;
+            try
+            {
+                var rowsAffected = await TranExecuteAsync(query, new { utcNow = utcNow }).ConfigureAwait(false);
+                return rowsAffected;
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
-
 
         private async Task<int> HouseKeeping_OvertakenSubscriptionEvents()
         {
@@ -311,10 +339,16 @@ namespace Resonance.Repo.Database
                 + " JOIN LastConsumedSubscriptionEvent lc ON  lc.SubscriptionId = se.SubscriptionId AND lc.FunctionalKey = se.FunctionalKey"
                 + " WHERE se.PublicationDateUtc < lc.PublicationDateUtc";
             var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
-            var rowsAffected = await TranExecuteAsync(query, new { utcNow = utcNow }).ConfigureAwait(false);
 
-            return rowsAffected;
+            try
+            {
+                var rowsAffected = await TranExecuteAsync(query, new { utcNow = utcNow }).ConfigureAwait(false);
+                return rowsAffected;
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
-
     }
 }
