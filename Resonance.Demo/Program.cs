@@ -16,8 +16,8 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 5; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
-        private const bool BATCHED = true;
+        private const int WORKER_COUNT = 1; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        private const bool BATCHED = false;
         private const bool GENERATE_DATA = true; // Change to enable/disable the adding of data to the subscription
 
         private static IServiceProvider serviceProvider;
@@ -32,15 +32,16 @@ namespace Resonance.Demo
             var consumer = serviceProvider.GetRequiredService<IEventConsumerAsync>();
 
             // Make sure the topic exists
-            var topic1 = publisher.GetTopicByNameAsync("Demo Topic 1").GetAwaiter().GetResult() ?? publisher.AddOrUpdateTopicAsync(new Topic { Name = "Demo Topic 1" }).GetAwaiter().GetResult();
+            var topic1 = publisher.GetTopicByNameAsync("Demo Topic 1").GetAwaiter().GetResult() ?? publisher.AddOrUpdateTopicAsync(new Topic { Name = "Demo Topic 1", Log = false }).GetAwaiter().GetResult();
             var subscription1 = consumer.GetSubscriptionByNameAsync("Demo Subscription 1").GetAwaiter().GetResult();
             subscription1 = consumer.AddOrUpdateSubscriptionAsync(new Subscription
             {
                 Id = subscription1 != null ? subscription1.Id.Value : default(Int64?),
                 Name = "Demo Subscription 1",
-                MaxDeliveries = 1,
-                DeliveryDelay = 3, // Deliverydelay, so that events cannot overtake eachother while publishing (because of IO latency of the DB)
-                Ordered = true,//!BATCHED, // Batched processing of ordered subscription is usually not very usefull
+                MaxDeliveries = 2, // Not too many delivery attempts
+                DeliveryDelay = 2, // Deliverydelay, so that events cannot overtake eachother while publishing (because of IO latency of the DB)
+                Ordered = !BATCHED, // Batched processing of ordered subscription is usually not very usefull
+                LogConsumed = false,
                 TopicSubscriptions = new List<TopicSubscription>
                 {
                     new TopicSubscription
@@ -118,7 +119,7 @@ namespace Resonance.Demo
                 eventConsumer: consumer,
                 subscriptionName: subscriptionName,
                 logger: serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<EventConsumptionWorker>(),
-                batchSize: batched ? 100 : 1,
+                batchSize: batched ? 300 : 1,
                 consumeModel: batched ? ConsumeModel.Batch : ConsumeModel.Single,
 
                 consumeAction: !batched ? async (ceW) =>
