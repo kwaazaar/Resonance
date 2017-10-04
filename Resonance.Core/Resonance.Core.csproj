@@ -10,7 +10,7 @@
     <AssemblyName>Resonance.Core</AssemblyName>
     <PackageId>Resonance.Core</PackageId>
     <PackageTags>pub;sub;esb;queue;topic;subscription;microservice;messaging;event;publish;subscribe;servicebus;mssql;mysql;mariadb;netcore</PackageTags>
-    <PackageReleaseNotes>Race-condition fix for expiring visibility timeouts on MsSql causing events to be overtaken.</PackageReleaseNotes>
+    <PackageReleaseNotes>Race-condition fix for expiring visibility timeouts on MsSql causing events to be overtaken, caching of topics and subscriptions (30 seconds) to prevent unnessecary dataaccess.</PackageReleaseNotes>
     <PackageIconUrl>https://raw.githubusercontent.com/kwaazaar/Resonance/master/Resonance-Icon-64x64.png</PackageIconUrl>
     <PackageProjectUrl>https://github.com/kwaazaar/Resonance</PackageProjectUrl>
     <PackageLicenseUrl>https://raw.githubusercontent.com/kwaazaar/Resonance/master/LICENSE</PackageLicenseUrl>
@@ -22,9 +22,9 @@
     <GenerateAssemblyTitleAttribute>false</GenerateAssemblyTitleAttribute>
     <GenerateAssemblyDescriptionAttribute>false</GenerateAssemblyDescriptionAttribute>
     <GenerateAssemblyCopyrightAttribute>false</GenerateAssemblyCopyrightAttribute>
-    <Version>0.8.4</Version>
+    <Version>0.8.5</Version>
     <AssemblyVersion>0.8.0.0</AssemblyVersion>
-    <FileVersion>0.8.4.0</FileVersion>
+    <FileVersion>0.8.5.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -39,6 +39,7 @@
 
   <ItemGroup>
     <PackageReference Include="Dapper" Version="1.50.2" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="1.1.2" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="1.1.2" />
     <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
   </ItemGroup>

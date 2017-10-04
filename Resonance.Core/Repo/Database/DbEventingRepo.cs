@@ -935,6 +935,12 @@ namespace Resonance.Repo.Database
             return await ConsumeNextForSubscription(subscription, visibilityTimeout, maxCount).ConfigureAwait(false);
         }
 
+        public async Task<IEnumerable<ConsumableEvent>> ConsumeNextAsync(Subscription subscription, int visibilityTimeout, int maxCount)
+        {
+            if (subscription == null) throw new ArgumentNullException("subscription");
+            return await ConsumeNextForSubscription(subscription, visibilityTimeout, maxCount).ConfigureAwait(false);
+        }
+
         public virtual async Task MarkConsumedAsync(IEnumerable<ConsumableEventId> consumableEventsIds, bool transactional = true)
         {
             var multiple = consumableEventsIds.Count() > 1;

@@ -97,6 +97,9 @@ namespace Resonance.Tests.Publishing
             
             // Assert
             Assert.Null(_publisher.GetTopic(addedTopicWithSubscriptions.Id.Value));
+
+            // Delete non-existing (should not fail)
+            _publisher.DeleteTopic(addedTopicWithSubscriptions.Id.Value, true);
         }
 
         [Fact]

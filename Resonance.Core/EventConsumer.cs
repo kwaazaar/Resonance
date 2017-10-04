@@ -5,16 +5,26 @@ using System.Threading.Tasks;
 using Resonance.Models;
 using Newtonsoft.Json;
 using Resonance.Repo;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Resonance
 {
     public class EventConsumer : IEventConsumer, IEventConsumerAsync
     {
-        private IEventingRepoFactory _repoFactory;
+        private readonly IEventingRepoFactory _repoFactory;
+        private readonly TimeSpan _cacheDuration;
+
+        protected static IMemoryCache subscriptionCache = new MemoryCache(new MemoryCacheOptions());
 
         public EventConsumer(IEventingRepoFactory repoFactory)
+            : this(repoFactory, TimeSpan.FromSeconds(30))
+        {
+        }
+
+        public EventConsumer(IEventingRepoFactory repoFactory, TimeSpan cacheDuration)
         {
             _repoFactory = repoFactory;
+            _cacheDuration = cacheDuration;
         }
 
         #region Sync
@@ -84,13 +94,24 @@ namespace Resonance
         public async Task<Subscription> AddOrUpdateSubscriptionAsync(Subscription subscription)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return await repo.AddOrUpdateSubscriptionAsync(subscription).ConfigureAwait(false);
+            {
+                var sub = await repo.AddOrUpdateSubscriptionAsync(subscription).ConfigureAwait(false);
+                UpdateSubscriptionCache(sub);
+                return sub;
+            }
         }
 
         public async Task DeleteSubscriptionAsync(Int64 id)
         {
             using (var repo = _repoFactory.CreateRepo())
-                await repo.DeleteSubscriptionAsync(id).ConfigureAwait(false);
+            {
+                var sub = await repo.GetSubscriptionAsync(id).ConfigureAwait(false);
+                if (sub != null)
+                {
+                    await repo.DeleteSubscriptionAsync(id).ConfigureAwait(false);
+                    UpdateSubscriptionCache(sub, deleted: true);
+                }
+            }
         }
 
         public async Task<Subscription> GetSubscriptionAsync(Int64 id)
@@ -99,10 +120,15 @@ namespace Resonance
                 return await repo.GetSubscriptionAsync(id).ConfigureAwait(false);
         }
 
-        public async Task<Subscription> GetSubscriptionByNameAsync(string name)
+        public Task<Subscription> GetSubscriptionByNameAsync(string name)
         {
-            using (var repo = _repoFactory.CreateRepo())
-                return await repo.GetSubscriptionByNameAsync(name).ConfigureAwait(false);
+            var sub = subscriptionCache.GetOrCreateAsync<Subscription>(name, async (s) =>
+            {
+                using (var repo = _repoFactory.CreateRepo())
+                    return await repo.GetSubscriptionByNameAsync(name).ConfigureAwait(false);
+            });
+
+            return sub;
         }
 
         public async Task<IEnumerable<Subscription>> GetSubscriptionsAsync(Int64? topicId = null)
@@ -119,8 +145,11 @@ namespace Resonance
 
         public async Task<IEnumerable<ConsumableEvent>> ConsumeNextAsync(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
         {
+            var sub = await GetSubscriptionByNameAsync(subscriptionName).ConfigureAwait(false);
+            if (sub == null) throw new ArgumentException($"No subscription with this name exists: {subscriptionName}");
+
             using (var repo = _repoFactory.CreateRepo())
-                return await repo.ConsumeNextAsync(subscriptionName, visibilityTimeout, maxCount).ConfigureAwait(false);
+                return await repo.ConsumeNextAsync(sub, visibilityTimeout, maxCount).ConfigureAwait(false);
         }
 
         public async Task<IEnumerable<ConsumableEvent<T>>> ConsumeNextAsync<T>(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
@@ -169,5 +198,17 @@ namespace Resonance
                 await repo.PerformHouseKeepingTasksAsync().ConfigureAwait(false);
         }
         #endregion
+
+        private void UpdateSubscriptionCache(Subscription sub, bool deleted = false)
+        {
+            if (deleted)
+            {
+                subscriptionCache.Remove(sub.Name);
+            }
+            else
+            {
+                subscriptionCache.Set<Subscription>(sub.Name, sub, _cacheDuration);
+            }
+        }
     }
 }

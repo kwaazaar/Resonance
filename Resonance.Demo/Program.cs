@@ -41,7 +41,7 @@ namespace Resonance.Demo
                 MaxDeliveries = 2, // Not too many delivery attempts
                 DeliveryDelay = 2, // Deliverydelay, so that events cannot overtake eachother while publishing (because of IO latency of the DB)
                 Ordered = !BATCHED, // Batched processing of ordered subscription is usually not very usefull
-                LogConsumed = false,
+                LogConsumed = true,
                 TopicSubscriptions = new List<TopicSubscription>
                 {
                     new TopicSubscription

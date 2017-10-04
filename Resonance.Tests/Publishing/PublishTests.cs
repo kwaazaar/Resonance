@@ -304,6 +304,7 @@ namespace Resonance.Tests.Publishing
             sub1.TopicSubscriptions[0].Filtered = false;
             sub1 = _consumer.AddOrUpdateSubscription(sub1);
             Assert.False(sub1.TopicSubscriptions[0].Filtered);
+            _publisher.AddOrUpdateTopic(topic1); // To make sure cached subscription-config is cleared
 
             var te3 = _publisher.Publish(topicName, functionalKey: "3", headers: new Dictionary<string, string> { });
             var se3 = _consumer.ConsumeNext(sub1.Name).SingleOrDefault();
@@ -361,6 +362,7 @@ namespace Resonance.Tests.Publishing
             sub1.TopicSubscriptions[0].Filtered = false;
             sub1 = _consumer.AddOrUpdateSubscription(sub1);
             Assert.False(sub1.TopicSubscriptions[0].Filtered);
+            _publisher.AddOrUpdateTopic(topic1); // To make sure cached subscription-config is cleared
 
             var te4 = _publisher.Publish(topicName, functionalKey: "4", headers: new Dictionary<string, string> { { "Headr1", "HdrValue" }, { "Headr2", "HdrValue" } }); // We (ab)use functionalkey for correlation
             var te5 = _publisher.Publish(topicName, functionalKey: "5", headers: new Dictionary<string, string> { }); // Absent

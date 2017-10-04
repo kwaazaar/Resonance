@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Resonance.Models;
 using Newtonsoft.Json;
 using Resonance.Repo;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Resonance
 {
@@ -12,6 +13,10 @@ namespace Resonance
     {
         private readonly IEventingRepoFactory _repoFactory;
         private readonly DateTimeProvider _dtProvider;
+        private readonly TimeSpan _cacheDuration;
+
+        protected static IMemoryCache topicCache = new MemoryCache(new MemoryCacheOptions());
+        protected static IMemoryCache topicSubscriptionCache = new MemoryCache(new MemoryCacheOptions());
 
         public EventPublisher(IEventingRepoFactory repoFactory)
             : this(repoFactory, DateTimeProvider.Repository)
@@ -19,9 +24,15 @@ namespace Resonance
         }
 
         public EventPublisher(IEventingRepoFactory repoFactory, DateTimeProvider dtProvider)
+            : this(repoFactory, dtProvider, TimeSpan.FromSeconds(30))
+        {
+        }
+
+        public EventPublisher(IEventingRepoFactory repoFactory, DateTimeProvider dtProvider, TimeSpan cacheDuration)
         {
             _repoFactory = repoFactory;
             _dtProvider = dtProvider;
+            _cacheDuration = cacheDuration;
         }
 
         #region Sync
@@ -70,13 +81,24 @@ namespace Resonance
         public async Task<Topic> AddOrUpdateTopicAsync(Topic topic)
         {
             using (var repo = _repoFactory.CreateRepo())
-                return await repo.AddOrUpdateTopicAsync(topic).ConfigureAwait(false);
+            {
+                var newTopic = await repo.AddOrUpdateTopicAsync(topic).ConfigureAwait(false);
+                UpdateTopicCache(newTopic);
+                return newTopic;
+            }
         }
 
         public async Task DeleteTopicAsync(Int64 id, bool inclSubscriptions)
         {
             using (var repo = _repoFactory.CreateRepo())
-                await repo.DeleteTopicAsync(id, inclSubscriptions).ConfigureAwait(false);
+            {
+                var topic = await GetTopicAsync(id).ConfigureAwait(false);
+                if (topic != null)
+                {
+                    await repo.DeleteTopicAsync(id, inclSubscriptions).ConfigureAwait(false);
+                    UpdateTopicCache(topic, deleted: true);
+                }
+            }
         }
 
         public async Task<Topic> GetTopicAsync(Int64 id)
@@ -85,10 +107,15 @@ namespace Resonance
                 return await repo.GetTopicAsync(id).ConfigureAwait(false);
         }
 
-        public async Task<Topic> GetTopicByNameAsync(string name)
+        public Task<Topic> GetTopicByNameAsync(string name)
         {
-            using (var repo = _repoFactory.CreateRepo())
-                return await repo.GetTopicByNameAsync(name).ConfigureAwait(false);
+            var topic = topicCache.GetOrCreateAsync<Topic>(name, async (t) =>
+            {
+                using (var repo = _repoFactory.CreateRepo())
+                    return await repo.GetTopicByNameAsync(name).ConfigureAwait(false);
+            });
+
+            return topic;
         }
 
         public async Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null)
@@ -97,18 +124,29 @@ namespace Resonance
                 return await repo.GetTopicsAsync(partOfName).ConfigureAwait(false);
         }
 
+        private Task<List<Subscription>> GetTopicSubscriptionsAsync(Int64 topicId)
+        {
+            var subs = topicSubscriptionCache.GetOrCreateAsync<List<Subscription>>(topicId, async (t) =>
+            {
+                using (var repo = _repoFactory.CreateRepo())
+                    return (await repo.GetSubscriptionsAsync(topicId: topicId).ConfigureAwait(false)).ToList();
+            });
+
+            return subs;
+        }
+
         public async Task<TopicEvent> PublishAsync(string topicName, string eventName = null, DateTime? publicationDateUtc = default(DateTime?), DateTime? deliveryDelayedUntilUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, string payload = null)
         {
             using (var repo = _repoFactory.CreateRepo())
             {
-                var topic = await repo.GetTopicByNameAsync(topicName).ConfigureAwait(false);
+                var topic = await GetTopicByNameAsync(topicName).ConfigureAwait(false);
                 if (topic == null)
                     throw new ArgumentException($"Topic with name {topicName} not found", "topicName");
 
                 // Store payload (outside transaction, no need to lock right now already)
                 var payloadId = (payload != null) ? await repo.StorePayloadAsync(payload).ConfigureAwait(false) : default(Int64?);
 
-                var subscriptions = await repo.GetSubscriptionsAsync(topicId: topic.Id).ConfigureAwait(false);
+                var subscriptions = await GetTopicSubscriptionsAsync(topic.Id.Value).ConfigureAwait(false);
 
                 var eventNameToUse = eventName;
                 if (eventNameToUse == null && headers != null)
@@ -229,5 +267,32 @@ namespace Resonance
                 return (filter.MatchExpression.Equals(headerValue, StringComparison.OrdinalIgnoreCase) == notMask);
             }
         }
+
+
+        private void UpdateTopicCache(Topic topic, bool deleted = false)
+        {
+            if (deleted)
+            {
+                topicCache.Remove(topic.Name);
+            }
+            else
+            {
+                topicCache.Set<Topic>(topic.Name, topic, _cacheDuration);
+            }
+            UpdateTopicSubscriptionsCache(topic.Id.Value, null); // Always invalidate subscriptions
+        }
+
+        private void UpdateTopicSubscriptionsCache(Int64 topicId, List<Subscription> subs)
+        {
+            if (subs == null || subs.Count == 0)
+            {
+                topicSubscriptionCache.Remove(topicId);
+            }
+            else
+            {
+                topicSubscriptionCache.Set<List<Subscription>>(topicId, subs, _cacheDuration);
+            }
+        }
+
     }
 }
