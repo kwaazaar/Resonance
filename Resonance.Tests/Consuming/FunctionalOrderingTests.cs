@@ -16,8 +16,53 @@ namespace Resonance.Tests.Consuming
 
         public FunctionalOrderingTests(EventingRepoFactoryFixture fixture)
         {
-            _publisher = new EventPublisher(fixture.RepoFactory);
+            _publisher = new EventPublisher(fixture.RepoFactory, DateTimeProvider.Repository);
             _consumer = new EventConsumer(fixture.RepoFactory);
+        }
+
+        [Fact]
+        public void RetryOnVisibilityTimeout()
+        {
+            // Arrange
+            var topicName = "Ordered.VisibilityTimemout";
+            var subName = topicName + "_Sub1";
+            var topic = _publisher.AddOrUpdateTopic(new Topic { Name = topicName });
+            var sub1 = _consumer.AddOrUpdateSubscription(new Subscription
+            {
+                Name = subName,
+                Ordered = true,
+                DeliveryDelay = 1,
+                TimeToLive = 60,
+                MaxDeliveries = 0,
+                TopicSubscriptions = new List<TopicSubscription> { new TopicSubscription { TopicId = topic.Id.Value, Enabled = true } },
+            });
+
+            var publishedDateUtcBaseLine = DateTime.UtcNow.AddSeconds(-10); // Explicitly setting publicationdates to make sure none are the same!
+            _publisher.Publish(topicName, payload: "1", functionalKey: "1", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(1));
+            _publisher.Publish(topicName, payload: "2", functionalKey: "1", publicationDateUtc: publishedDateUtcBaseLine.AddSeconds(2));
+
+            var visibilityTimeout = 1;
+            var e = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
+            Assert.Equal("1", e.Payload);
+            e = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
+            Assert.Null(e); // event(payload) 2 has same functional key and should not be delivered yet
+
+            // Try several times to make sure we don't run into race conditions
+            for (int attempt = 0; attempt < 20; attempt++)
+            {
+                // Now wait until p1 expires
+                do
+                {
+                    Thread.Sleep(2); // Not too long
+                    e = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
+                } while (e == null);
+                Assert.Equal("1", e.Payload); // p1 should be delivered once again!
+            }
+
+            // Now mark it consumed and get the next event
+            _consumer.MarkConsumed(e.Id, e.DeliveryKey); // p1 should be gone, so p2 can be delivered
+            e = _consumer.ConsumeNext(subName, visibilityTimeout: visibilityTimeout).SingleOrDefault();
+            Assert.Equal("2", e.Payload); // p2 should now be delivered, since p1 has been consumed on the second attempt
         }
 
         [Fact]

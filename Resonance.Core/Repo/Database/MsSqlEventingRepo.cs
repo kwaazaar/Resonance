@@ -112,9 +112,9 @@ namespace Resonance.Repo.Database
                             + " from SubscriptionEvent se"
                             + " join Subscription s on s.Id = se.SubscriptionId" // Needed for MaxRetries
                             + " where se.SubscriptionId = @subscriptionId"
-                            + " and se.DeliveryDelayedUntilUtc < @utcNow" // Must be allowed to be delivered
+                            + " and se.DeliveryDelayedUntilUtc <= @utcNow" // Must be allowed to be delivered
                             + " and se.ExpirationDateUtc > @utcNow" // Must not yet have expired
-                            + " and se.InvisibleUntilUtc < @utcNow" // Must not be 'locked'/made invisible by other consumer
+                            + " and se.InvisibleUntilUtc <= @utcNow" // Must not be 'locked'/made invisible by other consumer
                             + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
                             + " order by se.Priority ASC, se.PublicationDateUtc ASC" // Warning: prio can mess everything up!
                             + ") UPDATE DE"
@@ -190,9 +190,9 @@ namespace Resonance.Repo.Database
                                 + " left join LastConsumedSubscriptionEvent lc" // For functional ordering
                                 + "   on lc.SubscriptionId = se.SubscriptionId and lc.FunctionalKey = se.FunctionalKey"
                                 + " where se.SubscriptionId = @subscriptionId"
-                                + " and se.DeliveryDelayedUntilUtc < @utcNow" // Must be allowed to be delivered
+                                + " and se.DeliveryDelayedUntilUtc <= @utcNow" // Must be allowed to be delivered
                                 + " and se.ExpirationDateUtc > @utcNow" // Must not yet have expired
-                                + " and se.InvisibleUntilUtc < @utcNow" // Must not be 'locked'/made invisible by other consumer
+                                + " and se.InvisibleUntilUtc <= @utcNow" // Must not be 'locked'/made invisible by other consumer
                                 + " and (s.MaxDeliveries = 0 OR s.MaxDeliveries > se.DeliveryCount)" // Must not have reached max. allowed delivery attempts
                                 + "	and	seInv.Id IS NULL" // Geen in behandeling nu
                                 + " and	(lc.SubscriptionId IS NULL OR (lc.PublicationDateUtc <= se.PublicationDateUtc))" // Newer than last published

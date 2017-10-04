@@ -235,9 +235,9 @@ namespace Resonance.Repo.Database
                             "   from SubscriptionEvent seInner" +
                             "   join Subscription s on s.Id = seInner.SubscriptionId" +
                             "   where seInner.SubscriptionId = @subscriptionId" +
-                            "   and seInner.DeliveryDelayedUntilUtc < @utcNow" +
+                            "   and seInner.DeliveryDelayedUntilUtc <= @utcNow" +
                             "   and seInner.ExpirationDateUtc > @utcNow" +
-                            "   and seInner.InvisibleUntilUtc < @utcNow" +
+                            "   and seInner.InvisibleUntilUtc <= @utcNow" +
                             "   and(s.MaxDeliveries = 0 OR s.MaxDeliveries > seInner.DeliveryCount)" +
                             "   order by seInner.Priority ASC, seInner.PublicationDateUtc ASC" +
                             "   limit 1) tmp on tmp.Id = se.Id and tmp.DeliveryKey = se.DeliveryKey" + // FOR UPDATE removed due to locking issues
@@ -280,9 +280,9 @@ namespace Resonance.Repo.Database
                                 "     and		seInv.Id != se.Id" +
                                 " where		se.SubscriptionId = @subscriptionId" +
                                 "     and		seInv.Id IS NULL" +
-                                "     and		se.DeliveryDelayedUntilUtc < @utcNow" +
+                                "     and		se.DeliveryDelayedUntilUtc <= @utcNow" +
                                 "     and		se.ExpirationDateUtc > @utcNow" +
-                                "     and		se.InvisibleUntilUtc < @utcNow" +
+                                "     and		se.InvisibleUntilUtc <= @utcNow" +
                                 "     and		(	s.MaxDeliveries = 0" +
                                 "             OR	se.DeliveryCount < s.MaxDeliveries)" +
                                 "     and		(	(se.PublicationDateUtc >= lc.PublicationDateUtc)" +
