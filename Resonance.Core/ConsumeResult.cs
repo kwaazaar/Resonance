@@ -63,5 +63,14 @@ namespace Resonance
                 Reason = reason,
             };
         }
+
+        /// <summary>
+        /// Returns the value for ResultType as string.
+        /// </summary>
+        /// <returns></returns>
+        public override string ToString()
+        {
+            return ResultType.ToString();
+        }
     }
 }

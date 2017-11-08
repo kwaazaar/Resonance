@@ -552,10 +552,13 @@ namespace Resonance
                 result = ConsumeResult.Failed(procEx.ToString());
             }
 
+            LogTrace("Processing done for event with id {Id} and functional key {FunctionalKey}. Result: {result}",
+                ce.Id, ce.FunctionalKey != null ? ce.FunctionalKey : "n/a", result);
+
             switch (result.ResultType)
             {
                 case ConsumeResultType.Succeeded:
-                    { 
+                    {
                         bool markedConsumed = false;
 
                         try
