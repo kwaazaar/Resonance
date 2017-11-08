@@ -377,7 +377,8 @@ namespace Resonance
 #endif
                     }
                 }
-                this._cancellationToken.Dispose();
+                this._cancellationToken?.Dispose();
+                this._cancellationToken = null;
             }
             this._internalTask = null;
         }

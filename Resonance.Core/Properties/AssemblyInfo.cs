@@ -12,7 +12,7 @@ using System.Runtime.InteropServices;
 
 
 [assembly: AssemblyTitle("Resonance")]
-[assembly: AssemblyDescription("Eventing library, with support for MsSql and MySql. Ideal for implementing CQRS, business events, pub - sub, microservices, etc.")]
+[assembly: AssemblyDescription("Messaging library, with support for MsSql and MySql. Ideal for implementing pub/sub messaging for distributing (business) events for example in microservices architectures (eventual consistency), etc.")]
 [assembly: AssemblyCopyright("Copyright © 2017 - Robert te Kaat")]
 
 // Setting ComVisible to false makes the types in this assembly not visible

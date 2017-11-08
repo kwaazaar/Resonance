@@ -1,7 +1,6 @@
 ![Resonance](https://github.com/kwaazaar/Resonance/blob/master/Resonance-Icon-64x64.png "Resonance") [![Build status](https://ci.appveyor.com/api/projects/status/3wu0str4v3e8hgx4/branch/master?svg=true)](https://ci.appveyor.com/project/RobertTeKaat/resonance/branch/master) [![NuGet](https://img.shields.io/nuget/v/Resonance.Core.svg?maxAge=300)](https://www.nuget.org/packages/Resonance.Core/) [![Docker Pulls](https://img.shields.io/docker/pulls/kwaazaar/resonance.svg)](https://hub.docker.com/r/kwaazaar/resonance/)
 #Resonance
-Messaging library, supporting pub-sub, using MS SQL Server or MySql Server for storage.
-Ideal for implementing a (business) event driven architecture, CQRS/EVS, pub-sub, microservices, etc.
+Messaging library, with support for MsSql and MySql. Ideal for implementing pub/sub messaging for distributing (business) events for example in microservices architectures (eventual consistency), etc.
 
 **Core features:**
 * Pub-sub (using topics and subscriptions)
@@ -11,9 +10,10 @@ Ideal for implementing a (business) event driven architecture, CQRS/EVS, pub-sub
 * Delayed delivery
 * Message expiration (time to live), on both topic and subscriptions
 * Max-deliveries (per subscription) to maximize the number of retries/redeliveries
-* Filtered subscriptions (only matched messages go through)
+* Filtered subscriptions (only matched messages go through to subscription)
+* Batched processing
 * Targets both .NET Core and the regular .NET Framework (4.5.2)
-* Supports both Microsoft SQL Server (2012+ and SQL Azure) and MySql (5.5+)
+* Supports both Microsoft SQL Server (2012+ and SQL Azure) and MySql (5.7+)
 * ASP.NET Core REST-api supporting all functionality
  
 ## How to get it ##
