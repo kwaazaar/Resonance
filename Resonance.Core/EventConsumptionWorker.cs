@@ -285,6 +285,7 @@ namespace Resonance
         {
             try
             {
+                LogTrace("Retrieving {batchSize} event(s) to process", this._batchSize);
                 var workitems = await this.TryGetWork(this._batchSize).ConfigureAwait(false);
                 if (workitems == null || (workitems.Count() == 0)) // No result or empty list
                 {
@@ -303,7 +304,7 @@ namespace Resonance
                     {
                         if (workitems.Count() > 1)
                         {
-                            LogTrace("Processing {items} events in parallel.", workitems.Count());
+                            LogTrace("Processing {itemCount} events in parallel.", workitems.Count());
                             workitems.AsParallel().ForAll(ce => // AsParallel takes care of partitioning, resulting in using less threads than Parallal.ForEach, but still fast enough.
                                 Task.Run(async () => // Threadpool task to wait for async parts in inner task (ExecuteWork)
                                 {
@@ -319,6 +320,7 @@ namespace Resonance
                         await this.ExecuteWork(workitems); // Execute all work in a batch
                     }
 
+                    LogTrace("Finished processing {itemCount} event(s)", workitems.Count());
                     this.BackOff(); // Using backoff here as well to pause for minBackoffDelay between batches
                 }
             }
