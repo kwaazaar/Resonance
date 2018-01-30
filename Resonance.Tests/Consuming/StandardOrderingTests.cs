@@ -16,8 +16,8 @@ namespace Resonance.Tests.Consuming
 
         public StandardOrderingTests(EventingRepoFactoryFixture fixture)
         {
-            _publisher = new EventPublisher(fixture.RepoFactory);
-            _consumer = new EventConsumer(fixture.RepoFactory, TimeSpan.Zero, SafeExecOptions.NoRetries); // To test explicit behavior, retries get in the way
+            _publisher = new EventPublisher(fixture.RepoFactory, DateTimeProvider.Repository, TimeSpan.Zero, SafeExecOptions.NoRetries);
+            _consumer = new EventConsumer(fixture.RepoFactory, TimeSpan.Zero, SafeExecOptions.NoRetries);
         }
 
         [Fact]

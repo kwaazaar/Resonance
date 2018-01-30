@@ -14,6 +14,7 @@ namespace Resonance
         private readonly IEventingRepoFactory _repoFactory;
         private readonly DateTimeProvider _dtProvider;
         private readonly TimeSpan _cacheDuration;
+        private readonly SafeExecOptions _safeExecOptions;
 
         protected static IMemoryCache topicCache = new MemoryCache(new MemoryCacheOptions());
         protected static IMemoryCache topicSubscriptionCache = new MemoryCache(new MemoryCacheOptions());
@@ -29,10 +30,16 @@ namespace Resonance
         }
 
         public EventPublisher(IEventingRepoFactory repoFactory, DateTimeProvider dtProvider, TimeSpan cacheDuration)
+            : this(repoFactory, dtProvider, cacheDuration, SafeExecOptions.Default)
+        {
+        }
+
+        public EventPublisher(IEventingRepoFactory repoFactory, DateTimeProvider dtProvider, TimeSpan cacheDuration, SafeExecOptions safeExecOptions)
         {
             _repoFactory = repoFactory;
             _dtProvider = dtProvider;
             _cacheDuration = cacheDuration;
+            _safeExecOptions = safeExecOptions;
         }
 
         #region Sync
@@ -80,56 +87,46 @@ namespace Resonance
         #region Async
         public async Task<Topic> AddOrUpdateTopicAsync(Topic topic)
         {
-            using (var repo = _repoFactory.CreateRepo())
-            {
-                var newTopic = await repo.AddOrUpdateTopicAsync(topic).ConfigureAwait(false);
-                UpdateTopicCache(newTopic);
-                return newTopic;
-            }
+            var newTopic = await _repoFactory.SafeExecAsync(r => r.AddOrUpdateTopicAsync(topic), _safeExecOptions);
+            UpdateTopicCache(newTopic);
+            return newTopic;
         }
 
         public async Task DeleteTopicAsync(Int64 id, bool inclSubscriptions)
         {
-            using (var repo = _repoFactory.CreateRepo())
+            var topic = await GetTopicAsync(id).ConfigureAwait(false);
+            if (topic != null)
             {
-                var topic = await GetTopicAsync(id).ConfigureAwait(false);
-                if (topic != null)
-                {
-                    await repo.DeleteTopicAsync(id, inclSubscriptions).ConfigureAwait(false);
-                    UpdateTopicCache(topic, deleted: true);
-                }
+                await _repoFactory.SafeExecAsync(r => r.DeleteTopicAsync(id, inclSubscriptions), _safeExecOptions);
+                UpdateTopicCache(topic, deleted: true);
             }
         }
 
-        public async Task<Topic> GetTopicAsync(Int64 id)
+        public Task<Topic> GetTopicAsync(Int64 id)
         {
-            using (var repo = _repoFactory.CreateRepo())
-                return await repo.GetTopicAsync(id).ConfigureAwait(false);
+            return _repoFactory.SafeExecAsync(r => r.GetTopicAsync(id), _safeExecOptions);
         }
 
         public Task<Topic> GetTopicByNameAsync(string name)
         {
             var topic = topicCache.GetOrCreateAsync<Topic>(name, async (t) =>
             {
-                using (var repo = _repoFactory.CreateRepo())
-                    return await repo.GetTopicByNameAsync(name).ConfigureAwait(false);
+                return await _repoFactory.SafeExecAsync(r => r.GetTopicByNameAsync(name), _safeExecOptions);
             });
 
             return topic;
         }
 
-        public async Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null)
+        public Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null)
         {
-            using (var repo = _repoFactory.CreateRepo())
-                return await repo.GetTopicsAsync(partOfName).ConfigureAwait(false);
+            return _repoFactory.SafeExecAsync(r => r.GetTopicsAsync(partOfName), _safeExecOptions);
         }
 
         private Task<List<Subscription>> GetTopicSubscriptionsAsync(Int64 topicId)
         {
             var subs = topicSubscriptionCache.GetOrCreateAsync<List<Subscription>>(topicId, async (t) =>
             {
-                using (var repo = _repoFactory.CreateRepo())
-                    return (await repo.GetSubscriptionsAsync(topicId: topicId).ConfigureAwait(false)).ToList();
+                return (await _repoFactory.SafeExecAsync(r => r.GetSubscriptionsAsync(topicId: topicId), _safeExecOptions)).ToList();
             });
 
             return subs;
@@ -137,79 +134,75 @@ namespace Resonance
 
         public async Task<TopicEvent> PublishAsync(string topicName, string eventName = null, DateTime? publicationDateUtc = default(DateTime?), DateTime? deliveryDelayedUntilUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, string payload = null)
         {
-            using (var repo = _repoFactory.CreateRepo())
+            var topic = await GetTopicByNameAsync(topicName).ConfigureAwait(false);
+            if (topic == null)
+                throw new ArgumentException($"Topic with name {topicName} not found", "topicName");
+
+            // Store payload (outside transaction, no need to lock right now already)
+            var payloadId = (payload != null) ? await _repoFactory.SafeExecAsync(r => r.StorePayloadAsync(payload), _safeExecOptions) : default(Int64?);
+
+            var subscriptions = await GetTopicSubscriptionsAsync(topic.Id.Value).ConfigureAwait(false);
+
+            var eventNameToUse = eventName;
+            if (eventNameToUse == null && headers != null)
             {
-                var topic = await GetTopicByNameAsync(topicName).ConfigureAwait(false);
-                if (topic == null)
-                    throw new ArgumentException($"Topic with name {topicName} not found", "topicName");
+                var eventNameHeader = headers.FirstOrDefault(h => h.Key.Equals("EventName", StringComparison.OrdinalIgnoreCase));
+                if (eventNameHeader.Key != null)
+                    eventNameToUse = eventNameHeader.Value;
+            }
 
-                // Store payload (outside transaction, no need to lock right now already)
-                var payloadId = (payload != null) ? await repo.StorePayloadAsync(payload).ConfigureAwait(false) : default(Int64?);
+            var utcNow = _dtProvider == DateTimeProvider.Repository ? await _repoFactory.SafeExecAsync(r => r.GetNowUtcAsync(), _safeExecOptions) : DateTime.UtcNow;
 
-                var subscriptions = await GetTopicSubscriptionsAsync(topic.Id.Value).ConfigureAwait(false);
+            // Store topic event
+            var newTopicEvent = new TopicEvent
+            {
+                TopicId = topic.Id.Value,
+                EventName = eventNameToUse,
+                PublicationDateUtc = publicationDateUtc.GetValueOrDefault(utcNow),
+                FunctionalKey = functionalKey ?? string.Empty,
+                Priority = priority,
+                ExpirationDateUtc = expirationDateUtc.GetValueOrDefault(BaseEventingRepo.MaxDateTime),
+                Headers = headers,
+                PayloadId = payloadId,
+            };
 
-                var eventNameToUse = eventName;
-                if (eventNameToUse == null && headers != null)
+            // Determine for which subscriptions the topic must be published
+            var subscriptionsMatching = subscriptions
+                .Where((s) => s.TopicSubscriptions.Any((ts) => ((ts.TopicId == topic.Id.Value) && ts.Enabled && (!ts.Filtered || CheckFilters(ts.Filters, headers)))))
+                .Distinct(); // Nessecary when one subscription has more than once topicsubscription for the same topic (probably with different filters)
+
+            try
+            {
+                var topicEvent = await _repoFactory.SafeExecAsync(r => r.PublishTopicEventAsync(newTopicEvent, topic.Log, subscriptionsMatching, deliveryDelayedUntilUtc), _safeExecOptions);
+                return topicEvent;
+            }
+            catch (Exception)
+            {
+                if (payloadId.HasValue)
                 {
-                    var eventNameHeader = headers.FirstOrDefault(h => h.Key.Equals("EventName", StringComparison.OrdinalIgnoreCase));
-                    if (eventNameHeader.Key != null)
-                        eventNameToUse = eventNameHeader.Value;
-                }
-
-                var utcNow = _dtProvider == DateTimeProvider.Repository ? await repo.GetNowUtcAsync().ConfigureAwait(false) : DateTime.UtcNow;
-
-                // Store topic event
-                var newTopicEvent = new TopicEvent
-                {
-                    TopicId = topic.Id.Value,
-                    EventName = eventNameToUse,
-                    PublicationDateUtc = publicationDateUtc.GetValueOrDefault(utcNow),
-                    FunctionalKey = functionalKey ?? string.Empty,
-                    Priority = priority,
-                    ExpirationDateUtc = expirationDateUtc.GetValueOrDefault(BaseEventingRepo.MaxDateTime),
-                    Headers = headers,
-                    PayloadId = payloadId,
-                };
-
-                // Determine for which subscriptions the topic must be published
-                var subscriptionsMatching = subscriptions
-                    .Where((s) => s.TopicSubscriptions.Any((ts) => ((ts.TopicId == topic.Id.Value) && ts.Enabled && (!ts.Filtered || CheckFilters(ts.Filters, headers)))))
-                    .Distinct(); // Nessecary when one subscription has more than once topicsubscription for the same topic (probably with different filters)
-
-                try
-                {
-                    var topicEvent = await repo.PublishTopicEventAsync(newTopicEvent, topic.Log, subscriptionsMatching, deliveryDelayedUntilUtc).ConfigureAwait(false);
-                    return topicEvent;
-                }
-                catch (Exception)
-                {
-                    if (payloadId.HasValue)
+                    try
                     {
-                        try
-                        {
-                            await repo.DeletePayloadAsync(payloadId.Value).ConfigureAwait(false);
-                        }
-                        catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
+                        await _repoFactory.SafeExecAsync(r => r.DeletePayloadAsync(payloadId.Value), SafeExecOptions.NoRetries); // Something went wrong, so don't bother retrying here
                     }
-
-                    throw;
+                    catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
                 }
+
+                throw;
             }
         }
 
-        public async Task<TopicEvent> PublishAsync<T>(string topicName, string eventName = null, DateTime? publicationDateUtc = default(DateTime?), DateTime? deliveryDelayedUntilUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, T payload = null) where T : class
+        public Task<TopicEvent> PublishAsync<T>(string topicName, string eventName = null, DateTime? publicationDateUtc = default(DateTime?), DateTime? deliveryDelayedUntilUtc = default(DateTime?), DateTime? expirationDateUtc = default(DateTime?), string functionalKey = null, int priority = 100, Dictionary<string, string> headers = null, T payload = null) where T : class
         {
             string payloadAsString = null;
             if (payload != null)
                 payloadAsString = JsonConvert.SerializeObject(payload); // No specific parameters: the consumer must understand the json as well
 
-            return await PublishAsync(topicName, eventName, publicationDateUtc, deliveryDelayedUntilUtc, expirationDateUtc, functionalKey, priority, headers, payloadAsString).ConfigureAwait(false);
+            return PublishAsync(topicName, eventName, publicationDateUtc, deliveryDelayedUntilUtc, expirationDateUtc, functionalKey, priority, headers, payloadAsString);
         }
 
         public async Task PerformHouseKeepingTasksAsync()
         {
-            using (var repo = _repoFactory.CreateRepo())
-                await repo.PerformHouseKeepingTasksAsync().ConfigureAwait(false);
+            await _repoFactory.SafeExecAsync(r => r.PerformHouseKeepingTasksAsync(), SafeExecOptions.NoRetries); // Just housekeeping, so no retries
         }
         #endregion
 
@@ -277,7 +270,8 @@ namespace Resonance
             }
             else
             {
-                topicCache.Set<Topic>(topic.Name, topic, _cacheDuration);
+                if (_cacheDuration != TimeSpan.Zero)
+                    topicCache.Set<Topic>(topic.Name, topic, _cacheDuration);
             }
             UpdateTopicSubscriptionsCache(topic.Id.Value, null); // Always invalidate subscriptions
         }
@@ -290,7 +284,8 @@ namespace Resonance
             }
             else
             {
-                topicSubscriptionCache.Set<List<Subscription>>(topicId, subs, _cacheDuration);
+                if (_cacheDuration != TimeSpan.Zero)
+                    topicSubscriptionCache.Set<List<Subscription>>(topicId, subs, _cacheDuration);
             }
         }
 
