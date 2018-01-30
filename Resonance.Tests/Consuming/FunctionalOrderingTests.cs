@@ -17,7 +17,7 @@ namespace Resonance.Tests.Consuming
         public FunctionalOrderingTests(EventingRepoFactoryFixture fixture)
         {
             _publisher = new EventPublisher(fixture.RepoFactory, DateTimeProvider.Repository);
-            _consumer = new EventConsumer(fixture.RepoFactory);
+            _consumer = new EventConsumer(fixture.RepoFactory, TimeSpan.Zero, SafeExecOptions.NoRetries);
         }
 
         [Fact]

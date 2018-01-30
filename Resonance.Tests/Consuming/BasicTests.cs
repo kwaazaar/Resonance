@@ -17,7 +17,7 @@ namespace Resonance.Tests.Consuming
         public BasicTests(EventingRepoFactoryFixture fixture)
         {
             _publisher = new EventPublisher(fixture.RepoFactory);
-            _consumer = new EventConsumer(fixture.RepoFactory);
+            _consumer = new EventConsumer(fixture.RepoFactory, TimeSpan.Zero, SafeExecOptions.NoRetries);
         }
 
         [Fact]

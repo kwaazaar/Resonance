@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Resonance.Repo.Database
 {
-    public class MsSqlEventingRepoFactory : IEventingRepoFactory
+    public class MsSqlEventingRepoFactory : BaseEventingRepoFactory, IEventingRepoFactory
     {
         private readonly string _connectionString;
         private readonly TimeSpan _commandTimeout;
@@ -36,7 +36,7 @@ namespace Resonance.Repo.Database
         /// Create a repository instance
         /// </summary>
         /// <returns></returns>
-        public IEventingRepo CreateRepo()
+        public override IEventingRepo CreateRepo()
         {
             return new MsSqlEventingRepo(new SqlConnection(_connectionString), _commandTimeout);
         }

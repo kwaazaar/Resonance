@@ -7,7 +7,7 @@ using MySql.Data.MySqlClient;
 
 namespace Resonance.Repo.Database
 {
-    public class MySqlEventingRepoFactory : IEventingRepoFactory
+    public class MySqlEventingRepoFactory : BaseEventingRepoFactory, IEventingRepoFactory
     {
         private readonly string _connectionString;
         private readonly int _maxRetriesOnDeadlock;
@@ -40,7 +40,7 @@ namespace Resonance.Repo.Database
         /// Creates a repository instance
         /// </summary>
         /// <returns></returns>
-        public IEventingRepo CreateRepo()
+        public override IEventingRepo CreateRepo()
         {
             return new MySqlEventingRepo(new MySqlConnection(_connectionString), _commandTimeout, _maxRetriesOnDeadlock);
         }
