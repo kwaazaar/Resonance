@@ -18,7 +18,7 @@ namespace Resonance.Demo
     {
         private const int WORKER_COUNT = 1; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
         private const bool BATCHED = false;
-        private const bool GENERATE_DATA = true; // Change to enable/disable the adding of data to the subscription
+        private const bool GENERATE_DATA = false; // Change to enable/disable the adding of data to the subscription
 
         private static IServiceProvider serviceProvider;
 
@@ -161,11 +161,11 @@ namespace Resonance.Demo
             // Add IConfiguration dependency (reason: allows access to config from any injected component)
             serviceCollection.AddSingleton<IConfiguration>(config);
 
-            ILoggerFactory loggerFactory = new LoggerFactory()
+            // Logging services
+            serviceCollection.AddSingleton<ILoggerFactory>(new LoggerFactory()
                 .AddConsole(LogLevel.Information)
-                .AddDebug(LogLevel.Trace);
-            serviceCollection.AddSingleton<ILoggerFactory>(loggerFactory);
-
+                .AddDebug(LogLevel.Trace));
+            serviceCollection.AddLogging();
 
             ConfigureRepoServices(serviceCollection, config); // Using the db-repo's doesn't have any api/web dependencies
         }
@@ -181,23 +181,24 @@ namespace Resonance.Demo
             if (useMySql)
             {
                 var connectionString = config.GetConnectionString("Resonance.MySql");
-                serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
-                {
-                    return new MySqlEventingRepoFactory(connectionString, commandTimeout, maxRetriesOnDeadlock);
-                });
+                serviceCollection.AddTransient<IEventingRepoFactory>((p) => new MySqlEventingRepoFactory(connectionString, commandTimeout, maxRetriesOnDeadlock));
             }
             else // MsSql
             {
                 var connectionString = config.GetConnectionString("Resonance.MsSql");
-                serviceCollection.AddTransient<IEventingRepoFactory>((p) =>
-                {
-                    return new MsSqlEventingRepoFactory(connectionString, commandTimeout); // Does not (yet) support MaxRetriesOnDeadlock
-                });
+                serviceCollection.AddTransient<IEventingRepoFactory>((p) => new MsSqlEventingRepoFactory(connectionString, commandTimeout)); // Does not (yet) support MaxRetriesOnDeadlock
             }
-            
-            // Configure EventPublisher and Consumer (their constructors require the above registered IEventingRepoFactory).
-            serviceCollection.AddTransient<IEventPublisherAsync, EventPublisher>();
-            serviceCollection.AddTransient<IEventConsumerAsync, EventConsumer>();
+
+            // Configure EventPublisher and Consumer
+            serviceCollection
+                .AddSingleton<SafeExecOptions>((p) => new SafeExecOptions(RetryPolicy.Default, (ex) =>
+                    {
+                        var logger = serviceProvider.GetService<ILogger<SafeExecOptions>>();
+                        if (logger != null)
+                            logger.LogWarning("Error while loading/saving events, action will be retried: {details}", ex.Message);
+                    }))
+                .AddTransient<IEventPublisherAsync>(p => new EventPublisher(p.GetService<IEventingRepoFactory>(), DateTimeProvider.Repository, TimeSpan.FromSeconds(30), p.GetService<SafeExecOptions>()))
+                .AddTransient<IEventConsumerAsync>(p => new EventConsumer(p.GetService<IEventingRepoFactory>(), TimeSpan.FromSeconds(30), p.GetService<SafeExecOptions>()));
         }
     }
 }
