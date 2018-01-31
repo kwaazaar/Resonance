@@ -10,7 +10,6 @@ namespace Resonance.Repo.Database
     public class MySqlEventingRepoFactory : BaseEventingRepoFactory, IEventingRepoFactory
     {
         private readonly string _connectionString;
-        private readonly int _maxRetriesOnDeadlock;
         private readonly TimeSpan _commandTimeout;
 
         /// <summary>
@@ -19,7 +18,7 @@ namespace Resonance.Repo.Database
         /// <param name="connectionString">Connectionstring to use</param>
         /// <remarks>A default connectiontimeout of 30 seconds will be used. On deadlock a maximum of one retry will be performed.</remarks>
         public MySqlEventingRepoFactory(string connectionString)
-            : this(connectionString, TimeSpan.FromSeconds(30), 1)
+            : this(connectionString, TimeSpan.FromSeconds(30))
         {
         }
 
@@ -28,12 +27,10 @@ namespace Resonance.Repo.Database
         /// </summary>
         /// <param name="connectionString">Connectionstring to use</param>
         /// <param name="commandTimeout">Commandtimeout to use</param>
-        /// <param name="maxRetriesOnDeadlock">Specifies the maximum number of retries to perform in case of a deadlock situation.</param>
-        public MySqlEventingRepoFactory(string connectionString, TimeSpan commandTimeout, int maxRetriesOnDeadlock)
+        public MySqlEventingRepoFactory(string connectionString, TimeSpan commandTimeout)
         {
             _connectionString = connectionString;
             _commandTimeout = commandTimeout;
-            _maxRetriesOnDeadlock = maxRetriesOnDeadlock;
         }
 
         /// <summary>
@@ -42,7 +39,7 @@ namespace Resonance.Repo.Database
         /// <returns></returns>
         public override IEventingRepo CreateRepo()
         {
-            return new MySqlEventingRepo(new MySqlConnection(_connectionString), _commandTimeout, _maxRetriesOnDeadlock);
+            return new MySqlEventingRepo(new MySqlConnection(_connectionString), _commandTimeout);
         }
     }
 }

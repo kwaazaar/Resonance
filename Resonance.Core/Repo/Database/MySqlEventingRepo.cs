@@ -10,35 +10,16 @@ using System.Threading.Tasks;
 
 namespace Resonance.Repo.Database
 {
-    //2627: Duplicate key
-    //1205: Deadlock victim
-
     public class MySqlEventingRepo : DbEventingRepo, IEventingRepo
     {
-        private readonly int _maxRetriesOnDeadlock;
-
         /// <summary>
-        /// Creates a new MsSqlEventingRepo.
-        /// Defaults to a maximum of 1 retries on a deadlock
-        /// </summary>
-        /// <param name="conn"></param>
-        /// <param name="commandTimeout">Commandtimeout to use</param>
-        public MySqlEventingRepo(MySqlConnection conn, TimeSpan commandTimeout)
-            : this(conn, commandTimeout, 1)
-        {
-        }
-
-        /// <summary>
-        /// Creates a new MsSqlEventingRepo.
+        /// Creates a new MySqlEventingRepo.
         /// </summary>
         /// <param name="conn">IDbConnection to use.</param>
         /// <param name="commandTimeout">Commandtimeout to use</param>
-        /// <param name="maxRetriesOnDeadlock">Maximum number of times to retry DB-calls when deadlocks occur.</param>
-        public MySqlEventingRepo(MySqlConnection conn, TimeSpan commandTimeout, int maxRetriesOnDeadlock)
+        public MySqlEventingRepo(MySqlConnection conn, TimeSpan commandTimeout)
             : base(conn, commandTimeout)
         {
-            if (maxRetriesOnDeadlock < 0) throw new ArgumentOutOfRangeException("maxRetriesOnDeadlock");
-
             // Check if AllowUserVariables is enabled
             var connStringBuilder = new MySqlConnectionStringBuilder(conn.ConnectionString);
             if (!connStringBuilder.AllowUserVariables)
@@ -49,8 +30,6 @@ namespace Resonance.Repo.Database
                     _conn.Close();
                 _conn.ConnectionString = connStringBuilder.ConnectionString;
             }
-
-            _maxRetriesOnDeadlock = maxRetriesOnDeadlock;
         }
 
         public override string GetLastAutoIncrementValue
@@ -71,15 +50,6 @@ namespace Resonance.Repo.Database
             {
                 throw new RepoException(dbEx);
             }
-        }
-
-        protected override bool CanRetry(DbException dbEx, int attempts)
-        {
-            var mysqlEx = dbEx as MySqlException;
-            if (mysqlEx != null && mysqlEx.Number == 1213 && attempts < (_maxRetriesOnDeadlock + 1)) // After x attempts give up deadlocks
-                return true;
-            else
-                return base.CanRetry(dbEx, attempts);
         }
 
         public override async Task<int> UpdateLastConsumedSubscriptionEvent(SubscriptionEvent subscriptionEvent)
@@ -211,127 +181,106 @@ namespace Resonance.Repo.Database
 
         private async Task<Int64?> TryLockNextSubscriptionEventAsync(Int64 subscriptionId, int visibilityTimeout, bool ordered, bool hasSurroundingTran)
         {
-            int attempt = 0;
-            bool canRetry = false;
+            var deliveryKey = Guid.NewGuid().ToString();
+            var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
+            var invisibleUntilUtc = utcNow.AddSeconds(visibilityTimeout);
 
-            do
+            try
             {
-                attempt++;
-                canRetry = false;
-
-                var deliveryKey = Guid.NewGuid().ToString();
-                var utcNow = await GetNowUtcAsync().ConfigureAwait(false);
-                var invisibleUntilUtc = utcNow.AddSeconds(visibilityTimeout);
-
-                try
+                if (!ordered)
                 {
-                    if (!ordered)
-                    {
-                        // Locking details for MySql: http://dev.mysql.com/doc/refman/5.7/en/innodb-locking-reads.html
-                        var query = "set @updatedSeId := 0;" +
-                            " update SubscriptionEvent se" +
-                            " join(" +
-                            "   select seInner.Id, seInner.DeliveryKey" +
-                            "   from SubscriptionEvent seInner" +
-                            "   join Subscription s on s.Id = seInner.SubscriptionId" +
-                            "   where seInner.SubscriptionId = @subscriptionId" +
-                            "   and seInner.DeliveryDelayedUntilUtc <= @utcNow" +
-                            "   and seInner.ExpirationDateUtc > @utcNow" +
-                            "   and seInner.InvisibleUntilUtc <= @utcNow" +
-                            "   and(s.MaxDeliveries = 0 OR s.MaxDeliveries > seInner.DeliveryCount)" +
-                            "   order by seInner.Priority ASC, seInner.PublicationDateUtc ASC" +
-                            "   limit 1) tmp on tmp.Id = se.Id and tmp.DeliveryKey = se.DeliveryKey" + // FOR UPDATE removed due to locking issues
-                            " set se.InvisibleUntilUtc = @invisibleUntilUtc," +
-                            " se.DeliveryCount = DeliveryCount + 1," +
-                            " se.DeliveryKey = @deliveryKey," +
-                            " se.DeliveryDateUtc = @utcNow," +
-                            " se.Id = (select @updatedSeId:= se.Id)" +
-                            " WHERE se.Id = tmp.Id AND se.DeliveryKey = tmp.DeliveryKey" + // Where is required, because FOR UPDATE is not used, thus no locks where aquired
-                            ";select @updatedSeId;";
+                    // Locking details for MySql: http://dev.mysql.com/doc/refman/5.7/en/innodb-locking-reads.html
+                    var query = "set @updatedSeId := 0;" +
+                        " update SubscriptionEvent se" +
+                        " join(" +
+                        "   select seInner.Id, seInner.DeliveryKey" +
+                        "   from SubscriptionEvent seInner" +
+                        "   join Subscription s on s.Id = seInner.SubscriptionId" +
+                        "   where seInner.SubscriptionId = @subscriptionId" +
+                        "   and seInner.DeliveryDelayedUntilUtc <= @utcNow" +
+                        "   and seInner.ExpirationDateUtc > @utcNow" +
+                        "   and seInner.InvisibleUntilUtc <= @utcNow" +
+                        "   and(s.MaxDeliveries = 0 OR s.MaxDeliveries > seInner.DeliveryCount)" +
+                        "   order by seInner.Priority ASC, seInner.PublicationDateUtc ASC" +
+                        "   limit 1) tmp on tmp.Id = se.Id and tmp.DeliveryKey = se.DeliveryKey" + // FOR UPDATE removed due to locking issues
+                        " set se.InvisibleUntilUtc = @invisibleUntilUtc," +
+                        " se.DeliveryCount = DeliveryCount + 1," +
+                        " se.DeliveryKey = @deliveryKey," +
+                        " se.DeliveryDateUtc = @utcNow," +
+                        " se.Id = (select @updatedSeId:= se.Id)" +
+                        " WHERE se.Id = tmp.Id AND se.DeliveryKey = tmp.DeliveryKey" + // Where is required, because FOR UPDATE is not used, thus no locks where aquired
+                        ";select @updatedSeId;";
 
-                        var sIds = await TranQueryAsync<Int64?>(query,
-                            new Dictionary<string, object>
-                            {
-                        { "@subscriptionId", subscriptionId },
-                        { "@utcNow", utcNow },
-                        { "@deliveryKey", deliveryKey },
-                        { "@invisibleUntilUtc", invisibleUntilUtc },
-                            }).ConfigureAwait(false);
+                    var sIds = await TranQueryAsync<Int64?>(query,
+                        new Dictionary<string, object>
+                        {
+                    { "@subscriptionId", subscriptionId },
+                    { "@utcNow", utcNow },
+                    { "@deliveryKey", deliveryKey },
+                    { "@invisibleUntilUtc", invisibleUntilUtc },
+                        }).ConfigureAwait(false);
 
-                        var sId = sIds.FirstOrDefault();
-                        // sId may be null/0, event though there are more events. See comment below.
-                        return (sId.HasValue && (sId.Value > 0)) ? sId.Value : default(Int64?);
-                    }
-                    else
-                    {
-                        var query = "set @updatedSeId := 0;" +
-                            " update SubscriptionEvent seOuter" +
-                            " join (" +
-                                " select      se.Id, se.DeliveryKey" +
-                                " from        subscriptionevent se" +
-                                " join subscription s on s.Id = se.SubscriptionId" +
-                                " left join	LastConsumedSubscriptionEvent lc" +
-                                "     on		lc.SubscriptionId = se.SubscriptionId" +
-                                "     and		lc.FunctionalKey = se.FunctionalKey" +
-                                " left join	SubscriptionEvent seInv" +
-                                "     on		seInv.SubscriptionId = se.SubscriptionId" +
-                                "     and		seInv.FunctionalKey = se.FunctionalKey" +
-                                "     and		seInv.InvisibleUntilUtc > @utcNow" +
-                                "     and		seInv.Id != se.Id" +
-                                " where		se.SubscriptionId = @subscriptionId" +
-                                "     and		seInv.Id IS NULL" +
-                                "     and		se.DeliveryDelayedUntilUtc <= @utcNow" +
-                                "     and		se.ExpirationDateUtc > @utcNow" +
-                                "     and		se.InvisibleUntilUtc <= @utcNow" +
-                                "     and		(	s.MaxDeliveries = 0" +
-                                "             OR	se.DeliveryCount < s.MaxDeliveries)" +
-                                "     and		(	(se.PublicationDateUtc >= lc.PublicationDateUtc)" +
-                                "              OR	lc.SubscriptionId IS NULL)" +
-                                " order by 	se.PublicationDateUtc ASC" + // Prio is ignored, since it makes no sense for ordered delivery (once a higher prio event is consumed, lower prio events with a earlier publicationdate are no longer processed)
-                                " limit 1" + // FOR UPDATE" + // FOR UPDATE locks all matching records, not restricted by the LIMIT 1
-                            " ) tmp on tmp.Id = seOuter.Id and tmp.DeliveryKey = seOuter.DeliveryKey" +
-                            " set seOuter.InvisibleUntilUtc = @invisibleUntilUtc," +
-                            "   seOuter.DeliveryCount = seOuter.DeliveryCount + 1," +
-                            "   seOuter.DeliveryKey = @deliveryKey," +
-                            "   seOuter.DeliveryDateUtc = @utcNow," +
-                            "   seOuter.Id = (select @updatedSeId := seOuter.Id)" +
-                            " WHERE seOuter.Id = tmp.Id AND seOuter.DeliveryKey = tmp.DeliveryKey" + // WHERE-clause is needed when FOR UPDATE is not used
-                            ";select @updatedSeId;";
-
-                        var sIds = await TranQueryAsync<Int64?>(query,
-                            new Dictionary<string, object>
-                            {
-                        { "@subscriptionId", subscriptionId },
-                        { "@utcNow", utcNow },
-                        { "@deliveryKey", deliveryKey },
-                        { "@invisibleUntilUtc", invisibleUntilUtc },
-                            }).ConfigureAwait(false);
-
-                        var sId = sIds.FirstOrDefault();
-
-                        // The update-statement (above) can fail (0 rows affected and @updatedSeId not set/still 0) when the found record was modified before it could be updated.
-                        // (we no longer actively lock (FOR UPDATE) because of its performance impact on large tables (>200K records)
-                        // This may occur under heavy load. We also cannot retry, because we cannot determine if this is the case: they may actually be no more events to process.
-                        // When using the EventConsumptionWorker, the result will be that it backs off (minBackoffDelayMs), which may usually relief the process shortly.
-                        return (sId.HasValue && (sId.Value > 0)) ? sId.Value : default(Int64?);
-                    }
+                    var sId = sIds.FirstOrDefault();
+                    // sId may be null/0, event though there are more events. See comment below.
+                    return (sId.HasValue && (sId.Value > 0)) ? sId.Value : default(Int64?);
                 }
-                catch (DbException dbEx)
+                else
                 {
-                    canRetry = !hasSurroundingTran // If in a surrounding transaction, this failed call cannot be retried
-                        && CanRetry(dbEx, attempt);
+                    var query = "set @updatedSeId := 0;" +
+                        " update SubscriptionEvent seOuter" +
+                        " join (" +
+                            " select      se.Id, se.DeliveryKey" +
+                            " from        subscriptionevent se" +
+                            " join subscription s on s.Id = se.SubscriptionId" +
+                            " left join	LastConsumedSubscriptionEvent lc" +
+                            "     on		lc.SubscriptionId = se.SubscriptionId" +
+                            "     and		lc.FunctionalKey = se.FunctionalKey" +
+                            " left join	SubscriptionEvent seInv" +
+                            "     on		seInv.SubscriptionId = se.SubscriptionId" +
+                            "     and		seInv.FunctionalKey = se.FunctionalKey" +
+                            "     and		seInv.InvisibleUntilUtc > @utcNow" +
+                            "     and		seInv.Id != se.Id" +
+                            " where		se.SubscriptionId = @subscriptionId" +
+                            "     and		seInv.Id IS NULL" +
+                            "     and		se.DeliveryDelayedUntilUtc <= @utcNow" +
+                            "     and		se.ExpirationDateUtc > @utcNow" +
+                            "     and		se.InvisibleUntilUtc <= @utcNow" +
+                            "     and		(	s.MaxDeliveries = 0" +
+                            "             OR	se.DeliveryCount < s.MaxDeliveries)" +
+                            "     and		(	(se.PublicationDateUtc >= lc.PublicationDateUtc)" +
+                            "              OR	lc.SubscriptionId IS NULL)" +
+                            " order by 	se.PublicationDateUtc ASC" + // Prio is ignored, since it makes no sense for ordered delivery (once a higher prio event is consumed, lower prio events with a earlier publicationdate are no longer processed)
+                            " limit 1" + // FOR UPDATE" + // FOR UPDATE locks all matching records, not restricted by the LIMIT 1
+                        " ) tmp on tmp.Id = seOuter.Id and tmp.DeliveryKey = seOuter.DeliveryKey" +
+                        " set seOuter.InvisibleUntilUtc = @invisibleUntilUtc," +
+                        "   seOuter.DeliveryCount = seOuter.DeliveryCount + 1," +
+                        "   seOuter.DeliveryKey = @deliveryKey," +
+                        "   seOuter.DeliveryDateUtc = @utcNow," +
+                        "   seOuter.Id = (select @updatedSeId := seOuter.Id)" +
+                        " WHERE seOuter.Id = tmp.Id AND seOuter.DeliveryKey = tmp.DeliveryKey" + // WHERE-clause is needed when FOR UPDATE is not used
+                        ";select @updatedSeId;";
 
-                    if (!canRetry)
-                    {
-                        if (attempt > 1) // Retries only occur when repo is busy and since retries happened, this is the cause
-                            throw new RepoException($"Repo-action failed after {attempt} attempts", dbEx, RepoError.TooBusy);
-                        else
-                            throw new RepoException(dbEx);
-                    }
+                    var sIds = await TranQueryAsync<Int64?>(query, new Dictionary<string, object>
+                        {
+                            { "@subscriptionId", subscriptionId },
+                            { "@utcNow", utcNow },
+                            { "@deliveryKey", deliveryKey },
+                            { "@invisibleUntilUtc", invisibleUntilUtc },
+                        }).ConfigureAwait(false);
+
+                    var sId = sIds.FirstOrDefault();
+
+                    // The update-statement (above) can fail (0 rows affected and @updatedSeId not set/still 0) when the found record was modified before it could be updated.
+                    // (we no longer actively lock (FOR UPDATE) because of its performance impact on large tables (>200K records)
+                    // This may occur under heavy load. We also cannot retry, because we cannot determine if this is the case: they may actually be no more events to process.
+                    // When using the EventConsumptionWorker, the result will be that it backs off (minBackoffDelayMs), which may usually relief the process shortly.
+                    return (sId.HasValue && (sId.Value > 0)) ? sId.Value : default(Int64?);
                 }
-            } while (canRetry);
-
-            return null; // Still no result after retrying, then just return null (give up).
+            }
+            catch (DbException dbEx)
+            {
+                throw new RepoException(dbEx);
+            }
         }
 
         public async Task PerformHouseKeepingTasksAsync()

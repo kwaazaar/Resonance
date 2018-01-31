@@ -8,7 +8,7 @@ namespace Resonance.Repo
     {
         public abstract IEventingRepo CreateRepo();
 
-        public async Task SafeExecAsync(Func<IEventingRepo, Task> repoAction, SafeExecOptions options)
+        public async Task InvokeFuncAsync(Func<IEventingRepo, Task> repoAction, InvokeOptions options)
         {
             int attempts = 0;
             bool success = false;
@@ -31,7 +31,7 @@ namespace Resonance.Repo
                         // pass the exeception to the erroraction (if any)
                         if (options.ErrorAction != null)
                         {
-                            SafeInvoke(() => options.ErrorAction(ex));
+                            SafeInvoke(() => options.ErrorAction(ex, attempts, options.RetryPolicy.Retries + 1));
                         }
 
                         // Backoff
@@ -48,7 +48,7 @@ namespace Resonance.Repo
             } while (!success && attempts < (options.RetryPolicy.Retries + 1));
         }
 
-        public async Task<T> SafeExecAsync<T>(Func<IEventingRepo, Task<T>> repoAction, SafeExecOptions options)
+        public async Task<T> InvokeFuncAsync<T>(Func<IEventingRepo, Task<T>> repoAction, InvokeOptions options)
         {
             T result = default(T);
 
@@ -73,7 +73,7 @@ namespace Resonance.Repo
                         // pass the exeception to the erroraction (if any)
                         if (options.ErrorAction != null)
                         {
-                            SafeInvoke(() => options.ErrorAction(ex));
+                            SafeInvoke(() => options.ErrorAction(ex, attempts, options.RetryPolicy.Retries + 1));
                         }
 
                         // Backoff

@@ -13,7 +13,7 @@ namespace Resonance
     {
         private readonly IEventingRepoFactory _repoFactory;
         private readonly TimeSpan _cacheDuration;
-        private readonly SafeExecOptions _safeExecOptions;
+        private readonly InvokeOptions _invokeOptions;
 
         protected static IMemoryCache subscriptionCache = new MemoryCache(new MemoryCacheOptions());
 
@@ -23,15 +23,15 @@ namespace Resonance
         }
 
         public EventConsumer(IEventingRepoFactory repoFactory, TimeSpan cacheDuration)
-            : this(repoFactory, cacheDuration, SafeExecOptions.Default)
+            : this(repoFactory, cacheDuration, InvokeOptions.Default)
         {
         }
 
-        public EventConsumer(IEventingRepoFactory repoFactory, TimeSpan cacheDuration, SafeExecOptions safeExecOptions)
+        public EventConsumer(IEventingRepoFactory repoFactory, TimeSpan cacheDuration, InvokeOptions invokeOptions)
         {
             _repoFactory = repoFactory;
             _cacheDuration = cacheDuration;
-            _safeExecOptions = safeExecOptions;
+            _invokeOptions = invokeOptions;
         }
 
         #region Sync
@@ -100,7 +100,7 @@ namespace Resonance
         #region Async
         public async Task<Subscription> AddOrUpdateSubscriptionAsync(Subscription subscription)
         {
-            var sub = await _repoFactory.SafeExecAsync<Subscription>(r => r.AddOrUpdateSubscriptionAsync(subscription), _safeExecOptions);
+            var sub = await _repoFactory.InvokeFuncAsync<Subscription>(r => r.AddOrUpdateSubscriptionAsync(subscription), _invokeOptions);
             UpdateSubscriptionCache(sub);
             return sub;
         }
@@ -110,21 +110,21 @@ namespace Resonance
             var sub = await GetSubscriptionAsync(id);
             if (sub != null)
             {
-                await _repoFactory.SafeExecAsync(r => r.DeleteSubscriptionAsync(id), _safeExecOptions);
+                await _repoFactory.InvokeFuncAsync(r => r.DeleteSubscriptionAsync(id), _invokeOptions);
                 UpdateSubscriptionCache(sub, deleted: true);
             }
         }
 
         public Task<Subscription> GetSubscriptionAsync(Int64 id)
         {
-            return _repoFactory.SafeExecAsync<Subscription>(r => r.GetSubscriptionAsync(id), _safeExecOptions);
+            return _repoFactory.InvokeFuncAsync<Subscription>(r => r.GetSubscriptionAsync(id), _invokeOptions);
         }
 
         public Task<Subscription> GetSubscriptionByNameAsync(string name)
         {
             var sub = subscriptionCache.GetOrCreateAsync<Subscription>(name, async (s) =>
             {
-                return await _repoFactory.SafeExecAsync(r => r.GetSubscriptionByNameAsync(name), _safeExecOptions);
+                return await _repoFactory.InvokeFuncAsync(r => r.GetSubscriptionByNameAsync(name), _invokeOptions);
             });
 
             return sub;
@@ -132,12 +132,12 @@ namespace Resonance
 
         public Task<IEnumerable<Subscription>> GetSubscriptionsAsync(Int64? topicId = null)
         {
-            return _repoFactory.SafeExecAsync(r => r.GetSubscriptionsAsync(topicId), _safeExecOptions);
+            return _repoFactory.InvokeFuncAsync(r => r.GetSubscriptionsAsync(topicId), _invokeOptions);
         }
 
         public Task<IEnumerable<SubscriptionSummary>> GetSubscriptionStatisticsAsync(DateTime periodStartUtc, DateTime periodEndUtc)
         {
-            return _repoFactory.SafeExecAsync(r => r.GetSubscriptionStatisticsAsync(periodStartUtc, periodEndUtc), _safeExecOptions);
+            return _repoFactory.InvokeFuncAsync(r => r.GetSubscriptionStatisticsAsync(periodStartUtc, periodEndUtc), _invokeOptions);
         }
 
         public async Task<IEnumerable<ConsumableEvent>> ConsumeNextAsync(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
@@ -145,7 +145,7 @@ namespace Resonance
             var sub = await GetSubscriptionByNameAsync(subscriptionName).ConfigureAwait(false);
             if (sub == null) throw new ArgumentException($"No subscription with this name exists: {subscriptionName}");
 
-            return await _repoFactory.SafeExecAsync(r => r.ConsumeNextAsync(sub, visibilityTimeout, maxCount), _safeExecOptions);
+            return await _repoFactory.InvokeFuncAsync(r => r.ConsumeNextAsync(sub, visibilityTimeout, maxCount), _invokeOptions);
         }
 
         public async Task<IEnumerable<ConsumableEvent<T>>> ConsumeNextAsync<T>(string subscriptionName, int visibilityTimeout = 120, int maxCount = 1)
@@ -172,22 +172,22 @@ namespace Resonance
 
         public Task MarkConsumedAsync(IEnumerable<ConsumableEventId> consumableEventsIds, bool transactional = true)
         {
-            return _repoFactory.SafeExecAsync(r => r.MarkConsumedAsync(consumableEventsIds, transactional), _safeExecOptions);
+            return _repoFactory.InvokeFuncAsync(r => r.MarkConsumedAsync(consumableEventsIds, transactional), _invokeOptions);
         }
 
         public Task MarkConsumedAsync(Int64 id, string deliveryKey)
         {
-            return _repoFactory.SafeExecAsync(r => r.MarkConsumedAsync(id, deliveryKey), _safeExecOptions);
+            return _repoFactory.InvokeFuncAsync(r => r.MarkConsumedAsync(id, deliveryKey), _invokeOptions);
         }
 
         public Task MarkFailedAsync(Int64 id, string deliveryKey, Reason reason)
         {
-            return _repoFactory.SafeExecAsync(r => r.MarkFailedAsync(id, deliveryKey, reason), _safeExecOptions);
+            return _repoFactory.InvokeFuncAsync(r => r.MarkFailedAsync(id, deliveryKey, reason), _invokeOptions);
         }
 
         public Task PerformHouseKeepingTasksAsync()
         {
-            return _repoFactory.SafeExecAsync(r => r.PerformHouseKeepingTasksAsync(), SafeExecOptions.NoRetries); // No retries desired here
+            return _repoFactory.InvokeFuncAsync(r => r.PerformHouseKeepingTasksAsync(), InvokeOptions.NoRetries); // No retries desired here
         }
         #endregion
 

@@ -17,8 +17,8 @@ namespace Resonance.Tests.Consuming
 
         public SubscriptionTests(EventingRepoFactoryFixture fixture)
         {
-            _publisher = new EventPublisher(fixture.RepoFactory, DateTimeProvider.Repository, TimeSpan.Zero, SafeExecOptions.NoRetries);
-            _consumer = new EventConsumer(fixture.RepoFactory, TimeSpan.Zero, SafeExecOptions.NoRetries);
+            _publisher = new EventPublisher(fixture.RepoFactory, DateTimeProvider.Repository, TimeSpan.Zero, InvokeOptions.NoRetries);
+            _consumer = new EventConsumer(fixture.RepoFactory, TimeSpan.Zero, InvokeOptions.NoRetries);
             _fixture = fixture;
         }
 

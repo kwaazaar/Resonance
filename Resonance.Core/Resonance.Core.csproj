@@ -2,15 +2,15 @@
 
   <PropertyGroup>
     <Description>Eventing library, with support for MsSql and MySql. Ideal for implementing, eventdriven architectures, pub-sub, microservices, etc.</Description>
-    <Copyright>Copyright 2017 - Robert te Kaat</Copyright>
+    <Copyright>Copyright 2018 - Robert te Kaat</Copyright>
     <AssemblyTitle>Resonance</AssemblyTitle>
-    <VersionPrefix>0.8.6</VersionPrefix>
+    <VersionPrefix>0.9.0</VersionPrefix>
     <Authors>Robert te Kaat</Authors>
     <TargetFrameworks>netstandard1.3;netstandard2.0;net461</TargetFrameworks>
     <AssemblyName>Resonance.Core</AssemblyName>
     <PackageId>Resonance.Core</PackageId>
     <PackageTags>pub;sub;esb;queue;topic;subscription;microservice;messaging;event;publish;subscribe;servicebus;mssql;mysql;mariadb;netcore</PackageTags>
-    <PackageReleaseNotes>Small index improvement (MsSql database) and fix for Dispose-implementation (NullReferenceException)</PackageReleaseNotes>
+    <PackageReleaseNotes>Retry policy for all functionality (defaults to 3 retries).</PackageReleaseNotes>
     <PackageIconUrl>https://raw.githubusercontent.com/kwaazaar/Resonance/master/Resonance-Icon-64x64.png</PackageIconUrl>
     <PackageProjectUrl>https://github.com/kwaazaar/Resonance</PackageProjectUrl>
     <PackageLicenseUrl>https://raw.githubusercontent.com/kwaazaar/Resonance/master/LICENSE</PackageLicenseUrl>
@@ -22,9 +22,9 @@
     <GenerateAssemblyTitleAttribute>false</GenerateAssemblyTitleAttribute>
     <GenerateAssemblyDescriptionAttribute>false</GenerateAssemblyDescriptionAttribute>
     <GenerateAssemblyCopyrightAttribute>false</GenerateAssemblyCopyrightAttribute>
-    <Version>0.8.7</Version>
-    <AssemblyVersion>0.8.0.0</AssemblyVersion>
-    <FileVersion>0.8.7.0</FileVersion>
+    <Version>0.9.0</Version>
+    <AssemblyVersion>0.9.0.0</AssemblyVersion>
+    <FileVersion>0.9.0.0</FileVersion>
     <RootNamespace>Resonance</RootNamespace>
   </PropertyGroup>
 
@@ -34,6 +34,12 @@
 
   <ItemGroup>
     <None Update="content\ResonanceDB.MsSql.sql;content\ResonanceDB.MySql.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="content\SubscriptionSummary.MsSql.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="content\SubscriptionSummary.MySql.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="readme.txt">

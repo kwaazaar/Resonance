@@ -1,5 +1,5 @@
 image: Visual Studio 2017
-version: 0.8.7.{build}
+version: 0.9.0.{build}
 services:
 - mssql2016
 - mysql

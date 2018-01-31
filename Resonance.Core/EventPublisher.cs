@@ -14,7 +14,7 @@ namespace Resonance
         private readonly IEventingRepoFactory _repoFactory;
         private readonly DateTimeProvider _dtProvider;
         private readonly TimeSpan _cacheDuration;
-        private readonly SafeExecOptions _safeExecOptions;
+        private readonly InvokeOptions _invokeOptions;
 
         protected static IMemoryCache topicCache = new MemoryCache(new MemoryCacheOptions());
         protected static IMemoryCache topicSubscriptionCache = new MemoryCache(new MemoryCacheOptions());
@@ -30,16 +30,16 @@ namespace Resonance
         }
 
         public EventPublisher(IEventingRepoFactory repoFactory, DateTimeProvider dtProvider, TimeSpan cacheDuration)
-            : this(repoFactory, dtProvider, cacheDuration, SafeExecOptions.Default)
+            : this(repoFactory, dtProvider, cacheDuration, InvokeOptions.Default)
         {
         }
 
-        public EventPublisher(IEventingRepoFactory repoFactory, DateTimeProvider dtProvider, TimeSpan cacheDuration, SafeExecOptions safeExecOptions)
+        public EventPublisher(IEventingRepoFactory repoFactory, DateTimeProvider dtProvider, TimeSpan cacheDuration, InvokeOptions invokeOptions)
         {
             _repoFactory = repoFactory;
             _dtProvider = dtProvider;
             _cacheDuration = cacheDuration;
-            _safeExecOptions = safeExecOptions;
+            _invokeOptions = invokeOptions;
         }
 
         #region Sync
@@ -87,7 +87,7 @@ namespace Resonance
         #region Async
         public async Task<Topic> AddOrUpdateTopicAsync(Topic topic)
         {
-            var newTopic = await _repoFactory.SafeExecAsync(r => r.AddOrUpdateTopicAsync(topic), _safeExecOptions);
+            var newTopic = await _repoFactory.InvokeFuncAsync(r => r.AddOrUpdateTopicAsync(topic), _invokeOptions);
             UpdateTopicCache(newTopic);
             return newTopic;
         }
@@ -97,21 +97,21 @@ namespace Resonance
             var topic = await GetTopicAsync(id).ConfigureAwait(false);
             if (topic != null)
             {
-                await _repoFactory.SafeExecAsync(r => r.DeleteTopicAsync(id, inclSubscriptions), _safeExecOptions);
+                await _repoFactory.InvokeFuncAsync(r => r.DeleteTopicAsync(id, inclSubscriptions), _invokeOptions);
                 UpdateTopicCache(topic, deleted: true);
             }
         }
 
         public Task<Topic> GetTopicAsync(Int64 id)
         {
-            return _repoFactory.SafeExecAsync(r => r.GetTopicAsync(id), _safeExecOptions);
+            return _repoFactory.InvokeFuncAsync(r => r.GetTopicAsync(id), _invokeOptions);
         }
 
         public Task<Topic> GetTopicByNameAsync(string name)
         {
             var topic = topicCache.GetOrCreateAsync<Topic>(name, async (t) =>
             {
-                return await _repoFactory.SafeExecAsync(r => r.GetTopicByNameAsync(name), _safeExecOptions);
+                return await _repoFactory.InvokeFuncAsync(r => r.GetTopicByNameAsync(name), _invokeOptions);
             });
 
             return topic;
@@ -119,14 +119,14 @@ namespace Resonance
 
         public Task<IEnumerable<Topic>> GetTopicsAsync(string partOfName = null)
         {
-            return _repoFactory.SafeExecAsync(r => r.GetTopicsAsync(partOfName), _safeExecOptions);
+            return _repoFactory.InvokeFuncAsync(r => r.GetTopicsAsync(partOfName), _invokeOptions);
         }
 
         private Task<List<Subscription>> GetTopicSubscriptionsAsync(Int64 topicId)
         {
             var subs = topicSubscriptionCache.GetOrCreateAsync<List<Subscription>>(topicId, async (t) =>
             {
-                return (await _repoFactory.SafeExecAsync(r => r.GetSubscriptionsAsync(topicId: topicId), _safeExecOptions)).ToList();
+                return (await _repoFactory.InvokeFuncAsync(r => r.GetSubscriptionsAsync(topicId: topicId), _invokeOptions)).ToList();
             });
 
             return subs;
@@ -139,7 +139,7 @@ namespace Resonance
                 throw new ArgumentException($"Topic with name {topicName} not found", "topicName");
 
             // Store payload (outside transaction, no need to lock right now already)
-            var payloadId = (payload != null) ? await _repoFactory.SafeExecAsync(r => r.StorePayloadAsync(payload), _safeExecOptions) : default(Int64?);
+            var payloadId = (payload != null) ? await _repoFactory.InvokeFuncAsync(r => r.StorePayloadAsync(payload), _invokeOptions) : default(Int64?);
 
             var subscriptions = await GetTopicSubscriptionsAsync(topic.Id.Value).ConfigureAwait(false);
 
@@ -151,7 +151,7 @@ namespace Resonance
                     eventNameToUse = eventNameHeader.Value;
             }
 
-            var utcNow = _dtProvider == DateTimeProvider.Repository ? await _repoFactory.SafeExecAsync(r => r.GetNowUtcAsync(), _safeExecOptions) : DateTime.UtcNow;
+            var utcNow = _dtProvider == DateTimeProvider.Repository ? await _repoFactory.InvokeFuncAsync(r => r.GetNowUtcAsync(), _invokeOptions) : DateTime.UtcNow;
 
             // Store topic event
             var newTopicEvent = new TopicEvent
@@ -173,7 +173,7 @@ namespace Resonance
 
             try
             {
-                var topicEvent = await _repoFactory.SafeExecAsync(r => r.PublishTopicEventAsync(newTopicEvent, topic.Log, subscriptionsMatching, deliveryDelayedUntilUtc), _safeExecOptions);
+                var topicEvent = await _repoFactory.InvokeFuncAsync(r => r.PublishTopicEventAsync(newTopicEvent, topic.Log, subscriptionsMatching, deliveryDelayedUntilUtc), _invokeOptions);
                 return topicEvent;
             }
             catch (Exception)
@@ -182,7 +182,7 @@ namespace Resonance
                 {
                     try
                     {
-                        await _repoFactory.SafeExecAsync(r => r.DeletePayloadAsync(payloadId.Value), SafeExecOptions.NoRetries); // Something went wrong, so don't bother retrying here
+                        await _repoFactory.InvokeFuncAsync(r => r.DeletePayloadAsync(payloadId.Value), InvokeOptions.NoRetries); // Something went wrong, so don't bother retrying here
                     }
                     catch (Exception) { } // Don't bother, not too much of a problem (just a little storage lost)
                 }
@@ -202,7 +202,7 @@ namespace Resonance
 
         public async Task PerformHouseKeepingTasksAsync()
         {
-            await _repoFactory.SafeExecAsync(r => r.PerformHouseKeepingTasksAsync(), SafeExecOptions.NoRetries); // Just housekeeping, so no retries
+            await _repoFactory.InvokeFuncAsync(r => r.PerformHouseKeepingTasksAsync(), InvokeOptions.NoRetries); // Just housekeeping, so no retries
         }
         #endregion
 

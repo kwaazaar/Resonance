@@ -16,9 +16,9 @@ namespace Resonance.Demo
 {
     public class Program
     {
-        private const int WORKER_COUNT = 1; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
+        private const int WORKER_COUNT = 2; // Multiple parallel workers, to make sure any issues related to parallellisation occur, if any.
         private const bool BATCHED = false;
-        private const bool GENERATE_DATA = false; // Change to enable/disable the adding of data to the subscription
+        private const bool GENERATE_DATA = true; // Change to enable/disable the adding of data to the subscription
 
         private static IServiceProvider serviceProvider;
 
@@ -175,30 +175,33 @@ namespace Resonance.Demo
             // Configure IEventingRepoFactory dependency (reason: the repo that must be used in this app)
             var dbType = config["Resonance:Repo:Database:Type"];
             var useMySql = (dbType == null || dbType.Equals("MySql", StringComparison.OrdinalIgnoreCase)); // Anything else than MySql is considered MsSql
-            var maxRetriesOnDeadlock = int.Parse(config["Resonance:Repo:Database:MaxRetriesOnDeadlock"]);
             var commandTimeout = TimeSpan.FromSeconds(int.Parse(config["Resonance:Repo:Database:CommandTimeout"]));
 
             if (useMySql)
             {
                 var connectionString = config.GetConnectionString("Resonance.MySql");
-                serviceCollection.AddTransient<IEventingRepoFactory>((p) => new MySqlEventingRepoFactory(connectionString, commandTimeout, maxRetriesOnDeadlock));
+                serviceCollection.AddTransient<IEventingRepoFactory>((p) => new MySqlEventingRepoFactory(connectionString, commandTimeout));
             }
             else // MsSql
             {
                 var connectionString = config.GetConnectionString("Resonance.MsSql");
-                serviceCollection.AddTransient<IEventingRepoFactory>((p) => new MsSqlEventingRepoFactory(connectionString, commandTimeout)); // Does not (yet) support MaxRetriesOnDeadlock
+                serviceCollection.AddTransient<IEventingRepoFactory>((p) => new MsSqlEventingRepoFactory(connectionString, commandTimeout));
             }
 
             // Configure EventPublisher and Consumer
+            var maxRetries = int.Parse(config["Resonance:RetryPolicy:MaxRetries"]);
+            var initialBackoffMs = double.Parse(config["Resonance:RetryPolicy:InitialBackoffMs"]);
+            var incrBackoff = (config["Resonance:RetryPolicy:IncrBackoff"] ?? string.Empty).Equals(Boolean.TrueString, StringComparison.OrdinalIgnoreCase);
+            var retryPolicy = new RetryPolicy(maxRetries, TimeSpan.FromMilliseconds(initialBackoffMs), incrBackoff);
             serviceCollection
-                .AddSingleton<SafeExecOptions>((p) => new SafeExecOptions(RetryPolicy.Default, (ex) =>
+                .AddSingleton<InvokeOptions>((p) => new InvokeOptions(retryPolicy, (ex, attempt, maxAttempts) =>
                     {
-                        var logger = serviceProvider.GetService<ILogger<SafeExecOptions>>();
+                        var logger = serviceProvider.GetService<ILogger<InvokeOptions>>();
                         if (logger != null)
-                            logger.LogWarning("Error while loading/saving events, action will be retried: {details}", ex.Message);
+                            logger.LogWarning("Error while loading/saving events ({attempt} out of {maxAttempts}), action will be retried: {details}", attempt, maxAttempts, ex.Message);
                     }))
-                .AddTransient<IEventPublisherAsync>(p => new EventPublisher(p.GetService<IEventingRepoFactory>(), DateTimeProvider.Repository, TimeSpan.FromSeconds(30), p.GetService<SafeExecOptions>()))
-                .AddTransient<IEventConsumerAsync>(p => new EventConsumer(p.GetService<IEventingRepoFactory>(), TimeSpan.FromSeconds(30), p.GetService<SafeExecOptions>()));
+                .AddTransient<IEventPublisherAsync>(p => new EventPublisher(p.GetService<IEventingRepoFactory>(), DateTimeProvider.Repository, TimeSpan.FromSeconds(30), p.GetService<InvokeOptions>()))
+                .AddTransient<IEventConsumerAsync>(p => new EventConsumer(p.GetService<IEventingRepoFactory>(), TimeSpan.FromSeconds(30), p.GetService<InvokeOptions>()));
         }
     }
 }
