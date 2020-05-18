@@ -50,7 +50,7 @@
 
   <ItemGroup>
     <PackageReference Include="MySqlConnector" Version="0.35.0" />
-    <PackageReference Include="Dapper" Version="1.50.4" />
+    <PackageReference Include="Dapper" Version="2.0.35" />
     <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
   </ItemGroup>
 
