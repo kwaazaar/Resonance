@@ -1,3 +1,5 @@
+## Warning: this project is no longer maintained ##
+
 ![Resonance](https://github.com/kwaazaar/Resonance/blob/master/Resonance-Icon-64x64.png "Resonance") [![Build status](https://ci.appveyor.com/api/projects/status/3wu0str4v3e8hgx4/branch/master?svg=true)](https://ci.appveyor.com/project/RobertTeKaat/resonance/branch/master) [![NuGet](https://img.shields.io/nuget/v/Resonance.Core.svg?maxAge=300)](https://www.nuget.org/packages/Resonance.Core/) [![Docker Pulls](https://img.shields.io/docker/pulls/kwaazaar/resonance.svg)](https://hub.docker.com/r/kwaazaar/resonance/)
 #Resonance
 Messaging library, with support for MsSql and MySql. Ideal for implementing pub/sub messaging for distributing (business) events for example in microservices architectures (eventual consistency), etc.
